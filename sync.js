@@ -101,7 +101,7 @@ async function cloudLogout() {
 
 /* ---- dane (dokument backups/{uid}: json = cała baza apki, updatedAt, xlsx = plik Excel) ---- */
 const plural = (n, one, few, many) => n + ' ' + (n === 1 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? few : many);
-const hasLocalData = () => S.weights.length || S.workouts.length || S.plans.length || S.fav.length || (S.custom || []).length;
+const hasLocalData = () => S.weights.length || S.workouts.length || S.plans.length || S.fav.length || (S.custom || []).length || (S.measures || []).length;
 async function blobToB64(blob) {
   const u8 = new Uint8Array(await blob.arrayBuffer()); let s = '';
   for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
@@ -194,8 +194,8 @@ async function sendVerifyEmail() {
 async function refreshTokenNow() { if (SY.session) { SY.session.expiresAt = 0; await idToken(); } }
 function adoptRemote(data) {
   const keepActive = S.active;
-  S = Object.assign({ profile: { height: null, goalLoss: null }, weights: [], workouts: [], active: null, custom: [], fav: [], plans: [] }, data);
-  ['weights', 'workouts', 'custom', 'fav', 'plans'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
+  S = Object.assign({ profile: { height: null, goalLoss: null }, weights: [], workouts: [], active: null, custom: [], fav: [], plans: [], measures: [] }, data);
+  ['weights', 'workouts', 'custom', 'fav', 'plans', 'measures'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
   if (!S.active && keepActive) S.active = keepActive;
   save(true); rebuildExMap(); UI.cw = newFilter();
   if ($('#sheet').hidden) rerender();

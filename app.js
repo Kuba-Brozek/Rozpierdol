@@ -19,10 +19,11 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? null : n; };
 
 /* ============ Stan ============ */
-let S = { profile: { height: null, goalLoss: null }, weights: [], workouts: [], active: null, custom: [], fav: [], plans: [] };
+let S = { profile: { height: null, goalLoss: null }, weights: [], workouts: [], active: null, custom: [], fav: [], plans: [], measures: [] };
 try { const s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s) S = Object.assign(S, s); } catch (e) {}
 if (!Array.isArray(S.fav)) S.fav = [];
 if (!Array.isArray(S.plans)) S.plans = [];
+if (!Array.isArray(S.measures)) S.measures = [];
 const isFav = id => S.fav.includes(id);
 function toggleFav(id) {
   if (isFav(id)) S.fav = S.fav.filter(x => x !== id); else S.fav.push(id);
@@ -109,7 +110,7 @@ function setTab(t) {
   window.scrollTo(0, 0);
 }
 function rerender() {
-  ({ dieta: renderDieta, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
+  ({ dieta: renderDieta, cialo: renderCialo, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
 }
 $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 
@@ -493,6 +494,16 @@ function interpretBook(sheets) {
     }
     res.plans = [...byPlan.values()];
   }
+  const ms = find('POMIARY', 'POMIARY CIALA');
+  if (ms) {
+    const hdr = {}; MEAS.forEach(m => hdr[normTxt(`${m.l} (${measUnit(m)})`)] = m.k);
+    res.measures = sheetTable(ms.cells).map(r => {
+      const d = parseDateCell(r['DATA']); if (!d) return null;
+      const v = {};
+      for (const [h, val] of Object.entries(r)) { const k = hdr[h]; const n = typeof val === 'number' ? val : num(val); if (k && n != null && n > 0) v[k] = Math.round(n * 10) / 10; }
+      return Object.keys(v).length ? { d, v } : null;
+    }).filter(Boolean);
+  }
   return res;
 }
 // Wspólne łączenie danych: import z Excela i synchronizacja z chmurą.
@@ -522,11 +533,16 @@ function applyData(R, replace) {
     if (replace) S.fav = [];
     R.fav.forEach(id => { if (!S.fav.includes(id)) S.fav.push(id); });
   }
+  if (R.measures) {
+    if (replace) S.measures = [];
+    R.measures.forEach(m => { const i = S.measures.findIndex(x => x.d === m.d); if (i >= 0) S.measures[i] = { d: m.d, v: Object.assign({}, S.measures[i].v, m.v) }; else S.measures.push({ d: m.d, v: Object.assign({}, m.v) }); });
+    sortMeasures();
+  }
 }
 // Pełny stan apki → format dla applyData
 const stateAsData = d => ({
   diet: d.weights && d.weights.length ? { rows: d.weights, height: d.profile && d.profile.height, goal: d.profile && d.profile.goalLoss } : null,
-  workouts: d.workouts || [], plans: d.plans || [], fav: d.fav || [], custom: d.custom || [],
+  workouts: d.workouts || [], plans: d.plans || [], fav: d.fav || [], custom: d.custom || [], measures: d.measures || [],
 });
 async function onXlsxPicked(ev) {
   const file = ev.target.files && ev.target.files[0]; ev.target.value = '';
@@ -537,14 +553,14 @@ async function onXlsxPicked(ev) {
       const j = JSON.parse(await file.text());
       if (!j || j.app !== 'postep' || !j.data) throw new Error('To nie jest plik kopii z tej apki.');
       const d = j.data;
-      R = { diet: d.weights && d.weights.length ? { rows: d.weights, height: d.profile && d.profile.height, goal: d.profile && d.profile.goalLoss } : null, workouts: d.workouts || null, fav: d.fav || null, custom: d.custom || null, plans: d.plans || null };
+      R = { diet: d.weights && d.weights.length ? { rows: d.weights, height: d.profile && d.profile.height, goal: d.profile && d.profile.goalLoss } : null, workouts: d.workouts || null, fav: d.fav || null, custom: d.custom || null, plans: d.plans || null, measures: d.measures || null };
     } else {
       R = interpretBook(await readXlsxBook(file));
     }
-    if (!(R.diet && R.diet.rows.length) && !(R.workouts && R.workouts.length) && !(R.fav && R.fav.length) && !(R.plans && R.plans.length)) throw new Error('Nie znalazłem w pliku pomiarów wagi ani treningów. Arkusz z wagą powinien mieć nagłówki DATA i WAGA.');
+    if (!(R.diet && R.diet.rows.length) && !(R.workouts && R.workouts.length) && !(R.fav && R.fav.length) && !(R.plans && R.plans.length) && !(R.measures && R.measures.length)) throw new Error('Nie znalazłem w pliku pomiarów wagi ani treningów. Arkusz z wagą powinien mieć nagłówki DATA i WAGA.');
   } catch (e) { openSheet('Nie udało się wczytać pliku', `<p>${esc(e.message || e)}</p><button class="btn block" data-close type="button">OK</button>`); return; }
   const rows = R.diet ? R.diet.rows : [];
-  const hasAny = S.weights.length || S.workouts.length || S.fav.length || S.plans.length;
+  const hasAny = S.weights.length || S.workouts.length || S.fav.length || S.plans.length || S.measures.length;
   const row = (k, v) => `<div class="row"><span>${k}</span><b class="num" style="text-align:right">${v}</b></div>`;
   openSheet('Wczytaj z Excela', `
     <div class="card">
@@ -554,6 +570,7 @@ async function onXlsxPicked(ev) {
       ${R.diet && R.diet.goal ? row('Cel do zrzucenia', fmt(R.diet.goal, 1) + ' kg') : ''}
       ${R.workouts ? row('Treningi', R.workouts.length) : ''}
       ${R.plans ? row('Plany treningowe', R.plans.length) : ''}
+      ${R.measures ? row('Pomiary ciała', R.measures.length) : ''}
       ${R.fav ? row('Ulubione ćwiczenia', R.fav.length) : ''}
       ${R.custom && R.custom.length ? row('Własne ćwiczenia', R.custom.length) : ''}
     </div>
@@ -566,7 +583,7 @@ async function onXlsxPicked(ev) {
       const a = e.target.closest('[data-imp]'); if (!a) return;
       applyData(R, a.dataset.imp === 'replace');
       save(); rebuildExMap(); closeSheet();
-      const parts = [rows.length && `${rows.length} pomiarów`, R.workouts && R.workouts.length && `${R.workouts.length} treningów`, R.plans && R.plans.length && `${R.plans.length} planów`, R.fav && R.fav.length && `${R.fav.length} ulubionych`].filter(Boolean);
+      const parts = [rows.length && `${rows.length} pomiarów`, R.workouts && R.workouts.length && `${R.workouts.length} treningów`, R.plans && R.plans.length && `${R.plans.length} planów`, R.measures && R.measures.length && `${R.measures.length} pomiarów ciała`, R.fav && R.fav.length && `${R.fav.length} ulubionych`].filter(Boolean);
       toast('Wczytano: ' + parts.join(', '));
       UI.cw = newFilter();
       setTab(UI.tab === 'wiecej' ? 'wiecej' : 'dieta');
@@ -652,10 +669,12 @@ function backupXlsx() {
   S.plans.forEach(p => p.ex.forEach((e, i) => plans.push([p.name, p.id, i + 1, exName(EXMAP[e.id]), e.id, e.sets])));
   const fav = [[H('ID ĆWICZENIA'), H('NAZWA')], ...S.fav.map(id => [id, exName(EXMAP[id])])];
   const own = [[H('ID'), H('NAZWA'), H('PARTIA'), H('RODZAJ')], ...(S.custom || []).map(c => [c.id, c.n, (c.m || [])[0] || '', c.c || 'strength'])];
+  const meas = [[H('DATA'), ...MEAS.map(m => H(`${m.l} (${measUnit(m)})`))], ...S.measures.map(x => [{ d: x.d }, ...MEAS.map(m => x.v[m.k] != null ? N1(x.v[m.k]) : null)])];
   return buildXlsx([
     { name: 'DIETA', rows: diet, widths: [8, 12, 9, 9, 13, 20, 9, 10, 20, 8, 24] },
     { name: 'TRENINGI', rows: tr, widths: [12, 14, 38, 34, 7, 10, 11, 18] },
     { name: 'PLANY', rows: plans, widths: [18, 16, 11, 38, 34, 8] },
+    { name: 'POMIARY', rows: meas, widths: [12, ...MEAS.map(() => 16)] },
     { name: 'ULUBIONE', rows: fav, widths: [34, 38] },
     { name: 'WŁASNE ĆWICZENIA', rows: own, widths: [16, 34, 14, 10] },
   ]);
@@ -985,6 +1004,107 @@ function pickExercise(onPick, title = 'Dodaj ćwiczenie', onBack = null) {
   SHEET_BACK = onBack;
 }
 
+/* ============ POMIARY CIAŁA ============ */
+// d = data, v = { klucz: wartość }; obwody w cm, tkanka tłuszczowa w %
+const MEAS = [
+  { k: 'neck', l: 'Szyja' }, { k: 'chest', l: 'Klatka' }, { k: 'arm', l: 'Ramię (biceps)' },
+  { k: 'waist', l: 'Talia', less: true }, { k: 'belly', l: 'Brzuch (pępek)', less: true }, { k: 'hips', l: 'Biodra', less: true },
+  { k: 'thigh', l: 'Udo' }, { k: 'calf', l: 'Łydka' }, { k: 'fat', l: 'Tkanka tłuszczowa', u: '%', less: true },
+];
+const measUnit = m => m.u || 'cm';
+function sortMeasures() { S.measures.sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : 0); }
+const measSeries = k => S.measures.filter(x => x.v && x.v[k] != null).map(x => ({ d: x.d, w: x.v[k] }));
+function lastMeas(k, beforeDate) {
+  for (let i = S.measures.length - 1; i >= 0; i--) { const x = S.measures[i]; if ((!beforeDate || x.d < beforeDate) && x.v && x.v[k] != null) return x.v[k]; }
+  return null;
+}
+function measFormHTML(date, vals, idp) {
+  return `<div class="field"><label for="${idp}-date">Data</label><input type="date" id="${idp}-date" value="${date}" max="${today()}"></div>
+    <div class="meas-grid">${MEAS.map(m => {
+      const ph = lastMeas(m.k, date);
+      return `<div class="field"><label for="${idp}-${m.k}">${m.l} (${measUnit(m)})</label>
+        <input type="number" inputmode="decimal" step="0.1" min="0" id="${idp}-${m.k}" data-mk="${m.k}" value="${vals && vals[m.k] != null ? vals[m.k] : ''}" placeholder="${ph != null ? ph : ''}"></div>`;
+    }).join('')}</div>`;
+}
+function readMeasForm(root, idp) {
+  const v = {};
+  $$('[data-mk]', root).forEach(i => { const n = num(i.value); if (n != null && n > 0 && n < 400) v[i.dataset.mk] = Math.round(n * 10) / 10; });
+  return { d: ($(`#${idp}-date`, root).value || today()), v };
+}
+function saveMeasure(entry, replaceDate) {
+  if (replaceDate && replaceDate !== entry.d) S.measures = S.measures.filter(x => x.d !== replaceDate);
+  const i = S.measures.findIndex(x => x.d === entry.d);
+  if (i >= 0) S.measures[i] = entry; else S.measures.push(entry);
+  sortMeasures(); save();
+}
+function renderCialo() {
+  const body = $('#cialo-body');
+  const list = [...S.measures].reverse();
+  const first = S.measures[0], last = S.measures[S.measures.length - 1];
+  if (!UI.measK || !MEAS.some(m => m.k === UI.measK)) UI.measK = (MEAS.find(m => measSeries(m.k).length) || MEAS[3]).k;
+  const curM = MEAS.find(m => m.k === UI.measK);
+  const tiles = last ? MEAS.filter(m => lastMeas(m.k) != null).map(m => {
+    const now = lastMeas(m.k), start = (S.measures.find(x => x.v && x.v[m.k] != null) || {}).v[m.k];
+    const diff = now - start, good = diff === 0 ? '' : (m.less ? (diff < 0 ? 'down' : 'up') : '');
+    return `<button class="tile meas-tile" type="button" data-mk-pick="${m.k}" aria-pressed="${m.k === UI.measK}">
+      <span class="k">${m.l}</span><span class="v">${fmt(now, 1)}<small> ${measUnit(m)}</small></span>
+      <span class="d ${good}">${diff ? fmtSigned(diff, 1) + ' od startu' : 'start'}</span></button>`;
+  }).join('') : '';
+  body.innerHTML = `
+    ${last ? `
+      <section class="view" style="gap:10px">
+        <div class="row"><h3>Ostatni pomiar</h3><span class="muted small">${dayLabel(last.d, { day: 'numeric', month: 'long', year: 'numeric' })}${first !== last ? ' · start ' + dayLabel(first.d) : ''}</span></div>
+        <div class="tiles meas-tiles">${tiles}</div>
+      </section>
+      <section class="card chart">
+        <div class="row"><h2>${curM.l}</h2><span class="muted small">${measUnit(curM)}</span></div>
+        ${chartSVG(measSeries(curM.k), 0)}
+        <p class="muted small" style="margin:0">Stuknij kafelek wyżej, żeby zobaczyć wykres innego pomiaru.</p>
+      </section>` : `
+      <div class="card empty"><strong>Zacznij mierzyć obwody</strong><span>Mierz się co 1–2 tygodnie, rano, w tym samym miejscu ciała. Talia i biodra często pokazują postęp, gdy waga stoi w miejscu.</span></div>`}
+    <form class="card" id="meas-form" autocomplete="off">
+      <h2>Nowy pomiar</h2>
+      ${measFormHTML(today(), null, 'mf')}
+      <p class="muted small" style="margin:0">Wypełnij tylko to, co zmierzyłeś. Szare liczby to poprzedni pomiar.</p>
+      <button class="btn primary" type="submit">Zapisz pomiar</button>
+    </form>
+    ${list.length ? `<section class="view" style="gap:10px">
+      <div class="row"><h3>Historia</h3><span class="muted small">${plural2(list.length, 'pomiar', 'pomiary', 'pomiarów')}</span></div>
+      <div class="list">${list.map(x => `
+        <button class="li" type="button" data-md="${x.d}">
+          <div class="grow"><div class="t">${dayLabel(x.d, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+          <div class="s">${MEAS.filter(m => x.v[m.k] != null).map(m => `${m.l.split(' ')[0]} ${fmt(x.v[m.k], 1)}`).join(' · ')}</div></div>
+          <span class="chev" aria-hidden="true">›</span>
+        </button>`).join('')}</div>
+    </section>` : ''}`;
+  $$('[data-mk-pick]', body).forEach(b => b.onclick = () => { UI.measK = b.dataset.mkPick; renderCialo(); });
+  $$('[data-md]', body).forEach(b => b.onclick = () => editMeasure(b.dataset.md));
+  $('#meas-form', body).addEventListener('submit', e => {
+    e.preventDefault();
+    const entry = readMeasForm(body, 'mf');
+    if (!Object.keys(entry.v).length) { toast('Wpisz przynajmniej jeden pomiar'); return; }
+    const existed = S.measures.find(x => x.d === entry.d);
+    if (existed) entry.v = Object.assign({}, existed.v, entry.v); // ten sam dzień — dopisz do istniejącego
+    saveMeasure(entry); toast('Zapisano pomiar'); renderCialo();
+  });
+}
+function editMeasure(d) {
+  const x = S.measures.find(m => m.d === d); if (!x) return;
+  openSheet('Pomiar z ' + dayLabel(d, { day: 'numeric', month: 'long', year: 'numeric' }), `
+    ${measFormHTML(d, x.v, 'me')}
+    <div class="btns"><button class="btn danger" type="button" id="me-del">Usuń pomiar</button><button class="btn primary" type="button" id="me-ok">Zapisz</button></div>`, b => {
+    $('#me-ok', b).onclick = () => {
+      const entry = readMeasForm(b, 'me');
+      if (!Object.keys(entry.v).length) { toast('Wpisz przynajmniej jeden pomiar albo usuń cały wpis'); return; }
+      saveMeasure(entry, d); closeSheet(); renderCialo(); toast('Zapisano zmiany');
+    };
+    $('#me-del', b).onclick = async () => {
+      if (await confirmBox('Usunąć pomiar?', 'Wszystkie obwody z tego dnia znikną.', 'Usuń', true)) { S.measures = S.measures.filter(m => m.d !== d); save(); renderCialo(); toast('Usunięto pomiar'); }
+    };
+  });
+}
+const plural2 = (n, one, few, many) => n + ' ' + (n === 1 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? few : many);
+
 /* ============ PLANY TRENINGOWE ============ */
 function renderPlany() {
   const body = $('#plany-body');
@@ -1226,6 +1346,7 @@ function renderWiecej() {
       <div class="row small"><span>Pomiary wagi</span><b class="num">${S.weights.length}</b></div>
       <div class="row small"><span>Treningi</span><b class="num">${S.workouts.length}</b></div>
       <div class="row small"><span>Plany treningowe</span><b class="num">${S.plans.length}</b></div>
+      <div class="row small"><span>Pomiary ciała</span><b class="num">${S.measures.length}</b></div>
       <div class="row small"><span>Ulubione ćwiczenia</span><b class="num">${S.fav.length}</b></div>
       <div class="row small"><span>Własne ćwiczenia</span><b class="num">${(S.custom || []).length}</b></div>
       <button class="btn danger" type="button" id="wipe">Usuń wszystkie dane</button>
@@ -1256,7 +1377,7 @@ function renderWiecej() {
   $('#wipe').onclick = async () => {
     const inCloud = typeof SY !== 'undefined' && SY.session;
     if (await confirmBox('Usunąć wszystkie dane?', `Pomiary, treningi, plany, ulubione i własne ćwiczenia znikną z tego telefonu${inCloud ? ' <b>i z chmury</b> (konto jest zsynchronizowane)' : ''}. Tego nie da się cofnąć, chyba że masz plik kopii.`, 'Usuń wszystko', true)) {
-      S = { profile: { height: null, goalLoss: null }, weights: [], workouts: [], active: null, custom: [], fav: [], plans: [] };
+      S = { profile: { height: null, goalLoss: null }, weights: [], workouts: [], active: null, custom: [], fav: [], plans: [], measures: [] };
       save(); rebuildExMap(); UI.cw = newFilter(); toast('Usunięto dane'); renderWiecej();
     }
   };

@@ -51,8 +51,8 @@ main {
 }
 .view { display: flex; flex-direction: column; gap: 20px; }
 /* Treść każdej zakładki: bloki jeden pod drugim z odstępem */
-#dieta-body, #trening-body, #plany-body, #cw-body, #wiecej-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-#dieta-body > *, #trening-body > *, #plany-body > *, #cw-body > *, #wiecej-body > * { flex-shrink: 0; }
+#dieta-body, #cialo-body, #trening-body, #plany-body, #cw-body, #wiecej-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+#dieta-body > *, #cialo-body > *, #trening-body > *, #plany-body > *, #cw-body > *, #wiecej-body > * { flex-shrink: 0; }
 #cw-body { gap: 12px; }
 .vhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 8px; }
 .vhead h1 { font: 700 32px/1.1 var(--num); margin: 0; letter-spacing: -.01em; }
@@ -176,7 +176,7 @@ ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column;
 /* Pasek zakładek */
 .tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: grid; grid-template-columns: repeat(6, 1fr);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
@@ -413,3 +413,16 @@ input.has-clear { padding-right: 38px !important; }
 .share-opt { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 16px; cursor: pointer; }
 .share-opt input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
 hr.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; width: 100%; }
+
+/* Pomiary ciała */
+.meas-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 10px; }
+.meas-grid label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meas-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.meas-tile { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.meas-tile .v { font-size: 19px; }
+.meas-tile .v small { font-size: 12px; color: var(--muted); font-weight: 500; }
+.meas-tile[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+@media (max-width: 360px) { .meas-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* 6 zakładek na dole: trochę ciaśniej */
+.tabs button { font-size: 10.5px; letter-spacing: -.01em; }
+.tabs svg { width: 24px; height: 24px; }
