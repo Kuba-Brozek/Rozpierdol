@@ -1164,7 +1164,13 @@ function renderWiecej() {
       <div class="row small"><span>Własne ćwiczenia</span><b class="num">${(S.custom || []).length}</b></div>
       <button class="btn danger" type="button" id="wipe">Usuń wszystkie dane</button>
     </section>
-    <p class="muted small">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>`;
+    <p class="muted small">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
+    <p class="muted small" id="app-version" style="margin:0">Wersja apki: …</p>`;
+  // numer wersji = nazwa schowka plików apki (ustawiana przy budowaniu)
+  if (window.caches) caches.keys().then(k => {
+    const v = k.find(n => /^rozpierdol-(?!img)/.test(n));
+    const el = $('#app-version'); if (el) el.textContent = 'Wersja apki: ' + (v ? v.replace('rozpierdol-', '') : 'podgląd (bez pamięci offline)');
+  }).catch(() => {});
   if (typeof renderSyncCard === 'function') renderSyncCard($('#sync-card', body)); else $('#sync-card', body).remove();
   const info = () => {
     const st = stats(), el = $('#p-info');
@@ -1206,8 +1212,15 @@ if ('serviceWorker' in navigator) {
     // sprawdzaj aktualizacje przy powrocie do apki (to jeden mały plik, sw.js)
     document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
   }).catch(() => {}));
+  // kiedy ostatnio coś było klikane/wpisywane — żeby nie przeładować apki komuś pod palcami
+  let lastTouch = 0;
+  ['pointerdown', 'input', 'keydown'].forEach(ev => document.addEventListener(ev, () => { lastTouch = Date.now(); }, true));
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController || $('#update-bar')) return; // pierwsza instalacja — nic nie pokazuj
+    const typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    const busy = typing || !$('#sheet').hidden || Date.now() - lastTouch < 4000;
+    // Nowa wersja (wszystkie dane są już zapisane w telefonie): jeśli nic nie robisz — odśwież od razu.
+    if (!busy) { location.reload(); return; }
     const bar = document.createElement('div');
     bar.id = 'update-bar'; bar.setAttribute('role', 'status');
     bar.innerHTML = '<span>Jest nowa wersja apki</span><button type="button">Odśwież</button>';
