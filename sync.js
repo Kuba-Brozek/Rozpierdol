@@ -84,11 +84,13 @@ const authPost = (method, body) => call(AUTH_URL + method + '?key=' + FB_KEY, { 
 async function cloudLogin(email, password) {
   const r = await authPost('signInWithPassword', { email, password, returnSecureToken: true });
   setSession(await r.json());
+  checkSpecialTheme(SY.session.email);
   await firstSyncAfterLogin();
 }
 async function cloudSignup(email, password) {
   const r = await authPost('signUp', { email, password, returnSecureToken: true });
   setSession(await r.json());
+  checkSpecialTheme(SY.session.email);
   await firstSyncAfterLogin();
   return 'in';
 }
@@ -97,6 +99,7 @@ async function cloudResetPassword(email) {
 }
 async function cloudLogout() {
   SY.session = null; SY.lastRemoteAt = 0; SY.lastSyncAt = 0; SY.dirty = false; SY.sharedPublished = undefined; SY.status = 'idle'; sySave();
+  checkSpecialTheme(null);
 }
 
 /* ---- dane (dokument backups/{uid}: json = cała baza apki, updatedAt, xlsx = plik Excel) ---- */
@@ -500,6 +503,7 @@ function showShared(x) {
 
 /* ---- start ---- */
 if (cloudReady() && SY.session) syncNow();
+checkSpecialTheme(SY.session && SY.session.email);
 if (cloudReady() && !SY.session && !authSkipped()) showAuthScreen();
 window.addEventListener('online', () => { if (SY.session) syncNow(); });
 let lastVisiblePull = Date.now();

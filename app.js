@@ -1293,7 +1293,33 @@ const ACCENTS = [
   { id: 'raspberry', label: 'Malina', c: '#c2255c' },
   { id: 'green', label: 'Zieleń', c: '#1d7a52' },
   { id: 'pink', label: 'Różowy szał', c: 'linear-gradient(135deg, #ff1493, #ff9ccf)' },
+  { id: 'oliwka', label: 'Oliwka 🌸', c: 'linear-gradient(135deg, #ffc2d4, #d94f80)', only: 'oliwka' },
 ];
+/* Motyw tylko dla jednego konta. W kodzie (publicznym) jest wyłącznie skrót SHA-256 adresu e-mail,
+   nie sam adres — apka liczy skrót e-maila zalogowanej osoby i porównuje. */
+const OLIWKA_HASH = '2e9efe58a8ebfbc0468a417eb1ae8319921686b01fa2d18dc069923ab4c5dfc0';
+let IS_OLIWKA = false;
+async function sha256hex(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+// Wywoływane przy starcie, po zalogowaniu i po wylogowaniu
+async function checkSpecialTheme(email) {
+  try { IS_OLIWKA = !!email && window.crypto && crypto.subtle ? (await sha256hex(String(email).trim().toLowerCase())) === OLIWKA_HASH : false; }
+  catch (e) { IS_OLIWKA = false; }
+  const th = getTheme();
+  if (IS_OLIWKA) {
+    let welcomed = false; try { welcomed = localStorage.getItem('oliwka-powitanie') === '1'; } catch (e) {}
+    if (!welcomed) {
+      try { localStorage.setItem('oliwka-powitanie', '1'); } catch (e) {}
+      setTheme({ accent: 'oliwka' });
+      setTimeout(() => toast('Cześć Oliwka! Ten motyw jest tylko dla Ciebie 🌸'), 2300);
+    }
+  } else if (th.accent === 'oliwka') {
+    setTheme({ accent: 'ocean' }); // inne konto albo wylogowanie — wracamy do domyślnego
+  }
+  if (UI.tab === 'wiecej') renderWiecej();
+}
 const MODES = [['auto', 'Automatyczny'], ['light', 'Jasny'], ['dark', 'Ciemny']];
 function getTheme() { try { return Object.assign({ accent: 'ocean', mode: 'auto' }, JSON.parse(localStorage.getItem(THEME_KEY) || '{}')); } catch (e) { return { accent: 'ocean', mode: 'auto' }; } }
 function applyTheme(t) {
@@ -1318,7 +1344,7 @@ function renderWiecej() {
     <section class="card">
       <h2>Wygląd</h2>
       <div class="swatches" role="group" aria-label="Kolor apki">
-        ${ACCENTS.map(a => `<button class="swatch" type="button" data-accent="${a.id}" aria-pressed="${th.accent === a.id}"><i style="background:${a.c}"></i><span>${a.label}</span></button>`).join('')}
+        ${ACCENTS.filter(a => !a.only || (a.only === 'oliwka' && IS_OLIWKA)).map(a => `<button class="swatch" type="button" data-accent="${a.id}" aria-pressed="${th.accent === a.id}"><i style="background:${a.c}"></i><span>${a.label}</span></button>`).join('')}
       </div>
       <div class="seg seg-full" role="group" aria-label="Tryb">
         ${MODES.map(([v, l]) => `<button type="button" data-mode="${v}" aria-pressed="${th.mode === v}">${l}</button>`).join('')}

@@ -426,3 +426,39 @@ hr.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; width: 100
 /* 6 zakładek na dole: trochę ciaśniej */
 .tabs button { font-size: 10.5px; letter-spacing: -.01em; }
 .tabs svg { width: 24px; height: 24px; }
+
+/* =================== MOTYW „OLIWKA” — pudrowy róż, tylko dla jednego konta =================== */
+html:root[data-accent="oliwka"] {
+  --bg: #fff3f6; --surface: #ffffff; --surface-2: #ffe4ec; --fg: #4f2033; --muted: #a0607b; --line: #f6cfdc;
+  --a-l: #d94f80; --a-d: #ff9cbc; --accent: #d94f80; --accent-fg: #ffffff;
+  --accent-soft: #ffdbe7; --good: #2f9e6e; --bad: #c2334f; --bad-soft: #ffe0e6; --star: #e8a33d;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  html:root[data-accent="oliwka"]:not([data-mode="light"]) {
+    --bg: #1f1117; --surface: #2b1820; --surface-2: #3a222c; --fg: #ffe9f0; --muted: #d59ab2; --line: #4a2c38;
+    --accent: #ff9cbc; --accent-fg: #2a0f1a; --accent-soft: #4d2535; --good: #6fd3a2; --bad: #ff8a9c; --bad-soft: #4a1f29; --star: #ffc56b;
+    color-scheme: dark;
+  }
+}
+html:root[data-accent="oliwka"][data-mode="dark"] {
+  --bg: #1f1117; --surface: #2b1820; --surface-2: #3a222c; --fg: #ffe9f0; --muted: #d59ab2; --line: #4a2c38;
+  --accent: #ff9cbc; --accent-fg: #2a0f1a; --accent-soft: #4d2535; --good: #6fd3a2; --bad: #ff8a9c; --bad-soft: #4a1f29; --star: #ffc56b;
+  color-scheme: dark;
+}
+html[data-accent="oliwka"] .vhead h1::after { content: " 🌸"; font-size: .62em; vertical-align: .12em; }
+html[data-accent="oliwka"] .card, html[data-accent="oliwka"] .tile, html[data-accent="oliwka"] .list, html[data-accent="oliwka"] .ex-card {
+  box-shadow: 0 4px 16px rgb(217 79 128 / .10);
+}
+html[data-accent="oliwka"] .bar > i { background: linear-gradient(90deg, #ffb3c8, var(--accent)); }
+html[data-accent="oliwka"] .btn.primary, html[data-accent="oliwka"] .auth-btn { background: linear-gradient(135deg, #f07aa1, #d94f80); color: #fff; border-color: transparent; }
+html[data-accent="oliwka"] #splash,
+html[data-accent="oliwka"] #auth { background: linear-gradient(165deg, #f7a8c0 0%, #d94f80 60%, #9e2e59 100%); }
+html[data-accent="oliwka"] #splash rect[fill="#7d8796"], html[data-accent="oliwka"] #auth rect[fill="#7d8796"] { fill: #ffe4ec; }
+html[data-accent="oliwka"] #auth .auth-sub, html[data-accent="oliwka"] #auth label, html[data-accent="oliwka"] .auth-switch,
+html[data-accent="oliwka"] .auth-link, html[data-accent="oliwka"] .auth-pass button { color: #fff0f5; }
+html[data-accent="oliwka"] #auth input { background: rgb(255 255 255 / .2); border-color: rgb(255 255 255 / .45); }
+html[data-accent="oliwka"] .auth-btn { background: #fff; color: #d94f80; }
+html[data-accent="oliwka"] .auth-link.strong { color: #fff; text-decoration: underline; }
+html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
+.swatch[data-accent="oliwka"] { grid-column: 1 / -1; }
