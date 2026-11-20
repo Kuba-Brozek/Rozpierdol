@@ -497,6 +497,7 @@ function interpretBook(sheets) {
   const ms = find('POMIARY', 'POMIARY CIALA');
   if (ms) {
     const hdr = {}; MEAS.forEach(m => hdr[normTxt(`${m.l} (${measUnit(m)})`)] = m.k);
+    hdr[normTxt('Ramię (biceps) (cm)')] = 'arm'; // nazwa kolumny ze starszych kopii
     res.measures = sheetTable(ms.cells).map(r => {
       const d = parseDateCell(r['DATA']); if (!d) return null;
       const v = {};
@@ -1006,12 +1007,36 @@ function pickExercise(onPick, title = 'Dodaj ćwiczenie', onBack = null) {
 
 /* ============ POMIARY CIAŁA ============ */
 // d = data, v = { klucz: wartość }; obwody w cm, tkanka tłuszczowa w %
+// s = krótka nazwa do historii; legacy = dawny wspólny pomiar ramienia (zostaje dla starych wpisów)
 const MEAS = [
-  { k: 'neck', l: 'Szyja' }, { k: 'chest', l: 'Klatka' }, { k: 'arm', l: 'Ramię (biceps)' },
-  { k: 'waist', l: 'Talia', less: true }, { k: 'belly', l: 'Brzuch (pępek)', less: true }, { k: 'hips', l: 'Biodra', less: true },
-  { k: 'thigh', l: 'Udo' }, { k: 'calf', l: 'Łydka' }, { k: 'fat', l: 'Tkanka tłuszczowa', u: '%', less: true },
+  { k: 'neck', l: 'Szyja' }, { k: 'shoulders', l: 'Barki' }, { k: 'chest', l: 'Klatka' },
+  { k: 'armL', l: 'Biceps lewy', s: 'Biceps L' }, { k: 'armR', l: 'Biceps prawy', s: 'Biceps P' },
+  { k: 'waist', l: 'Talia', less: true }, { k: 'belly', l: 'Brzuch (pępek)', s: 'Brzuch', less: true }, { k: 'hips', l: 'Biodra', less: true },
+  { k: 'thigh', l: 'Udo' }, { k: 'calf', l: 'Łydka' }, { k: 'fat', l: 'Tkanka tłuszczowa', s: 'Tłuszcz', u: '%', less: true },
+  { k: 'arm', l: 'Ramię (dawny pomiar)', s: 'Ramię', legacy: true },
 ];
 const measUnit = m => m.u || 'cm';
+const measShort = m => m.s || m.l;
+// Co mierzy ta osoba (S.measCfg, zapisywane w chmurze). Domyślnie wszystko poza dawnym pomiarem ramienia.
+function measActive() {
+  const cfg = Array.isArray(S.measCfg) && S.measCfg.length ? S.measCfg : MEAS.filter(m => !m.legacy).map(m => m.k);
+  return MEAS.filter(m => cfg.includes(m.k));
+}
+const measHasData = k => S.measures.some(x => x.v && x.v[k] != null);
+function pickMeasures() {
+  const active = measActive().map(m => m.k);
+  const options = MEAS.filter(m => !m.legacy || measHasData(m.k));
+  openSheet('Co chcesz mierzyć?', `
+    <p class="muted small" style="margin:0">Zaznaczone pomiary pojawią się w formularzu, kafelkach i na wykresie. Odznaczenie niczego nie kasuje — stare wpisy zostają w historii.</p>
+    <div class="share-opts">${options.map(m => `<label class="share-opt"><input type="checkbox" data-pick="${m.k}" ${active.includes(m.k) ? 'checked' : ''}><span>${m.l} <span class="muted small">(${measUnit(m)})</span></span></label>`).join('')}</div>
+    <button class="btn primary block" type="button" id="pick-ok">Zapisz wybór</button>`, b => {
+    $('#pick-ok', b).onclick = () => {
+      const keys = $$('[data-pick]', b).filter(i => i.checked).map(i => i.dataset.pick);
+      if (!keys.length) { toast('Zaznacz przynajmniej jeden pomiar'); return; }
+      S.measCfg = keys; save(); closeSheet(); renderCialo(); toast('Zapisano wybór pomiarów');
+    };
+  });
+}
 function sortMeasures() { S.measures.sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : 0); }
 const measSeries = k => S.measures.filter(x => x.v && x.v[k] != null).map(x => ({ d: x.d, w: x.v[k] }));
 function lastMeas(k, beforeDate) {
@@ -1020,7 +1045,7 @@ function lastMeas(k, beforeDate) {
 }
 function measFormHTML(date, vals, idp) {
   return `<div class="field"><label for="${idp}-date">Data</label><input type="date" id="${idp}-date" value="${date}" max="${today()}"></div>
-    <div class="meas-grid">${MEAS.map(m => {
+    <div class="meas-grid">${MEAS.filter(m => measActive().includes(m) || (vals && vals[m.k] != null)).map(m => {
       const ph = lastMeas(m.k, date);
       return `<div class="field"><label for="${idp}-${m.k}">${m.l} (${measUnit(m)})</label>
         <input type="number" inputmode="decimal" step="0.1" min="0" id="${idp}-${m.k}" data-mk="${m.k}" value="${vals && vals[m.k] != null ? vals[m.k] : ''}" placeholder="${ph != null ? ph : ''}"></div>`;
@@ -1041,9 +1066,11 @@ function renderCialo() {
   const body = $('#cialo-body');
   const list = [...S.measures].reverse();
   const first = S.measures[0], last = S.measures[S.measures.length - 1];
-  if (!UI.measK || !MEAS.some(m => m.k === UI.measK)) UI.measK = (MEAS.find(m => measSeries(m.k).length) || MEAS[3]).k;
+  const act = measActive();
+  const shown = act.filter(m => lastMeas(m.k) != null);
+  if (!UI.measK || !shown.some(m => m.k === UI.measK)) UI.measK = (shown[0] || act[0] || MEAS[0]).k;
   const curM = MEAS.find(m => m.k === UI.measK);
-  const tiles = last ? MEAS.filter(m => lastMeas(m.k) != null).map(m => {
+  const tiles = last ? shown.map(m => {
     const now = lastMeas(m.k), start = (S.measures.find(x => x.v && x.v[m.k] != null) || {}).v[m.k];
     const diff = now - start, good = diff === 0 ? '' : (m.less ? (diff < 0 ? 'down' : 'up') : '');
     return `<button class="tile meas-tile" type="button" data-mk-pick="${m.k}" aria-pressed="${m.k === UI.measK}">
@@ -1051,7 +1078,7 @@ function renderCialo() {
       <span class="d ${good}">${diff ? fmtSigned(diff, 1) + ' od startu' : 'start'}</span></button>`;
   }).join('') : '';
   body.innerHTML = `
-    ${last ? `
+    ${last && shown.length ? `
       <section class="view" style="gap:10px">
         <div class="row"><h3>Ostatni pomiar</h3><span class="muted small">${dayLabel(last.d, { day: 'numeric', month: 'long', year: 'numeric' })}${first !== last ? ' · start ' + dayLabel(first.d) : ''}</span></div>
         <div class="tiles meas-tiles">${tiles}</div>
@@ -1061,9 +1088,9 @@ function renderCialo() {
         ${chartSVG(measSeries(curM.k), 0)}
         <p class="muted small" style="margin:0">Stuknij kafelek wyżej, żeby zobaczyć wykres innego pomiaru.</p>
       </section>` : `
-      <div class="card empty"><strong>Zacznij mierzyć obwody</strong><span>Mierz się co 1–2 tygodnie, rano, w tym samym miejscu ciała. Talia i biodra często pokazują postęp, gdy waga stoi w miejscu.</span></div>`}
+      <div class="card empty"><strong>${last ? 'Brak danych dla wybranych pomiarów' : 'Zacznij mierzyć obwody'}</strong><span>Mierz się co 1–2 tygodnie, rano, w tym samym miejscu ciała. Talia i biodra często pokazują postęp, gdy waga stoi w miejscu.</span></div>`}
     <form class="card" id="meas-form" autocomplete="off">
-      <h2>Nowy pomiar</h2>
+      <div class="row"><h2>Nowy pomiar</h2><button class="link" type="button" id="meas-pick">Wybierz pomiary</button></div>
       ${measFormHTML(today(), null, 'mf')}
       <p class="muted small" style="margin:0">Wypełnij tylko to, co zmierzyłeś. Szare liczby to poprzedni pomiar.</p>
       <button class="btn primary" type="submit">Zapisz pomiar</button>
@@ -1073,12 +1100,13 @@ function renderCialo() {
       <div class="list">${list.map(x => `
         <button class="li" type="button" data-md="${x.d}">
           <div class="grow"><div class="t">${dayLabel(x.d, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</div>
-          <div class="s">${MEAS.filter(m => x.v[m.k] != null).map(m => `${m.l.split(' ')[0]} ${fmt(x.v[m.k], 1)}`).join(' · ')}</div></div>
+          <div class="s">${MEAS.filter(m => x.v[m.k] != null).map(m => `${measShort(m)} ${fmt(x.v[m.k], 1)}`).join(' · ')}</div></div>
           <span class="chev" aria-hidden="true">›</span>
         </button>`).join('')}</div>
     </section>` : ''}`;
   $$('[data-mk-pick]', body).forEach(b => b.onclick = () => { UI.measK = b.dataset.mkPick; renderCialo(); });
   $$('[data-md]', body).forEach(b => b.onclick = () => editMeasure(b.dataset.md));
+  $('#meas-pick', body).onclick = pickMeasures;
   $('#meas-form', body).addEventListener('submit', e => {
     e.preventDefault();
     const entry = readMeasForm(body, 'mf');
