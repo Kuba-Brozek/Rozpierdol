@@ -20,7 +20,7 @@ try { Object.assign(SY, JSON.parse(localStorage.getItem(SYNC_KEY) || '{}')); } c
 if (SY.session && !SY.session.idToken) SY.session = null; // sesja ze starej wersji (Supabase)
 SY.status = 'idle'; SY.error = '';
 function sySave() {
-  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ session: SY.session, lastSyncAt: SY.lastSyncAt, lastRemoteAt: SY.lastRemoteAt, dirty: SY.dirty })); } catch (e) {}
+  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ session: SY.session, lastSyncAt: SY.lastSyncAt, lastRemoteAt: SY.lastRemoteAt, dirty: SY.dirty, sharedPublished: SY.sharedPublished })); } catch (e) {}
 }
 
 /* ---- błędy po polsku ---- */
@@ -96,7 +96,7 @@ async function cloudResetPassword(email) {
   await authPost('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 async function cloudLogout() {
-  SY.session = null; SY.lastRemoteAt = 0; SY.lastSyncAt = 0; SY.dirty = false; SY.status = 'idle'; sySave();
+  SY.session = null; SY.lastRemoteAt = 0; SY.lastSyncAt = 0; SY.dirty = false; SY.sharedPublished = undefined; SY.status = 'idle'; sySave();
 }
 
 /* ---- dane (dokument backups/{uid}: json = cała baza apki, updatedAt, xlsx = plik Excel) ---- */
@@ -126,7 +126,72 @@ async function pushRemote() {
   try { fields.xlsx = { bytesValue: await blobToB64(backupXlsx()) }; } catch (e) {}
   await authed(docUrl(SY.session.uid), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
   SY.lastRemoteAt = now;
+  // Udostępniany wycinek (osobny dokument) — błąd tutaj nie psuje kopii zapasowej
+  try { await pushShared(); SY.shareErr = ''; } catch (e) { SY.shareErr = e.message; }
 }
+
+/* ---- UDOSTĘPNIANIE: wybrane dane do podglądu dla wskazanych osób ----
+   Dokument shared/{uid}: owner, viewers (lista e-maili), json (tylko zaznaczone: plany / ulubione / waga).
+   Czytać go może tylko właściciel i osoby z listy viewers, które potwierdziły swój e-mail (reguły Firestore). */
+const sharedUrl = uid => `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FB_PROJECT)}/databases/(default)/documents/shared/${encodeURIComponent(uid)}`;
+const normEmail = s => String(s || '').trim().toLowerCase();
+function shareSettings() {
+  S.share = Object.assign({ viewers: [], plans: true, fav: true, weights: true }, S.share || {});
+  return S.share;
+}
+function sharedPayload() {
+  const sh = shareSettings(), d = { what: { plans: !!sh.plans, fav: !!sh.fav, weights: !!sh.weights } };
+  if (sh.plans) d.plans = S.plans;
+  if (sh.fav) d.fav = S.fav;
+  if (sh.weights) { d.weights = S.weights; d.profile = { height: S.profile.height, goalLoss: S.profile.goalLoss }; }
+  // własne ćwiczenia użyte w planach/ulubionych — żeby u oglądającego miały nazwy
+  const ids = new Set([...(sh.plans ? S.plans.flatMap(p => p.ex.map(e => e.id)) : []), ...(sh.fav ? S.fav : [])]);
+  d.custom = (S.custom || []).filter(c => ids.has(c.id));
+  return d;
+}
+async function pushShared() {
+  const sh = shareSettings(), uid = SY.session.uid;
+  if (!sh.viewers.length || !(sh.plans || sh.fav || sh.weights)) {
+    // nic nie udostępniam — usuń dokument (brak dokumentu = brak dostępu dla kogokolwiek), ale tylko jeśli istniał
+    if (SY.sharedPublished === false) return;
+    await authed(sharedUrl(uid), { method: 'DELETE' });
+    SY.sharedPublished = false; sySave();
+    return;
+  }
+  const fields = {
+    owner: { stringValue: SY.session.email || '' },
+    viewers: { arrayValue: { values: sh.viewers.map(v => ({ stringValue: v })) } },
+    json: { stringValue: JSON.stringify(sharedPayload()) },
+    updatedAt: { integerValue: String(Date.now()) },
+  };
+  await authed(sharedUrl(uid), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
+  SY.sharedPublished = true; sySave();
+}
+async function listSharedWithMe() {
+  const email = normEmail(SY.session.email);
+  const r = await authed(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FB_PROJECT)}/databases/(default)/documents:runQuery`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'shared' }], where: { fieldFilter: { field: { fieldPath: 'viewers' }, op: 'ARRAY_CONTAINS', value: { stringValue: email } } } } }),
+  });
+  const rows = await r.json();
+  return (Array.isArray(rows) ? rows : []).filter(x => x.document).map(x => {
+    const f = x.document.fields || {}; let data = {};
+    try { data = JSON.parse(f.json && f.json.stringValue || '{}'); } catch (e) {}
+    return { uid: x.document.name.split('/').pop(), owner: f.owner && f.owner.stringValue, updatedAt: +(f.updatedAt && f.updatedAt.integerValue || 0), data };
+  }).filter(x => x.uid !== SY.session.uid);
+}
+// Weryfikacja e-maila (potrzebna osobie, która ogląda cudze dane)
+async function emailVerified() {
+  const t = await idToken(); if (!t) throw Object.assign(new Error('Brak połączenia z serwerem.'), { code: 'net' });
+  const r = await authPost('lookup', { idToken: t });
+  const j = await r.json();
+  return !!(j.users && j.users[0] && j.users[0].emailVerified);
+}
+async function sendVerifyEmail() {
+  const t = await idToken(); if (!t) throw Object.assign(new Error('Brak połączenia z serwerem.'), { code: 'net' });
+  await authPost('sendOobCode', { requestType: 'VERIFY_EMAIL', idToken: t });
+}
+async function refreshTokenNow() { if (SY.session) { SY.session.expiresAt = 0; await idToken(); } }
 function adoptRemote(data) {
   const keepActive = S.active;
   S = Object.assign({ profile: { height: null, goalLoss: null }, weights: [], workouts: [], active: null, custom: [], fav: [], plans: [] }, data);
@@ -315,6 +380,124 @@ function showAuthScreen(mode = 'login') {
     } catch (err) { say(err.message); busy(false); }
   });
 }
+
+/* ---- interfejs: sekcja „Udostępnianie” w Ustawieniach ---- */
+function renderShareCard(card) {
+  if (!card) return;
+  if (!cloudReady() || !SY.session) { card.remove(); return; }
+  const sh = shareSettings();
+  const chk = (k, label) => `<label class="share-opt"><input type="checkbox" data-what="${k}" ${sh[k] ? 'checked' : ''}><span>${label}</span></label>`;
+  card.innerHTML = `
+    <h2>Udostępnianie</h2>
+    <p class="muted small" style="margin:0">Osoby z listy po zalogowaniu zobaczą zaznaczone rzeczy, tylko do podglądu. Treningi i reszta danych zostają prywatne. Usunięcie osoby z listy od razu zabiera jej dostęp.</p>
+    <div class="share-opts">${chk('plans', 'Plany treningowe')}${chk('fav', 'Ulubione ćwiczenia')}${chk('weights', 'Historia wagi')}</div>
+    <div class="list" id="share-viewers">${sh.viewers.length ? sh.viewers.map(v => `
+      <div class="li"><div class="grow"><div class="t" style="font-weight:500">${esc(v)}</div></div>
+        <button class="icon-btn" type="button" data-unshare="${esc(v)}" aria-label="Zabierz dostęp ${esc(v)}">✕</button></div>`).join('')
+      : '<div class="li"><span class="muted small">Nikt jeszcze nie ma dostępu.</span></div>'}</div>
+    <form id="share-add" class="add-weight" style="grid-template-columns:minmax(0,1fr) auto" autocomplete="off">
+      <div class="field"><label for="share-email">E-mail osoby (jej konto w apce)</label><input type="email" id="share-email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="np. ona@gmail.com"></div>
+      <button class="btn primary" type="submit">Udostępnij</button>
+    </form>
+    ${SY.shareErr ? `<p class="small" style="margin:0;color:var(--bad)">Nie udało się zapisać udostępnienia: ${esc(SY.shareErr)}</p>` : ''}
+    <hr class="sep">
+    <h2>Udostępnione mi</h2>
+    <div id="shared-me" class="view" style="gap:10px"><button class="btn" type="button" id="shared-load">Pokaż, co inni mi udostępnili</button></div>`;
+  const changed = msg => { save(); toast(msg); renderShareCard(card); };
+  card.querySelectorAll('[data-what]').forEach(c => c.onchange = () => { sh[c.dataset.what] = c.checked; changed('Zapisano. Zmiana trafi do chmury za chwilę'); });
+  card.querySelectorAll('[data-unshare]').forEach(b => b.onclick = async () => {
+    if (!await confirmBox('Zabrać dostęp?', `${esc(b.dataset.unshare)} przestanie widzieć twoje udostępnione dane.`, 'Zabierz dostęp', true)) return;
+    sh.viewers = sh.viewers.filter(v => v !== b.dataset.unshare); changed('Dostęp zabrany');
+  });
+  card.querySelector('#share-add').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = normEmail(card.querySelector('#share-email').value);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { toast('Wpisz poprawny e-mail'); return; }
+    if (v === normEmail(SY.session.email)) { toast('To twój własny e-mail'); return; }
+    if (sh.viewers.includes(v)) { toast('Ta osoba już ma dostęp'); return; }
+    if (sh.viewers.length >= 20) { toast('Maksymalnie 20 osób'); return; }
+    sh.viewers.push(v); changed('Udostępniono: ' + v);
+  });
+  card.querySelector('#shared-load').onclick = () => loadSharedWithMe(card.querySelector('#shared-me'));
+}
+
+async function loadSharedWithMe(box) {
+  box.innerHTML = '<p class="muted small" style="margin:0">Sprawdzam…</p>';
+  try {
+    if (!await emailVerified()) {
+      box.innerHTML = `<p class="small" style="margin:0">Żeby oglądać cudze dane, potwierdź najpierw swój e-mail <b>${esc(SY.session.email)}</b>. To chroni przed podszyciem się pod ciebie.</p>
+        <div class="btns"><button class="btn primary" type="button" id="ver-send">Wyślij link potwierdzający</button><button class="btn" type="button" id="ver-check">Już potwierdziłem</button></div>
+        <p class="muted small" id="ver-msg" style="margin:0"></p>`;
+      box.querySelector('#ver-send').onclick = async () => {
+        try { await sendVerifyEmail(); box.querySelector('#ver-msg').textContent = 'Wysłane. Otwórz maila od Firebase, kliknij link, wróć tu i stuknij „Już potwierdziłem”. Sprawdź też spam.'; }
+        catch (e) { box.querySelector('#ver-msg').textContent = e.message; }
+      };
+      box.querySelector('#ver-check').onclick = async () => { await refreshTokenNow(); loadSharedWithMe(box); };
+      return;
+    }
+    const list = await listSharedWithMe();
+    if (!list.length) { box.innerHTML = '<p class="muted small" style="margin:0">Nikt jeszcze niczego ci nie udostępnił. Poproś tę osobę, żeby w swoich Ustawieniach → Udostępnianie dopisała twój e-mail.</p><button class="btn" type="button" id="shared-load">Sprawdź ponownie</button>'; box.querySelector('#shared-load').onclick = () => loadSharedWithMe(box); return; }
+    box.innerHTML = `<div class="list">${list.map((x, i) => {
+      const w = x.data.what || {};
+      const parts = [w.weights && 'waga', w.plans && plural((x.data.plans || []).length, 'plan', 'plany', 'planów'), w.fav && plural((x.data.fav || []).length, 'ulubione', 'ulubione', 'ulubionych')].filter(Boolean).join(' · ');
+      return `<button class="li" type="button" data-sh="${i}"><div class="grow"><div class="t">${esc(x.owner || 'Użytkownik')}</div><div class="s">${parts}</div></div><span class="chev" aria-hidden="true">›</span></button>`;
+    }).join('')}</div>`;
+    box.querySelectorAll('[data-sh]').forEach(b => b.onclick = () => showShared(list[+b.dataset.sh]));
+  } catch (e) {
+    const rulesHint = /odmówił dostępu|PERMISSION/i.test(e.message) ? ' Możliwe, że w Firebase brakuje nowych reguł udostępniania (instrukcja w FIREBASE.md).' : '';
+    box.innerHTML = `<p class="small" style="margin:0;color:var(--bad)">${esc(e.message)}${rulesHint}</p><button class="btn" type="button" id="shared-load">Spróbuj ponownie</button>`;
+    box.querySelector('#shared-load').onclick = () => loadSharedWithMe(box);
+  }
+}
+
+function showShared(x) {
+  const d = x.data || {}, w = d.what || {};
+  // nazwy własnych ćwiczeń tej osoby
+  const other = {}; (d.custom || []).forEach(c => other[c.id] = Object.assign({ own: true, img: [], ins: [], s: [] }, c));
+  const exOf = id => EXMAP[id] || other[id];
+  const ws = (d.weights || []).slice().sort((a, b) => a.d < b.d ? -1 : 1);
+  let weightHTML = '';
+  if (w.weights) {
+    if (ws.length) {
+      const start = ws[0].w, cur = ws[ws.length - 1].w, h = d.profile && d.profile.height, goal = d.profile && d.profile.goalLoss;
+      const lost = start - cur, bmi = h ? cur / (h * h) : null;
+      weightHTML = `<section class="card">
+        <div class="hero-nums">
+          <div><h3>Aktualna waga</h3><div class="big">${fmt(cur, 1)}<small>kg</small></div></div>
+          <div class="lost"><h3>Od startu</h3><div class="big ${lost > 0 ? 'down' : lost < 0 ? 'up' : ''}">${lost > 0 ? '−' : lost < 0 ? '+' : ''}${fmt(Math.abs(lost), 1)}<small>kg</small></div></div>
+        </div>
+        <div class="muted small">${ws.length} pomiarów · ${dayLabel(ws[0].d)} – ${dayLabel(ws[ws.length - 1].d)}${bmi ? ' · BMI ' + fmt(bmi, 1) : ''}${goal ? ' · cel −' + fmt(goal, 1) + ' kg (' + fmt(lost / goal * 100, 0) + '%)' : ''}</div>
+        <div class="chart">${chartSVG(ws, 0)}</div>
+      </section>`;
+    } else weightHTML = '<p class="muted small" style="margin:0">Brak pomiarów wagi.</p>';
+  }
+  const plansHTML = w.plans ? `<h3>Plany treningowe</h3>${(d.plans || []).length ? `<div class="list">${d.plans.map((p, i) => `
+      <div class="li" style="align-items:flex-start">
+        <div class="grow"><div class="t">${esc(p.name)}</div>
+          <div class="s">${p.ex.map(e => `${esc(exName(exOf(e.id)))} <span class="num">×${e.sets}</span>`).join(' · ')}</div></div>
+        <button class="btn" type="button" data-copy="${i}" style="padding:8px 12px;font-size:14px;flex:none">Skopiuj</button>
+      </div>`).join('')}</div>` : '<p class="muted small" style="margin:0">Brak planów.</p>'}` : '';
+  const favHTML = w.fav ? `<h3>Ulubione ćwiczenia</h3>${(d.fav || []).length ? `<div class="list">${d.fav.map(id => { const e = exOf(id); return `
+      <div class="li li-row"><div class="li-main" style="cursor:default">${thumbHTML(e)}<div class="grow"><div class="t">${esc(exName(e))}</div><div class="s">${e ? [...(e.m || []).map(m => MUSCLE[m] || m), EQUIP[e.e] || ''].filter(Boolean).join(' · ') : ''}</div></div></div>${EXMAP[id] ? starBtn(id) : ''}</div>`; }).join('')}</div>` : '<p class="muted small" style="margin:0">Brak ulubionych.</p>'}` : '';
+  openSheet(x.owner || 'Udostępnione', `
+    <p class="muted small" style="margin:0">Podgląd danych udostępnionych przez tę osobę${x.updatedAt ? ' · stan z ' + new Date(x.updatedAt).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}. Gwiazdką dodasz ćwiczenie do swoich ulubionych.</p>
+    ${weightHTML}${plansHTML}${favHTML}`, b => {
+    b.addEventListener('click', e => {
+      const c = e.target.closest('[data-copy]');
+      if (c) {
+        const p = d.plans[+c.dataset.copy];
+        (d.custom || []).forEach(cu => { if (p.ex.some(x => x.id === cu.id) && !S.custom.some(m => m.id === cu.id)) S.custom.push(cu); });
+        const base = p.name + ' (od ' + String(x.owner || '').split('@')[0] + ')';
+        S.plans.push({ id: 'p_' + uid(), name: base, ex: p.ex.map(x => ({ id: x.id, sets: x.sets })) });
+        save(); rebuildExMap(); toast('Skopiowano plan „' + base + '” do twoich planów'); c.disabled = true; c.textContent = 'Skopiowano';
+        return;
+      }
+      const f = e.target.closest('[data-fav]');
+      if (f) { const on = toggleFav(f.dataset.fav); f.outerHTML = starBtn(f.dataset.fav); toast(on ? 'Dodano do twoich ulubionych' : 'Usunięto z twoich ulubionych'); }
+    });
+  });
+}
+
 /* ---- start ---- */
 if (cloudReady() && SY.session) syncNow();
 if (cloudReady() && !SY.session && !authSkipped()) showAuthScreen();

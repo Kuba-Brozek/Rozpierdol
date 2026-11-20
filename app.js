@@ -198,11 +198,11 @@ function setWeight(d, w) {
 }
 
 /* ============ DIETA: wykres ============ */
-function chartSVG() {
-  const all = S.weights;
+function chartSVG(weights = S.weights, rangeDays = UI.range) {
+  const all = weights;
   if (all.length < 2) return '<p class="muted small">Wykres pojawi się po dwóch pomiarach.</p>';
   const last = all[all.length - 1].d;
-  const from = UI.range === 0 ? all[0].d : addDays(last, -UI.range + 1);
+  const from = rangeDays === 0 ? all[0].d : addDays(last, -rangeDays + 1);
   const pts = all.filter(x => x.d >= from);
   if (pts.length < 2) return '<p class="muted small">Za mało pomiarów w tym okresie.</p>';
   const W = 340, H = 190, L = 38, R = 8, T = 10, B = 24;
@@ -1156,6 +1156,7 @@ function renderWiecej() {
   const body = $('#wiecej-body');
   body.innerHTML = `
     <section class="card" id="sync-card"></section>
+    <section class="card" id="share-card"></section>
     <section class="card">
       <h2>Wygląd</h2>
       <div class="swatches" role="group" aria-label="Kolor apki">
@@ -1199,6 +1200,7 @@ function renderWiecej() {
     const el = $('#app-version'); if (el) el.textContent = 'Wersja apki: ' + (v ? v.replace('rozpierdol-', '') : 'podgląd (bez pamięci offline)');
   }).catch(() => {});
   if (typeof renderSyncCard === 'function') renderSyncCard($('#sync-card', body)); else $('#sync-card', body).remove();
+  if (typeof renderShareCard === 'function') renderShareCard($('#share-card', body)); else $('#share-card', body).remove();
   const info = () => {
     const st = stats(), el = $('#p-info');
     el.textContent = st && p.goalLoss ? `Waga docelowa: ${fmt(st.start - p.goalLoss, 1)} kg (start ${fmt(st.start, 1)} kg)` : '';
