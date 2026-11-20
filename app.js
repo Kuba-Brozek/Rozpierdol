@@ -29,7 +29,9 @@ function toggleFav(id) {
   save(); return isFav(id);
 }
 // Filtr listy ćwiczeń: przełącznik „tylko ulubione” + kategoria
-const newFilter = () => ({ fav: S.fav.length > 0, g: S.fav.length ? 'all' : 'pop', q: '', lim: 60 });
+const newFilter = () => ({ fav: S.fav.length > 0, g: S.fav.length ? 'all' : 'pop', eq: '', q: '', lim: 60 });
+// Filtr sprzętu: kolejność przycisków (pokazujemy tylko te, dla których są ćwiczenia)
+const EQUIP_ORDER = ['barbell', 'dumbbell', 'machine', 'cable', 'body only', 'kettlebells', 'e-z curl bar', 'bands', 'exercise ball', 'medicine ball', 'foam roll', 'other'];
 // Zapis lokalny; każda zmiana danych zleca też (z opóźnieniem) wysyłkę do chmury, jeśli jesteś zalogowany.
 // silent = zapis danych właśnie pobranych z chmury (nie odsyłaj ich z powrotem)
 function save(silent) {
@@ -52,7 +54,9 @@ const GROUPS = [
   { id: 'back', label: 'Plecy', m: ['lats', 'middle back', 'lower back', 'traps'] },
   { id: 'legs', label: 'Nogi', m: ['quadriceps', 'hamstrings', 'glutes', 'calves', 'adductors', 'abductors'] },
   { id: 'shoulders', label: 'Barki', m: ['shoulders'] },
-  { id: 'arms', label: 'Ręce', m: ['biceps', 'triceps', 'forearms'] },
+  { id: 'biceps', label: 'Biceps', m: ['biceps'] },
+  { id: 'triceps', label: 'Triceps', m: ['triceps'] },
+  { id: 'forearms', label: 'Przedramiona', m: ['forearms'] },
   { id: 'abs', label: 'Brzuch', m: ['abdominals'] },
   { id: 'cardio', label: 'Cardio', test: e => e.c === 'cardio' },
   { id: 'stretch', label: 'Rozciąganie', test: e => e.c === 'stretching' },
@@ -837,7 +841,7 @@ function exFiltered(F) {
   const t = groupTest(g);
   const q = fold(F.q.trim());
   const hit = e => fold(e.pl).includes(q) || fold(e.n).includes(q) || fold(ALIASES[e.id]).includes(q);
-  const list = exSorted().filter(e => (!F.fav || isFav(e.id)) && t(e) && (!q || hit(e)));
+  const list = exSorted().filter(e => (!F.fav || isFav(e.id)) && t(e) && (!F.eq || e.e === F.eq) && (!q || hit(e)));
   if (!q) return list;
   // przy wyszukiwaniu: najpierw trafienia po skrócie (np. „ohp”, „bench”), potem od początku nazwy, potem reszta
   const rank = e => fold(ALIASES[e.id]).split(' ').some(w => w.startsWith(q)) ? 0 : (fold(e.pl).startsWith(q) || fold(e.n).startsWith(q)) ? 1 : 2;
@@ -875,6 +879,11 @@ function listShellHTML(F, idp) {
       <span class="chip-sep" aria-hidden="true"></span>
       ${GROUPS.map(g => `<button class="chip" type="button" data-g="${g.id}" aria-pressed="${g.id === F.g}">${g.label}</button>`).join('')}
     </div>
+    <div class="chips chips-eq" role="group" aria-label="Sprzęt">
+      <span class="chips-label">Sprzęt</span>
+      <button class="chip chip-eq" type="button" data-eq="" aria-pressed="${!F.eq}">Dowolny</button>
+      ${EQUIP_ORDER.filter(k => EX.some(e => e.e === k) || (S.custom || []).some(c => c.e === k)).map(k => `<button class="chip chip-eq" type="button" data-eq="${esc(k)}" aria-pressed="${F.eq === k}">${EQUIP[k] || k}</button>`).join('')}
+    </div>
     <div class="muted small" id="${idp}-count">${countLabel(items.length, F)}</div>
     <div id="${idp}-list">${exListHTML(items, F)}</div>`;
 }
@@ -892,6 +901,7 @@ function wireList(root, idp, F, onPick) {
     $(`#${idp}-list`, root).innerHTML = exListHTML(items, F);
     $(`#${idp}-count`, root).textContent = countLabel(items.length, F);
     $$('[data-g]', root).forEach(c => c.setAttribute('aria-pressed', c.dataset.g === F.g));
+    $$('[data-eq]', root).forEach(c => c.setAttribute('aria-pressed', c.dataset.eq === (F.eq || '')));
     const fc = $('[data-favonly]', root);
     fc.setAttribute('aria-pressed', F.fav);
     fc.innerHTML = `★ Ulubione${S.fav.length ? ` <span class="chip-n">${S.fav.length}</span>` : ''}`;
@@ -906,6 +916,8 @@ function wireList(root, idp, F, onPick) {
     if (e.target.closest('[data-favoff]')) { F.fav = false; F.g = 'pop'; F.lim = 60; refresh(); return; }
     const chip = e.target.closest('[data-g]');
     if (chip) { F.g = chip.dataset.g; F.lim = 60; refresh(); return; }
+    const eq = e.target.closest('[data-eq]');
+    if (eq) { F.eq = eq.dataset.eq; F.lim = 60; refresh(); return; }
     const fav = e.target.closest('[data-fav]');
     if (fav) {
       const on = toggleFav(fav.dataset.fav);
@@ -1085,12 +1097,13 @@ $('#btn-custom').addEventListener('click', () => {
   openSheet('Własne ćwiczenie', `
     <div class="field"><label for="c-name">Nazwa</label><input type="text" id="c-name" placeholder="np. Wyciskanie na maszynie Hammer" maxlength="80"></div>
     <div class="field"><label for="c-m">Główna partia</label><select id="c-m">${Object.entries(MUSCLE).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+    <div class="field"><label for="c-e">Sprzęt</label><select id="c-e">${EQUIP_ORDER.map(k => `<option value="${k}"${k === 'machine' ? ' selected' : ''}>${EQUIP[k]}</option>`).join('')}</select></div>
     <div class="field"><label for="c-t">Rodzaj</label><select id="c-t"><option value="strength">Siłowe (kg × powtórzenia)</option><option value="cardio">Cardio (minuty / km)</option></select></div>
     <button class="btn primary" type="button" id="c-ok">Dodaj</button>`, b => {
     $('#c-ok', b).onclick = () => {
       const n = $('#c-name', b).value.trim(); if (!n) { toast('Wpisz nazwę ćwiczenia'); return; }
       S.custom = S.custom || [];
-      S.custom.push({ id: 'c_' + uid(), n, pl: n, m: [$('#c-m', b).value], c: $('#c-t', b).value, e: 'other' });
+      S.custom.push({ id: 'c_' + uid(), n, pl: n, m: [$('#c-m', b).value], c: $('#c-t', b).value, e: $('#c-e', b).value });
       save(); rebuildExMap(); closeSheet(); UI.cw = newFilter(); UI.cw.fav = false; UI.cw.g = 'pop'; renderCw(); toast('Dodano ćwiczenie');
     };
   });
