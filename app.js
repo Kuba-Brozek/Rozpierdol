@@ -879,7 +879,10 @@ function listShellHTML(F, idp) {
     <div id="${idp}-list">${exListHTML(items, F)}</div>`;
 }
 function renderCw() {
-  const body = $('#cw-body');
+  // świeży element przy każdym rysowaniu — inaczej obsługa kliknięć dokładałaby się przy każdym wejściu
+  // do zakładki i np. gwiazdka przełączałaby ulubione kilka razy na jedno stuknięcie
+  const old = $('#cw-body'), body = old.cloneNode(false);
+  old.replaceWith(body);
   body.innerHTML = listShellHTML(UI.cw, 'cw');
   wireList(body, 'cw', UI.cw, id => showExercise(id));
 }
@@ -1197,6 +1200,49 @@ function renderWiecej() {
     }
   };
 }
+
+/* ============ Przycisk ✕ do czyszczenia pola ============
+   Jeden wspólny przycisk: pojawia się po prawej stronie aktywnego pola, gdy coś w nim jest.
+   Stuknięcie czyści pole, zostawia w nim kursor (klawiatura się nie chowa) i zapisuje zmianę jak przy wpisywaniu. */
+(function clearButton() {
+  const CLEARABLE = 'input[type="number"], input[type="text"], input[type="search"], input[type="email"]';
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.id = 'clear-x'; btn.hidden = true; btn.setAttribute('aria-label', 'Wyczyść pole'); btn.textContent = '✕';
+  document.body.appendChild(btn);
+  let target = null;
+  const place = () => {
+    if (!target || !document.contains(target) || !target.value || target.disabled) { btn.hidden = true; return; }
+    const r = target.getBoundingClientRect();
+    if (r.width < 60 || r.bottom < 0 || r.top > innerHeight) { btn.hidden = true; return; }
+    const size = Math.min(28, r.height - 8);
+    btn.style.width = btn.style.height = size + 'px';
+    btn.style.left = (r.right - size - 6) + 'px';
+    btn.style.top = (r.top + (r.height - size) / 2) + 'px';
+    btn.hidden = false;
+  };
+  document.addEventListener('focusin', e => {
+    if (e.target.matches && e.target.matches(CLEARABLE)) { target = e.target; target.classList.add('has-clear'); place(); }
+  });
+  document.addEventListener('focusout', e => {
+    if (e.target === target) setTimeout(() => { if (document.activeElement !== target) { target.classList.remove('has-clear'); target = null; btn.hidden = true; } }, 0);
+  });
+  document.addEventListener('input', e => {
+    if (e.target !== target && e.target.matches && e.target.matches(CLEARABLE)) { if (target) target.classList.remove('has-clear'); target = e.target; target.classList.add('has-clear'); }
+    if (e.target === target) place();
+  });
+  window.addEventListener('scroll', place, true);
+  window.addEventListener('resize', place);
+  // pointerdown + preventDefault: pole nie traci kursora, więc klawiatura na iPhonie zostaje
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (!target) return;
+    target.value = '';
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+    target.focus(); place();
+  });
+  btn.addEventListener('click', e => e.preventDefault());
+})();
 
 /* ============ Start ============ */
 const splashStart = performance.now();
