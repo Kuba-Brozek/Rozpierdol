@@ -699,8 +699,14 @@ function renderTrening() {
     $$('[data-w]', body).forEach(b => b.onclick = () => showWorkout(b.dataset.w));
     return;
   }
+  const editing = !!A.editId;
   body.innerHTML = `
-    ${A.planName ? `<div class="row"><span class="pill good">Plan: ${esc(A.planName)}</span><span class="muted small">${dayLabel(A.date, { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>` : ''}
+    ${editing ? `<section class="card edit-head">
+        <div class="row"><b>Edycja zapisanego treningu</b>${A.planName ? `<span class="pill good">Plan: ${esc(A.planName)}</span>` : ''}</div>
+        <div class="field"><label for="t-date">Data treningu</label><input type="date" id="t-date" value="${A.date}" max="${today()}"></div>
+        <p class="muted small" style="margin:0">Zmień serie, dodaj lub usuń ćwiczenia, potem stuknij „Zapisz trening”.</p>
+      </section>`
+    : A.planName ? `<div class="row"><span class="pill good">Plan: ${esc(A.planName)}</span><span class="muted small">${dayLabel(A.date, { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>` : ''}
     ${A.ex.map((e, ei) => {
       const ex = EXMAP[e.id], c = isCardio(ex), prev = lastSetsFor(e.id, A.id);
       return `<section class="ex-card" data-ei="${ei}">
@@ -722,9 +728,11 @@ function renderTrening() {
         <div class="row"><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length ? '<button class="link" type="button" data-act="pop" style="color:var(--muted)">Usuń ostatnią</button>' : ''}</div>
       </section>`;
     }).join('')}
-    ${A.ex.length ? '' : '<div class="card empty"><strong>Trening trwa</strong><span>Dodaj pierwsze ćwiczenie.</span></div>'}
+    ${A.ex.length ? '' : `<div class="card empty"><strong>${editing ? 'Brak ćwiczeń' : 'Trening trwa'}</strong><span>Dodaj ${editing ? '' : 'pierwsze '}ćwiczenie.</span></div>`}
     <button class="btn block" type="button" id="t-add">+ Dodaj ćwiczenie</button>
-    <div class="btns"><button class="btn danger" type="button" id="t-cancel">Odrzuć</button><button class="btn primary" type="button" id="t-finish">Zakończ trening</button></div>`;
+    <div class="btns"><button class="btn danger" type="button" id="t-cancel">${editing ? 'Odrzuć zmiany' : 'Odrzuć'}</button><button class="btn primary" type="button" id="t-finish">Zapisz trening</button></div>`;
+  const dateInp = $('#t-date', body);
+  if (dateInp) dateInp.onchange = () => { if (dateInp.value) { A.date = dateInp.value; save(); } };
 
   body.oninput = e => {
     const inp = e.target.closest('input[data-f]'); if (!inp) return;
@@ -750,7 +758,12 @@ function renderTrening() {
     save(); renderTrening();
   };
   $('#t-add').onclick = () => pickExercise(id => { addExToActive(id); closeSheet(); renderTrening(); toast('Dodano: ' + exName(EXMAP[id])); });
-  $('#t-cancel').onclick = async () => { if (await confirmBox('Odrzucić trening?', 'Wpisane serie z tego treningu zostaną usunięte.', 'Odrzuć', true)) { S.active = null; save(); renderTrening(); } };
+  $('#t-cancel').onclick = async () => {
+    const ok = editing
+      ? await confirmBox('Odrzucić zmiany?', 'Zapisany trening zostanie taki, jak był przed edycją.', 'Odrzuć zmiany', true)
+      : await confirmBox('Odrzucić trening?', 'Wpisane serie z tego treningu zostaną usunięte.', 'Odrzuć', true);
+    if (ok) { S.active = null; save(); renderTrening(); }
+  };
   $('#t-finish').onclick = finishWorkout;
 }
 function addExToActive(id) {
@@ -763,7 +776,22 @@ async function finishWorkout() {
   const A = S.active;
   const ex = A.ex.map(e => ({ id: e.id, sets: e.sets.filter(s => s.a != null || s.b != null).map(s => ({ a: s.a, b: s.b })) })).filter(e => e.sets.length);
   if (!ex.length) {
+    if (A.editId) { toast('Trening musi mieć co najmniej jedną serię. Żeby go skasować, użyj „Usuń trening”.'); return; }
     if (await confirmBox('Pusty trening', 'Nie wpisałeś żadnej serii. Odrzucić ten trening?', 'Odrzuć', true)) { S.active = null; save(); renderTrening(); }
+    return;
+  }
+  if (A.editId) {
+    // edycja: nadpisz zapisany trening (ten sam identyfikator), zachowaj godziny; przy zmianie daty przestaw w historii
+    const i = S.workouts.findIndex(x => x.id === A.editId);
+    const old = i >= 0 ? S.workouts[i] : {};
+    const dateChanged = old.date && old.date !== A.date;
+    const start = dateChanged ? parseD(A.date).getTime() + 12 * 36e5 : (old.start || A.start);
+    const w = Object.assign({}, old, { id: A.editId, date: A.date, start, end: dateChanged ? start : (old.end || start), ex });
+    if (A.planName) { w.planId = A.planId; w.planName = A.planName; }
+    if (i >= 0) S.workouts[i] = w; else S.workouts.push(w);
+    S.workouts.sort((a, b) => a.start - b.start);
+    S.active = null; save(); renderTrening();
+    toast('Zapisano zmiany w treningu');
     return;
   }
   const w = { id: A.id, date: A.date, start: A.start, end: Date.now(), ex };
@@ -771,6 +799,14 @@ async function finishWorkout() {
   S.workouts.push(w); S.workouts.sort((a, b) => a.start - b.start);
   S.active = null; save(); renderTrening();
   toast('Zapisano trening');
+}
+function editWorkout(id) {
+  const w = S.workouts.find(x => x.id === id); if (!w) return;
+  if (S.active) { toast(S.active.editId ? 'Najpierw zapisz albo odrzuć zmiany w edytowanym treningu.' : 'Najpierw zapisz albo odrzuć trening, który trwa.'); return; }
+  // kopia treningu jako „trening w toku” z oznaczeniem edycji; serie oznaczone jako zrobione
+  S.active = { id: w.id, editId: w.id, date: w.date, start: w.start, ex: w.ex.map(e => ({ id: e.id, sets: e.sets.map(s => ({ a: s.a, b: s.b, done: true })) })) };
+  if (w.planName) { S.active.planId = w.planId; S.active.planName = w.planName; }
+  save(); closeSheet(); setTab('trening');
 }
 function showWorkout(id) {
   const w = S.workouts.find(x => x.id === id); if (!w) return;
@@ -782,10 +818,12 @@ function showWorkout(id) {
     </div>
     <div class="list">${w.ex.map(e => { const ex = EXMAP[e.id]; return `<div class="li">${thumbHTML(ex)}<div class="grow"><div class="t">${esc(exName(ex))}</div><div class="s num">${setsSummary(ex, e.sets)}</div></div></div>`; }).join('')}</div>
     ${w.planName ? `<p class="muted small" style="margin:0">Według planu: <b>${esc(w.planName)}</b></p>` : ''}
+    <button class="btn primary block" type="button" id="wd-edit">Edytuj trening</button>
     <div class="btns">
       <button class="btn" type="button" id="wd-plan">Zapisz jako plan</button>
       <button class="btn danger" type="button" id="wd-del">Usuń trening</button>
     </div>`, b => {
+    $('#wd-edit', b).onclick = () => editWorkout(id);
     $('#wd-plan', b).onclick = () => editPlan(null, { id: 'p_' + uid(), name: w.planName ? w.planName + ' (kopia)' : '', ex: w.ex.map(e => ({ id: e.id, sets: e.sets.length })) });
     $('#wd-del', b).onclick = async () => {
       if (await confirmBox('Usunąć trening?', 'Tego nie da się cofnąć.', 'Usuń', true)) { S.workouts = S.workouts.filter(x => x.id !== id); save(); renderTrening(); toast('Usunięto trening'); }
