@@ -814,6 +814,9 @@ const ALIASES = {
   'Wide-Grip_Lat_Pulldown': 'lat pulldown sciaganie drazka wyciag gorny',
   Barbell_Hip_Thrust: 'hip thrust hipthrust posladki',
   Side_Lateral_Raise: 'lateral wznosy bokiem boczne barki',
+  Machine_Lateral_Raise: 'lateral maszyna wznosy bokiem boczne barki machine',
+  Cable_Seated_Lateral_Raise: 'lateral wyciag wznosy bokiem boczne barki',
+  Seated_Side_Lateral_Raise: 'lateral wznosy siedzac',
   Face_Pull: 'facepull face pull',
   Leg_Press: 'suwnica leg press wypychanie',
   Lying_Leg_Curls: 'leg curl uginanie nog dwuglowe',
@@ -1064,7 +1067,7 @@ function showExercise(id) {
     ${hist.length ? `<div class="card"><h3>Twoja historia</h3>
       ${best ? `<div class="row"><span>Najwyższy ciężar</span><b class="num">${fmt(best.a, best.a % 1 ? 1 : 0)} kg × ${best.b}</b></div>` : ''}
       ${hist.slice(0, 5).map(h => `<div class="row small"><span class="muted">${dayLabel(h.date)}</span><span class="num">${setsSummary(e, h.sets)}</span></div>`).join('')}</div>` : ''}
-    ${e.ins && e.ins.length ? `<div class="card"><h3>Jak wykonać (po angielsku)</h3><ol class="steps">${e.ins.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>` : ''}
+    ${e.ins && e.ins.length ? `<div class="card"><h3>Jak wykonać${e.insPl ? '' : ' (po angielsku)'}</h3><ol class="steps">${e.ins.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>` : ''}
     ${e.own ? `<button class="btn danger" type="button" id="ex-del">Usuń własne ćwiczenie</button>` : ''}`, b => {
     $('#ex-fav', b).onclick = ev => {
       const on = toggleFav(id), btn = ev.currentTarget;
