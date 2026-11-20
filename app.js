@@ -790,11 +790,55 @@ function showWorkout(id) {
 }
 
 /* ============ ĆWICZENIA ============ */
+// Skróty i potoczne nazwy z siłowni, po których też da się znaleźć ćwiczenie
+const ALIASES = {
+  Standing_Military_Press: 'ohp overhead press wyciskanie nad glowe stojac military',
+  Barbell_Shoulder_Press: 'ohp overhead press military barki sztanga',
+  Seated_Barbell_Military_Press: 'ohp siedzac wyciskanie zolnierskie siedzac',
+  Dumbbell_Shoulder_Press: 'db ohp hantle nad glowe barki',
+  Arnold_Dumbbell_Press: 'arnold arnoldki wyciskanie arnolda',
+  'Barbell_Bench_Press_-_Medium_Grip': 'bench bp klata lawka plaska wyciskanie lezac',
+  'Barbell_Incline_Bench_Press_-_Medium_Grip': 'incline skos klata skosna',
+  Dumbbell_Bench_Press: 'db bench hantle klata',
+  Barbell_Squat: 'squat przysiad back squat',
+  Front_Barbell_Squat: 'front squat przysiad przedni',
+  Goblet_Squat: 'goblet',
+  Split_Squat_with_Dumbbells: 'bulgar bulgarian split squat przysiad bulgarski',
+  Barbell_Deadlift: 'dl deadlift mc martwy',
+  Romanian_Deadlift: 'rdl rumun martwy rumunski',
+  Sumo_Deadlift: 'sumo mc sumo',
+  Bent_Over_Barbell_Row: 'row wioslo wioslowanie',
+  Seated_Cable_Rows: 'row wyciag wioslowanie siedzac',
+  Pullups: 'pull up pullup drazek podciaganie',
+  'Chin-Up': 'chin up chinup podchwyt drazek',
+  'Wide-Grip_Lat_Pulldown': 'lat pulldown sciaganie drazka wyciag gorny',
+  Barbell_Hip_Thrust: 'hip thrust hipthrust posladki',
+  Side_Lateral_Raise: 'lateral wznosy bokiem boczne barki',
+  Face_Pull: 'facepull face pull',
+  Leg_Press: 'suwnica leg press wypychanie',
+  Lying_Leg_Curls: 'leg curl uginanie nog dwuglowe',
+  Leg_Extensions: 'prostowanie nog wyprosty czworoglowe',
+  Standing_Calf_Raises: 'lydki calf wspiecia',
+  Triceps_Pushdown: 'pushdown triceps wyciag prostowanie',
+  Barbell_Curl: 'biceps curl uginanie sztanga',
+  Hammer_Curls: 'mlotki hammer',
+  'Dips_-_Chest_Version': 'dipy dips porecze',
+  Pushups: 'pompki push up pushup',
+  Plank: 'plank deska',
+  Hanging_Leg_Raise: 'wznosy nog w zwisie brzuch',
+};
+// Porównujemy bez wielkości liter i polskich znaków („zolnierskie” = „żołnierskie”)
+const fold = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
 function exFiltered(F) {
   const g = GROUPS.find(x => x.id === F.g) || GROUPS[0];
   const t = groupTest(g);
-  const q = F.q.trim().toLowerCase();
-  return exSorted().filter(e => (!F.fav || isFav(e.id)) && t(e) && (!q || (e.pl || '').toLowerCase().includes(q) || e.n.toLowerCase().includes(q)));
+  const q = fold(F.q.trim());
+  const hit = e => fold(e.pl).includes(q) || fold(e.n).includes(q) || fold(ALIASES[e.id]).includes(q);
+  const list = exSorted().filter(e => (!F.fav || isFav(e.id)) && t(e) && (!q || hit(e)));
+  if (!q) return list;
+  // przy wyszukiwaniu: najpierw trafienia po skrócie (np. „ohp”, „bench”), potem od początku nazwy, potem reszta
+  const rank = e => fold(ALIASES[e.id]).split(' ').some(w => w.startsWith(q)) ? 0 : (fold(e.pl).startsWith(q) || fold(e.n).startsWith(q)) ? 1 : 2;
+  return list.map((e, i) => [rank(e), i, e]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(x => x[2]);
 }
 function starBtn(id) {
   const on = isFav(id);
