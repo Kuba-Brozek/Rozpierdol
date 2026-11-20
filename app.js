@@ -469,7 +469,8 @@ function interpretBook(sheets) {
       if (r['PLAN'] && !w.planName) w.planName = String(r['PLAN']);
       let e = w.ex.find(x => x.id === exId);
       if (!e) { e = { id: exId, sets: [] }; w.ex.push(e); }
-      e.sets.push({ a: num(r['KG / MIN']), b: num(r['POWT. / KM']) });
+      const sa = num(r['KG / MIN']), sb = num(r['POWT. / KM']);
+      if (sa != null || sb != null) e.sets.push({ a: sa, b: sb });
     }
     res.workouts = [...byId.values()];
     if (extraCustom.length) res.custom = [...(res.custom || []), ...extraCustom];
@@ -665,7 +666,9 @@ function backupXlsx() {
   if (diet.length < 2) diet.push([]);
   diet[1][9] = N1(g); diet[1][10] = '<- cel: ile kg zrzucić';
   const tr = [[H('DATA'), H('TRENING'), H('ĆWICZENIE'), H('ID ĆWICZENIA'), H('SERIA'), H('KG / MIN'), H('POWT. / KM'), H('PLAN')]];
-  S.workouts.forEach(w => w.ex.forEach(e => e.sets.forEach((s, i) => tr.push([{ d: w.date }, w.id, exName(EXMAP[e.id]), e.id, i + 1, s.a, s.b, w.planName || '']))));
+  S.workouts.forEach(w => w.ex.forEach(e => e.sets.length
+    ? e.sets.forEach((s, i) => tr.push([{ d: w.date }, w.id, exName(EXMAP[e.id]), e.id, i + 1, s.a, s.b, w.planName || '']))
+    : tr.push([{ d: w.date }, w.id, exName(EXMAP[e.id]), e.id, null, null, null, w.planName || ''])));
   const plans = [[H('PLAN'), H('ID PLANU'), H('KOLEJNOŚĆ'), H('ĆWICZENIE'), H('ID ĆWICZENIA'), H('SERIE')]];
   S.plans.forEach(p => p.ex.forEach((e, i) => plans.push([p.name, p.id, i + 1, exName(EXMAP[e.id]), e.id, e.sets])));
   const fav = [[H('ID ĆWICZENIA'), H('NAZWA')], ...S.fav.map(id => [id, exName(EXMAP[id])])];
@@ -690,7 +693,7 @@ function lastSetsFor(exId, beforeId) {
   }
   return null;
 }
-const setsSummary = (e, sets) => sets.map(s => isCardio(e) ? `${fmt(s.a, 0)} min${s.b ? ' / ' + fmt(s.b, 1) + ' km' : ''}` : `${fmt(s.a, s.a % 1 ? 1 : 0)}×${s.b}`).join(', ');
+const setsSummary = (e, sets) => !sets.length ? 'bez serii' : sets.map(s => isCardio(e) ? `${fmt(s.a, 0)} min${s.b ? ' / ' + fmt(s.b, 1) + ' km' : ''}` : `${fmt(s.a, s.a % 1 ? 1 : 0)}×${s.b}`).join(', ');
 const volume = w => w.ex.reduce((sum, e) => isCardio(EXMAP[e.id]) ? sum : sum + e.sets.reduce((s, x) => s + (x.a || 0) * (x.b || 0), 0), 0);
 const durMin = w => w.end ? Math.max(1, Math.round((w.end - w.start) / 60000)) : null;
 
@@ -792,12 +795,17 @@ function addExToActive(id) {
   S.active.ex.push({ id, sets: Array.from({ length: n }, () => ({ a: null, b: null, done: false })) });
   save();
 }
+function emptySets(id) {
+  const prev = lastSetsFor(id);
+  return Array.from({ length: prev ? prev.sets.length : 3 }, () => ({ a: null, b: null, done: false }));
+}
 async function finishWorkout() {
   const A = S.active;
-  const ex = A.ex.map(e => ({ id: e.id, sets: e.sets.filter(s => s.a != null || s.b != null).map(s => ({ a: s.a, b: s.b })) })).filter(e => e.sets.length);
+  // ćwiczenia zostają w treningu nawet bez wpisanych serii (zachowany układ); puste serie są pomijane
+  const ex = A.ex.map(e => ({ id: e.id, sets: e.sets.filter(s => s.a != null || s.b != null).map(s => ({ a: s.a, b: s.b })) }));
   if (!ex.length) {
-    if (A.editId) { toast('Trening musi mieć co najmniej jedną serię. Żeby go skasować, użyj „Usuń trening”.'); return; }
-    if (await confirmBox('Pusty trening', 'Nie wpisałeś żadnej serii. Odrzucić ten trening?', 'Odrzuć', true)) { S.active = null; save(); renderTrening(); }
+    if (A.editId) { toast('Trening musi mieć co najmniej jedno ćwiczenie. Żeby go skasować, użyj „Usuń trening”.'); return; }
+    if (await confirmBox('Pusty trening', 'Nie dodałeś żadnego ćwiczenia. Odrzucić ten trening?', 'Odrzuć', true)) { S.active = null; save(); renderTrening(); }
     return;
   }
   if (A.editId) {
@@ -824,7 +832,7 @@ function editWorkout(id) {
   const w = S.workouts.find(x => x.id === id); if (!w) return;
   if (S.active) { toast(S.active.editId ? 'Najpierw zapisz albo odrzuć zmiany w edytowanym treningu.' : 'Najpierw zapisz albo odrzuć trening, który trwa.'); return; }
   // kopia treningu jako „trening w toku” z oznaczeniem edycji; serie oznaczone jako zrobione
-  S.active = { id: w.id, editId: w.id, date: w.date, start: w.start, ex: w.ex.map(e => ({ id: e.id, sets: e.sets.map(s => ({ a: s.a, b: s.b, done: true })) })) };
+  S.active = { id: w.id, editId: w.id, date: w.date, start: w.start, ex: w.ex.map(e => ({ id: e.id, sets: e.sets.length ? e.sets.map(s => ({ a: s.a, b: s.b, done: true })) : emptySets(e.id) })) };
   if (w.planName) { S.active.planId = w.planId; S.active.planName = w.planName; }
   save(); closeSheet(); setTab('trening');
 }
@@ -844,7 +852,7 @@ function showWorkout(id) {
       <button class="btn danger" type="button" id="wd-del">Usuń trening</button>
     </div>`, b => {
     $('#wd-edit', b).onclick = () => editWorkout(id);
-    $('#wd-plan', b).onclick = () => editPlan(null, { id: 'p_' + uid(), name: w.planName ? w.planName + ' (kopia)' : '', ex: w.ex.map(e => ({ id: e.id, sets: e.sets.length })) });
+    $('#wd-plan', b).onclick = () => editPlan(null, { id: 'p_' + uid(), name: w.planName ? w.planName + ' (kopia)' : '', ex: w.ex.map(e => ({ id: e.id, sets: e.sets.length || emptySets(e.id).length })) });
     $('#wd-del', b).onclick = async () => {
       if (await confirmBox('Usunąć trening?', 'Tego nie da się cofnąć.', 'Usuń', true)) { S.workouts = S.workouts.filter(x => x.id !== id); save(); renderTrening(); toast('Usunięto trening'); }
     };
