@@ -399,3 +399,11 @@ input.has-clear { padding-right: 38px !important; }
 .chips-label { flex: none; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding-right: 2px; }
 .chip-eq { padding: 5px 12px; font-size: 13px; }
 .chip-eq[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
+/* „★ Ulubione” przypięte do lewej krawędzi rzędu filtrów — kategorie przewijają się pod nim */
+.chips-sticky {
+  position: sticky; left: 0; z-index: 2; flex: none; display: flex; align-items: stretch; gap: 8px;
+  background: var(--bg); padding-right: 2px;
+  box-shadow: -16px 0 0 var(--bg), 10px 0 10px -6px var(--bg);
+}
+.sheet .chips-sticky { background: var(--bg); }

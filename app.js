@@ -875,8 +875,7 @@ function listShellHTML(F, idp) {
   const items = exFiltered(F);
   return `<input type="search" id="${idp}-q" placeholder="Szukaj ćwiczenia…" value="${esc(F.q)}" autocomplete="off" aria-label="Szukaj ćwiczenia">
     <div class="chips" role="group" aria-label="Filtry">
-      <button class="chip chip-fav" type="button" data-favonly aria-pressed="${F.fav}">★ Ulubione${S.fav.length ? ` <span class="chip-n">${S.fav.length}</span>` : ''}</button>
-      <span class="chip-sep" aria-hidden="true"></span>
+      <span class="chips-sticky"><button class="chip chip-fav" type="button" data-favonly aria-pressed="${F.fav}">★ Ulubione${S.fav.length ? ` <span class="chip-n">${S.fav.length}</span>` : ''}</button><span class="chip-sep" aria-hidden="true"></span></span>
       ${GROUPS.map(g => `<button class="chip" type="button" data-g="${g.id}" aria-pressed="${g.id === F.g}">${g.label}</button>`).join('')}
     </div>
     <div class="chips chips-eq" role="group" aria-label="Sprzęt">
