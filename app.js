@@ -470,7 +470,7 @@ function interpretBook(sheets) {
       let e = w.ex.find(x => x.id === exId);
       if (!e) { e = { id: exId, sets: [] }; w.ex.push(e); }
       const sa = num(r['KG / MIN']), sb = num(r['POWT. / KM']);
-      if (sa != null || sb != null) e.sets.push({ a: sa, b: sb });
+      if (sa != null || sb != null || num(r['SERIA']) != null) e.sets.push({ a: sa, b: sb });
     }
     res.workouts = [...byId.values()];
     if (extraCustom.length) res.custom = [...(res.custom || []), ...extraCustom];
@@ -689,11 +689,12 @@ function lastSetsFor(exId, beforeId) {
   for (let i = S.workouts.length - 1; i >= 0; i--) {
     const w = S.workouts[i]; if (w.id === beforeId) continue;
     const e = w.ex.find(x => x.id === exId);
-    if (e && e.sets.length) return { date: w.date, sets: e.sets };
+    if (e && e.sets.some(filled)) return { date: w.date, sets: e.sets };
   }
   return null;
 }
-const setsSummary = (e, sets) => !sets.length ? 'bez serii' : sets.map(s => isCardio(e) ? `${fmt(s.a, 0)} min${s.b ? ' / ' + fmt(s.b, 1) + ' km' : ''}` : `${fmt(s.a, s.a % 1 ? 1 : 0)}×${s.b}`).join(', ');
+const filled = s => s.a != null || s.b != null;
+const setsSummary = (e, sets) => !(sets = sets.filter(filled)).length ? 'bez serii' : sets.map(s => isCardio(e) ? `${fmt(s.a, 0)} min${s.b ? ' / ' + fmt(s.b, 1) + ' km' : ''}` : `${fmt(s.a, s.a % 1 ? 1 : 0)}×${s.b}`).join(', ');
 const volume = w => w.ex.reduce((sum, e) => isCardio(EXMAP[e.id]) ? sum : sum + e.sets.reduce((s, x) => s + (x.a || 0) * (x.b || 0), 0), 0);
 const durMin = w => w.end ? Math.max(1, Math.round((w.end - w.start) / 60000)) : null;
 
@@ -799,7 +800,7 @@ function renderTrening() {
           <button class="li" type="button" data-w="${w.id}">
             <div class="grow"><div class="t">${dayLabel(w.date, { weekday: 'long', day: 'numeric', month: 'long' })}${w.planName ? ` <span class="pill">${esc(w.planName)}</span>` : ''}</div>
             <div class="s">${w.ex.map(e => esc(exName(EXMAP[e.id]))).slice(0, 3).join(', ')}${w.ex.length > 3 ? ` +${w.ex.length - 3}` : ''}</div></div>
-            <div class="r small muted">${w.ex.reduce((s, e) => s + e.sets.length, 0)} serii${volume(w) ? '<br>' + fmt(volume(w), 0) + ' kg' : ''}</div>
+            <div class="r small muted">${w.ex.reduce((s, e) => s + e.sets.filter(filled).length, 0)} serii${volume(w) ? '<br>' + fmt(volume(w), 0) + ' kg' : ''}</div>
           </button>`).join('')}</div>`
       : `<div class="card empty"><strong>Brak treningów</strong><span>Rozpocznij trening, dodaj ćwiczenia z bazy i zapisuj serie: ciężar i powtórzenia. Przy kolejnym treningu zobaczysz, co zrobiłeś ostatnio.</span></div>`}`;
     $('#t-start').onclick = startWorkoutSheet;
@@ -886,8 +887,8 @@ function emptySets(id) {
 }
 async function finishWorkout() {
   const A = S.active;
-  // ćwiczenia zostają w treningu nawet bez wpisanych serii (zachowany układ); puste serie są pomijane
-  const ex = A.ex.map(e => ({ id: e.id, sets: e.sets.filter(s => s.a != null || s.b != null).map(s => ({ a: s.a, b: s.b })) }));
+  // ćwiczenia zostają w treningu nawet bez wpisanych serii (zachowany układ) i z pełną liczbą serii, także pustych
+  const ex = A.ex.map(e => ({ id: e.id, sets: e.sets.map(s => ({ a: s.a, b: s.b })) }));
   if (!ex.length) {
     if (A.editId) { toast('Trening musi mieć co najmniej jedno ćwiczenie. Żeby go skasować, użyj „Usuń trening”.'); return; }
     if (await confirmBox('Pusty trening', 'Nie dodałeś żadnego ćwiczenia. Odrzucić ten trening?', 'Odrzuć', true)) { S.active = null; save(); renderTrening(); }
@@ -917,7 +918,7 @@ function editWorkout(id) {
   const w = S.workouts.find(x => x.id === id); if (!w) return;
   if (S.active) { toast(S.active.editId ? 'Najpierw zapisz albo odrzuć zmiany w edytowanym treningu.' : 'Najpierw zapisz albo odrzuć trening, który trwa.'); return; }
   // kopia treningu jako „trening w toku” z oznaczeniem edycji; serie oznaczone jako zrobione
-  S.active = { id: w.id, editId: w.id, date: w.date, start: w.start, ex: w.ex.map(e => ({ id: e.id, sets: e.sets.length ? e.sets.map(s => ({ a: s.a, b: s.b, done: true })) : emptySets(e.id) })) };
+  S.active = { id: w.id, editId: w.id, date: w.date, start: w.start, ex: w.ex.map(e => ({ id: e.id, sets: e.sets.length ? e.sets.map(s => ({ a: s.a, b: s.b, done: filled(s) })) : emptySets(e.id) })) };
   if (w.planName) { S.active.planId = w.planId; S.active.planName = w.planName; }
   save(); closeSheet(); setTab('trening');
 }
@@ -926,7 +927,7 @@ function showWorkout(id) {
   openSheet(dayLabel(w.date, { weekday: 'long', day: 'numeric', month: 'long' }), `
     <div class="tiles">
       <div class="tile"><span class="k">Ćwiczenia</span><span class="v">${w.ex.length}</span><span class="d">w treningu</span></div>
-      <div class="tile"><span class="k">Serie</span><span class="v">${w.ex.reduce((s, e) => s + e.sets.length, 0)}</span><span class="d">łącznie</span></div>
+      <div class="tile"><span class="k">Serie</span><span class="v">${w.ex.reduce((s, e) => s + e.sets.filter(filled).length, 0)}</span><span class="d">łącznie</span></div>
       <div class="tile"><span class="k">Objętość</span><span class="v">${fmt(volume(w), 0)}</span><span class="d">kg × powt.</span></div>
     </div>
     <div class="list">${w.ex.map(e => { const ex = EXMAP[e.id]; return `<div class="li">${thumbHTML(ex)}<div class="grow"><div class="t">${esc(exName(ex))}</div><div class="s num">${setsSummary(ex, e.sets)}</div></div></div>`; }).join('')}</div>
@@ -1351,7 +1352,7 @@ function exHistory(id) {
 function showExercise(id) {
   const e = EXMAP[id]; if (!e) return;
   const hist = exHistory(id);
-  const best = isCardio(e) ? null : hist.flatMap(h => h.sets).reduce((m, s) => (s.a || 0) > (m ? m.a : -1) ? s : m, null);
+  const best = isCardio(e) ? null : hist.flatMap(h => h.sets.filter(filled)).reduce((m, s) => (s.a || 0) > (m ? m.a : -1) ? s : m, null);
   openSheet(exName(e), `
     ${e.img && e.img.length ? `<div class="ex-anim">${e.img.slice(0, 2).map((p, i) => `<img src="${IMG + p}" alt="${i ? 'Pozycja końcowa' : 'Pozycja początkowa'}" crossorigin="anonymous">`).join('')}</div>` : ''}
     ${e.pl ? `<div class="muted small">${esc(e.n)}</div>` : ''}
