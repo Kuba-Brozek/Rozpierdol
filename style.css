@@ -420,6 +420,10 @@ input.has-clear { padding-right: 38px !important; }
 .share-opts { display: flex; flex-direction: column; gap: 2px; }
 .share-opt { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 16px; cursor: pointer; }
 .share-opt input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+/* Rekordy osobiste */
+.pill.pr { background: color-mix(in srgb, #f5b301 22%, transparent); color: inherit; }
+.pr-line { color: var(--fg) !important; font-weight: 600; margin-top: 3px; }
+.pr-val { color: var(--accent); }
 .share-opt.off { opacity: .45; cursor: default; }
 /* Dużo pól w serii: węższe kolumny */
 .sets.many { gap: 6px 5px; }

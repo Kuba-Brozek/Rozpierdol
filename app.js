@@ -742,6 +742,66 @@ function setText(ex, s) {
   return parts.join(' ');
 }
 const setsSummary = (e, sets) => !(sets = sets.filter(filled)).length ? 'bez serii' : sets.map(s => setText(e, s)).join(', ');
+/* ---- rekordy osobiste ---- */
+// szacowany ciężar maksymalny na 1 powtórzenie (wzór Epleya), liczony z serii do 12 powtórzeń
+const e1rm = s => s.a > 0 && s.b >= 1 && s.b <= 12 ? (s.b === 1 ? s.a : s.a * (1 + s.b / 30)) : 0;
+const PR_KINDS = {
+  w: { l: 'Najcięższa seria', s: 'najcięższa seria', f: r => `${fmtN(r.s.a)} kg${hasVal(r.s.b) ? ' × ' + fmtN(r.s.b) : ''}` },
+  e1rm: { l: 'Szacowany 1RM', s: 'szacowany 1RM', f: r => `${fmtN(Math.round(r.v * 2) / 2)} kg` },
+  reps: { l: 'Najwięcej powtórzeń', s: 'najwięcej powtórzeń', f: r => `${fmtN(r.v)} powt.` },
+  vol: { l: 'Największa objętość', s: 'objętość', f: r => `${fmt(r.v, 0)} kg`, quiet: true },
+  dist: { l: 'Najdłuższy dystans', s: 'najdłuższy dystans', f: r => `${fmtN(r.v)} km` },
+  time: { l: 'Najdłuższy czas', s: 'najdłuższy czas', f: r => `${fmtN(r.v)} min` },
+};
+function bestsOf(ex, sets) {
+  const out = {}, put = (k, v, s) => { if (v > 0 && (!out[k] || v > out[k].v)) out[k] = { v, s }; };
+  let vol = 0;
+  sets.filter(filled).forEach(s => {
+    if (isCardio(ex)) { put('dist', s.b || 0, s); put('time', s.a || 0, s); return; }
+    if (s.a > 0) { put('w', s.a, s); put('e1rm', e1rm(s), s); vol += s.a * (s.b || 0); }
+    else put('reps', s.b || 0, s); // ćwiczenia bez obciążenia
+  });
+  put('vol', vol, null);
+  return out;
+}
+// Jedno przejście po historii: najlepsze wyniki każdego ćwiczenia + rekordy pobite w każdym treningu.
+// Pierwszy wynik w danej kategorii nie jest „pobitym rekordem”, bo nie ma z czym porównać.
+function prTimeline() {
+  const best = {}, byW = {};
+  [...S.workouts].sort((a, b) => a.start - b.start).forEach(w => w.ex.forEach(e => {
+    const b = bestsOf(EXMAP[e.id], e.sets), cur = best[e.id] || (best[e.id] = {});
+    for (const k in b) {
+      if (cur[k] && b[k].v > cur[k].v && !PR_KINDS[k].quiet) (byW[w.id] = byW[w.id] || []).push({ id: e.id, k, cur: b[k], prev: cur[k] });
+      if (!cur[k] || b[k].v > cur[k].v) cur[k] = Object.assign({ date: w.date, wid: w.id }, b[k]);
+    }
+  }));
+  return { best, byW };
+}
+function celebratePRs(wid) {
+  const prs = prTimeline().byW[wid]; if (!prs) return false;
+  if (navigator.vibrate) navigator.vibrate([20, 60, 20]);
+  openSheet('🏆 Nowe rekordy!', `
+    <p class="muted small" style="margin:0">Trening zapisany. Pobite rekordy osobiste:</p>
+    <div class="list">${[...new Set(prs.map(p => p.id))].map(id => { const ex = EXMAP[id]; return `
+      <div class="li">${thumbHTML(ex)}<div class="grow"><div class="t">${esc(exName(ex))}</div>
+        ${prs.filter(p => p.id === id).map(p => { const K = PR_KINDS[p.k]; return `<div class="s">${K.l}: <b class="num pr-val">${K.f(p.cur)}</b> <span class="muted">(było ${K.f(p.prev)})</span></div>`; }).join('')}</div></div>`; }).join('')}</div>
+    <button class="btn primary block" type="button" data-close>Super</button>`);
+  return true;
+}
+function showRecords() {
+  const { best } = prTimeline();
+  const rows = Object.entries(best).filter(([id, r]) => EXMAP[id] && Object.keys(r).some(k => !PR_KINDS[k].quiet))
+    .map(([id, r]) => ({ id, r, last: Object.values(r).reduce((m, x) => x.date > m ? x.date : m, '') }))
+    .sort((a, b) => a.last < b.last ? 1 : -1);
+  openSheet('🏆 Rekordy osobiste', rows.length ? `
+    <p class="muted small" style="margin:0">Najlepsze wyniki z całej historii. Szacowany 1RM liczony z serii do 12 powtórzeń.</p>
+    <div class="list">${rows.map(({ id, r, last }) => {
+      const parts = ['w', 'e1rm', 'reps', 'dist', 'time'].filter(k => r[k]).map(k => k === 'e1rm' ? '1RM ≈ ' + PR_KINDS[k].f(r[k]) : PR_KINDS[k].f(r[k]));
+      return `<button class="li" type="button" data-ex="${esc(id)}">${thumbHTML(EXMAP[id])}<div class="grow"><div class="t">${esc(exName(EXMAP[id]))}</div><div class="s num">${parts.join(' · ')}</div></div><div class="r small muted">${dayLabel(last)}</div></button>`;
+    }).join('')}</div>` : '<div class="card empty"><span>Zapisz pierwszy trening z wpisanymi seriami, a tu pojawią się twoje najlepsze wyniki.</span></div>', b => {
+    b.addEventListener('click', e => { const x = e.target.closest('[data-ex]'); if (x) { showExercise(x.dataset.ex); SHEET_BACK = showRecords; } });
+  });
+}
 const volume = w => w.ex.reduce((sum, e) => isCardio(EXMAP[e.id]) ? sum : sum + e.sets.reduce((s, x) => s + (x.a || 0) * (x.b || 0), 0), 0);
 const durMin = w => w.end ? Math.max(1, Math.round((w.end - w.start) / 60000)) : null;
 
@@ -833,7 +893,7 @@ function renderTrening() {
   const body = $('#trening-body');
   const A = S.active;
   if (!A) {
-    const hist = [...S.workouts].reverse();
+    const hist = [...S.workouts].reverse(), prW = hist.length ? prTimeline().byW : {};
     body.innerHTML = `
       <button class="btn primary block" type="button" id="t-start">Rozpocznij trening</button>
       ${hist.length ? `
@@ -842,15 +902,17 @@ function renderTrening() {
           <div class="tile"><span class="k">Ten tydzień</span><span class="v">${hist.filter(w => w.date >= addDays(today(), -((new Date().getDay() + 6) % 7))).length}</span><span class="d">od poniedziałku</span></div>
           <div class="tile"><span class="k">Ostatni</span><span class="v" style="font-size:17px">${dayLabel(hist[0].date)}</span><span class="d">${(n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : n + ' dni temu')(daysBetween(hist[0].date, today()))}</span></div>
         </div>
+        <button class="btn block" type="button" id="t-prs">🏆 Rekordy osobiste</button>
         <h3>Historia</h3>
         <div class="list">${hist.map(w => `
           <button class="li" type="button" data-w="${w.id}">
-            <div class="grow"><div class="t">${dayLabel(w.date, { weekday: 'long', day: 'numeric', month: 'long' })}${w.planName ? ` <span class="pill">${esc(w.planName)}</span>` : ''}</div>
+            <div class="grow"><div class="t">${dayLabel(w.date, { weekday: 'long', day: 'numeric', month: 'long' })}${w.planName ? ` <span class="pill">${esc(w.planName)}</span>` : ''}${prW[w.id] ? ` <span class="pill pr" title="Pobite rekordy">🏆 ${prW[w.id].length}</span>` : ''}</div>
             <div class="s">${w.ex.map(e => esc(exName(EXMAP[e.id]))).slice(0, 3).join(', ')}${w.ex.length > 3 ? ` +${w.ex.length - 3}` : ''}</div></div>
             <div class="r small muted">${w.ex.reduce((s, e) => s + e.sets.filter(filled).length, 0)} serii${volume(w) ? '<br>' + fmt(volume(w), 0) + ' kg' : ''}</div>
           </button>`).join('')}</div>`
       : `<div class="card empty"><strong>Brak treningów</strong><span>Rozpocznij trening, dodaj ćwiczenia z bazy i zapisuj serie: ciężar i powtórzenia. Przy kolejnym treningu zobaczysz, co zrobiłeś ostatnio.</span></div>`}`;
     $('#t-start').onclick = startWorkoutSheet;
+    const prb = $('#t-prs', body); if (prb) prb.onclick = showRecords;
     $$('[data-w]', body).forEach(b => b.onclick = () => showWorkout(b.dataset.w));
     return;
   }
@@ -991,14 +1053,14 @@ async function finishWorkout() {
     if (i >= 0) S.workouts[i] = w; else S.workouts.push(w);
     S.workouts.sort((a, b) => a.start - b.start);
     S.active = null; save(); renderTrening();
-    toast('Zapisano zmiany w treningu');
+    if (!celebratePRs(w.id)) toast('Zapisano zmiany w treningu');
     return;
   }
   const w = { id: A.id, date: A.date, start: A.start, end: Date.now(), ex };
   if (A.planName) { w.planId = A.planId; w.planName = A.planName; }
   S.workouts.push(w); S.workouts.sort((a, b) => a.start - b.start);
   S.active = null; save(); renderTrening();
-  toast('Zapisano trening');
+  if (!celebratePRs(w.id)) toast('Zapisano trening');
 }
 function editWorkout(id) {
   const w = S.workouts.find(x => x.id === id); if (!w) return;
@@ -1010,13 +1072,15 @@ function editWorkout(id) {
 }
 function showWorkout(id) {
   const w = S.workouts.find(x => x.id === id); if (!w) return;
+  const prs = prTimeline().byW[id] || [];
+  const prLine = exId => { const l = prs.filter(p => p.id === exId).map(p => PR_KINDS[p.k].s + ' ' + PR_KINDS[p.k].f(p.cur)); return l.length ? `<div class="s pr-line">🏆 Rekord: ${l.join(', ')}</div>` : ''; };
   openSheet(dayLabel(w.date, { weekday: 'long', day: 'numeric', month: 'long' }), `
     <div class="tiles">
       <div class="tile"><span class="k">Ćwiczenia</span><span class="v">${w.ex.length}</span><span class="d">w treningu</span></div>
       <div class="tile"><span class="k">Serie</span><span class="v">${w.ex.reduce((s, e) => s + e.sets.filter(filled).length, 0)}</span><span class="d">łącznie</span></div>
       <div class="tile"><span class="k">Objętość</span><span class="v">${fmt(volume(w), 0)}</span><span class="d">kg × powt.</span></div>
     </div>
-    <div class="list">${w.ex.map(e => { const ex = EXMAP[e.id]; return `<div class="li">${thumbHTML(ex)}<div class="grow"><div class="t">${esc(exName(ex))}</div><div class="s num">${setsSummary(ex, e.sets)}</div></div></div>`; }).join('')}</div>
+    <div class="list">${w.ex.map(e => { const ex = EXMAP[e.id]; return `<div class="li">${thumbHTML(ex)}<div class="grow"><div class="t">${esc(exName(ex))}</div><div class="s num">${setsSummary(ex, e.sets)}</div>${prLine(e.id)}</div></div>`; }).join('')}</div>
     ${w.planName ? `<p class="muted small" style="margin:0">Według planu: <b>${esc(w.planName)}</b></p>` : ''}
     <button class="btn primary block" type="button" id="wd-edit">Edytuj trening</button>
     <div class="btns">
@@ -1438,7 +1502,8 @@ function exHistory(id) {
 function showExercise(id) {
   const e = EXMAP[id]; if (!e) return;
   const hist = exHistory(id);
-  const best = isCardio(e) ? null : hist.flatMap(h => h.sets.filter(filled)).reduce((m, s) => (s.a || 0) > (m ? m.a : -1) ? s : m, null);
+  const rec = prTimeline().best[id] || {};
+  const recHTML = Object.keys(PR_KINDS).filter(k => rec[k]).map(k => `<div class="row"><span>${PR_KINDS[k].l}</span><span style="text-align:right"><b class="num">${PR_KINDS[k].f(rec[k])}</b> <span class="muted small">${dayLabel(rec[k].date)}</span></span></div>`).join('');
   openSheet(exName(e), `
     ${e.img && e.img.length ? `<div class="ex-anim">${e.img.slice(0, 2).map((p, i) => `<img src="${IMG + p}" alt="${i ? 'Pozycja końcowa' : 'Pozycja początkowa'}" crossorigin="anonymous">`).join('')}</div>` : ''}
     ${e.pl ? `<div class="muted small">${esc(e.n)}</div>` : ''}
@@ -1452,8 +1517,8 @@ function showExercise(id) {
       <button class="btn" type="button" id="ex-fav" aria-pressed="${isFav(id)}">${isFav(id) ? '★ W ulubionych' : '☆ Dodaj do ulubionych'}</button>
       ${S.active ? `<button class="btn primary" type="button" id="ex-add">Dodaj do treningu</button>` : ''}
     </div>
+    ${recHTML ? `<div class="card"><h3>🏆 Rekordy osobiste</h3>${recHTML}</div>` : ''}
     ${hist.length ? `<div class="card"><h3>Twoja historia</h3>
-      ${best ? `<div class="row"><span>Najwyższy ciężar</span><b class="num">${fmt(best.a, best.a % 1 ? 1 : 0)} kg × ${best.b}</b></div>` : ''}
       ${hist.slice(0, 5).map(h => `<div class="row small"><span class="muted">${dayLabel(h.date)}</span><span class="num">${setsSummary(e, h.sets)}</span></div>`).join('')}</div>` : ''}
     ${e.ins && e.ins.length ? `<div class="card"><h3>Jak wykonać${e.insPl ? '' : ' (po angielsku)'}</h3><ol class="steps">${e.ins.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>` : ''}
     ${e.own ? `<button class="btn danger" type="button" id="ex-del">Usuń własne ćwiczenie</button>` : ''}`, b => {
