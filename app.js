@@ -2114,7 +2114,7 @@ function renderWiecej() {
     </section>
     <section class="card about" data-sec="about">
       <p class="big-note" style="text-align:left">Cześć! 👋</p>
-      <p>Wszystko zaczęło się od zwykłego pliku Excel. Codziennie rano nowy wiersz: data i waga. Obok formuły liczyły BMI, zrzucone kilogramy, procent celu i średnią tygodniową, a w osobnej kolumnie świeciła brutalnie szczera „rodzaj otyłości”. Wzrost i cel siedziały w komórkach J1 i J2, żeby żadna formuła się nie zgubiła.</p>
+      <p>Wszystko zaczęło się od zwykłego pliku Excel. Codziennie rano nowy wiersz: data i waga. Obok formuły liczyły BMI, zrzucone kilogramy, procent celu i średnią tygodniową, a w osobnej kolumnie świeciła brutalnie szczera „rodzaj otyłości”. Wzrost i cel miały swoje stałe komórki, żeby żadna formuła się nie zgubiła.</p>
       <p>Działało, ale wpisywanie wagi w Excelu na telefonie o 7 rano to sport ekstremalny. W końcu padło pytanie: „a może by tak zrobić to porządnie?”. Tak powstał Rozpierdol. Zakładka Dieta wciąż liczy to samo co tamten arkusz, a kopia zapasowa zapisuje się w jego układzie.</p>
       <p>Teraz liczy treningi, rekordy, kalorie i ma motyw tak różowy, że aż boli.</p>
       <p>Robię ją sam, za darmo i bez reklam. Pomysły i błędy wrzucaj do „Sugestii”.</p>
