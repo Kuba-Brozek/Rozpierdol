@@ -1180,6 +1180,86 @@ function dragSort(box, sel, onMove) {
 }
 const moveItem = (arr, from, to) => { arr.splice(to, 0, arr.splice(from, 1)[0]); };
 
+/* ============ Mapa partii mięśni: serie z ostatnich 7 dni ============
+   Sylwetka przód/tył; każda partia to kształt (lewa połowa, prawa to jej lustro).
+   Kolor = ile serii (ćwiczenie główne = 1 seria, pomocnicze = ½). Szczegóły po stuknięciu w partię. */
+const BODY_FRONT = [
+  ['traps', 'M44 31 L37 36 L45 36 Z'],
+  ['shoulders', 'M36 37 C28 37 24 43 24 51 L30 53 C31 47 34 43 40 41 Z'],
+  ['chest', 'M49 40 L41 41 C35 43 32 48 32 54 C36 59 44 60 49 58 Z'],
+  ['biceps', 'M24 53 C22 61 22 68 24 74 L30 74 C31 67 31 60 30 55 Z'],
+  ['forearms', 'M23 77 C20 87 19 96 19 103 L24 103 C26 95 29 86 30 77 Z'],
+  ['abdominals', 'M49 60 C44 61 39 61 36 59 L37 89 C40 96 45 99 49 100 Z'],
+  ['abductors', 'M36 92 C33 97 32 103 32 109 L36 105 C36 100 36 96 37 93 Z'],
+  ['quadriceps', 'M37 105 C33 120 33 138 36 150 L46 150 C47 138 47 121 46 109 C43 107 40 105 37 105 Z'],
+  ['adductors', 'M47 107 L49 104 L49 128 L47.5 134 Z'],
+  ['calves', 'M36 156 C34 170 35 184 37 196 L43 196 C45 184 46 170 45 156 Z'],
+];
+const BODY_BACK = [
+  ['traps', 'M49 27 L43 31 L36 36 L43 40 L49 49 Z'],
+  ['shoulders', BODY_FRONT[1][1]],
+  ['middle back', 'M49 50 L43 41 L39 45 L44 56 L49 59 Z'],
+  ['lats', 'M38 46 L32 54 C33 66 38 76 45 82 L49 80 L49 60 L43 57 Z'],
+  ['lower back', 'M49 81 L45 83 L40 88 L41 94 L49 94 Z'],
+  ['triceps', BODY_FRONT[3][1]],
+  ['forearms', BODY_FRONT[4][1]],
+  ['abductors', 'M36 95 C33 99 32 105 32 111 L35 113 C34 107 35 101 37 96 Z'],
+  ['glutes', 'M49 95 L40 95 C35 99 34 108 36 116 C40 120 46 119 49 116 Z'],
+  ['hamstrings', 'M36 120 C33 132 34 144 36 152 L46 152 C47 142 47 131 47 121 C44 122 39 122 36 120 Z'],
+  ['calves', 'M36 157 C33 167 34 178 37 189 L44 189 C46 178 46 167 45 157 Z'],
+];
+// nieklikalne „tło”: głowa, szyja, dłonie, stopy
+const BODY_BASE = '<ellipse cx="50" cy="15" rx="8.5" ry="10.5"/><path d="M45 25 L55 25 L56 31 L44 31 Z"/>'
+  + '<ellipse cx="21" cy="109" rx="3.5" ry="5.5"/><ellipse cx="79" cy="109" rx="3.5" ry="5.5"/>'
+  + '<path d="M37 199 L43 199 L44 206 L34 206 Z"/><path d="M63 199 L57 199 L56 206 L66 206 Z"/>';
+function muscleSets(days = 7) {
+  const from = addDays(today(), -(days - 1)), out = {};
+  S.workouts.filter(w => w.date >= from && w.date <= today()).forEach(w => w.ex.forEach(e => {
+    const ex = EXMAP[e.id]; if (!ex || isCardio(ex)) return;
+    const n = e.sets.filter(filled).length; if (!n) return;
+    const add = (m, k) => { const o = out[m] = out[m] || { main: 0, help: 0, items: [] }; o[k] += n; o.items.push({ w, e, n, k }); };
+    (ex.m || []).forEach(m => add(m, 'main'));
+    (ex.s || []).forEach(m => { if (!(ex.m || []).includes(m)) add(m, 'help'); });
+  }));
+  return out;
+}
+const muscleScore = o => o ? o.main + o.help / 2 : 0;
+const muscleLevel = v => v <= 0 ? 0 : v < 4 ? 1 : v < 10 ? 2 : 3;
+function bodyMapHTML() {
+  const data = muscleSets();
+  const fig = (list, dx, label) => {
+    const shapes = list.map(([m, d]) => `<path d="${d}" data-m="${m}" class="mz l${muscleLevel(muscleScore(data[m]))}"/>`).join('');
+    return `<g transform="translate(${dx} 0)"><g class="mbase">${BODY_BASE}</g>${shapes}
+      <g transform="matrix(-1 0 0 1 100 0)">${shapes}</g><text x="50" y="218" class="mlab">${label}</text></g>`;
+  };
+  return `<section class="card bodymap">
+    <div class="row"><h3 style="margin:0">Partie mięśni</h3><span class="muted small">ostatnie 7 dni</span></div>
+    <svg viewBox="0 0 210 222" role="group" aria-label="Sylwetka: stuknij partię, żeby zobaczyć serie">${fig(BODY_FRONT, 0, 'Przód')}${fig(BODY_BACK, 110, 'Tył')}</svg>
+    <p class="muted small" style="margin:0;text-align:center">Stuknij partię, żeby zobaczyć serie</p></section>`;
+}
+function showMuscle(m) {
+  const o = muscleSets()[m] || { main: 0, help: 0, items: [] }, name = MUSCLE[m] || m;
+  const days = [...Array(7)].map((_, i) => addDays(today(), i - 6));
+  const perDay = days.map(d => o.items.filter(x => x.w.date === d).reduce((s, x) => s + (x.k === 'main' ? x.n : x.n / 2), 0));
+  const max = Math.max(1, ...perDay);
+  const v = muscleScore(o);
+  openSheet(name, `
+    <div class="mus-head"><b class="num">${fmt(v, v % 1 ? 1 : 0)}</b><span>${v === 1 ? 'seria' : v % 1 === 0 && v % 10 >= 2 && v % 10 <= 4 && (v % 100 < 10 || v % 100 >= 20) ? 'serie' : 'serii'} w 7 dni</span></div>
+    <p class="muted small" style="margin:0">${o.main} jako główna partia${o.help ? `, ${o.help} jako pomocnicza (liczone po ½)` : ''}.</p>
+    <div class="mus-bars" role="img" aria-label="Serie dzień po dniu">${days.map((d, i) => `<div class="mb${d === today() ? ' today' : ''}">
+      <span class="v num">${perDay[i] ? fmt(perDay[i], perDay[i] % 1 ? 1 : 0) : ''}</span>
+      <span class="bar" style="height:${Math.round(perDay[i] / max * 100)}%"></span>
+      <span class="d">${parseD(d).toLocaleDateString('pl-PL', { weekday: 'short' }).replace('.', '')}</span></div>`).join('')}</div>
+    ${o.items.length ? `<div class="list">${[...o.items].sort((a, b) => b.w.date < a.w.date ? -1 : 1).map(x => `
+      <button class="li" type="button" data-w="${x.w.id}">${thumbHTML(EXMAP[x.e.id])}<div class="grow"><div class="t">${esc(exName(EXMAP[x.e.id]))}</div>
+        <div class="s">${dayLabel(x.w.date, { weekday: 'long', day: 'numeric', month: 'short' })}${x.k === 'help' ? ' · pomocniczo' : ''}</div></div>
+        <div class="r small muted">${plural(x.n, 'seria', 'serie', 'serii')}</div></button>`).join('')}</div>`
+      : '<p class="muted" style="margin:0">W ostatnich 7 dniach nic na tę partię.</p>'}
+    <button class="btn block" type="button" data-close>OK</button>`, b => {
+    $$('[data-w]', b).forEach(x => x.onclick = () => showWorkout(x.dataset.w));
+  });
+}
+
 function renderTrening() {
   const body = $('#trening-body');
   const A = S.active;
@@ -1202,6 +1282,7 @@ function renderTrening() {
           <div class="tile"><span class="k">Ostatni</span><span class="v" style="font-size:17px">${dayLabel(hist[0].date)}</span><span class="d">${(n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : n + ' dni temu')(daysBetween(hist[0].date, today()))}</span></div>
         </div>
         <button class="btn block" type="button" id="t-prs">🏆 Rekordy osobiste</button>
+        ${bodyMapHTML()}
         <h3>Historia</h3>
         <div class="list">${hist.map(w => `
           <button class="li" type="button" data-w="${w.id}">
@@ -1212,6 +1293,7 @@ function renderTrening() {
       : `<div class="card empty"><strong>Brak treningów</strong><span>Rozpocznij trening, dodaj ćwiczenia z bazy i zapisuj serie: ciężar i powtórzenia. Przy kolejnym treningu zobaczysz, co zrobiłeś ostatnio.</span></div>`}`;
     $('#t-start').onclick = startWorkoutSheet;
     const prb = $('#t-prs', body); if (prb) prb.onclick = showRecords;
+    const bm = $('.bodymap svg', body); if (bm) bm.addEventListener('click', e => { const p = e.target.closest('[data-m]'); if (p) showMuscle(p.dataset.m); });
     $$('[data-w]', body).forEach(b => b.onclick = () => showWorkout(b.dataset.w));
     return;
   }

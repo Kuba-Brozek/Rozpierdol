@@ -540,3 +540,24 @@ html[data-accent="oliwka"] .auth-btn { background: #fff; color: #d94f80; }
 html[data-accent="oliwka"] .auth-link.strong { color: #fff; text-decoration: underline; }
 html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .swatch[data-accent="oliwka"] { grid-column: 1 / -1; }
+
+/* Mapa partii mięśni (Trening) */
+.bodymap { gap: 8px; }
+.bodymap svg { width: 100%; max-width: 360px; margin: 0 auto; display: block; -webkit-tap-highlight-color: transparent; }
+.bodymap .mbase { fill: var(--surface-2); }
+.bodymap .mz { stroke: var(--surface); stroke-width: .8; cursor: pointer; transition: fill .2s, opacity .2s; }
+.bodymap .mz.l0 { fill: var(--line); }
+.bodymap .mz.l1 { fill: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.bodymap .mz.l2 { fill: color-mix(in srgb, var(--accent) 70%, var(--line)); }
+.bodymap .mz.l3 { fill: var(--accent); }
+.bodymap .mz:active { opacity: .6; }
+.bodymap .mlab { font-size: 9px; fill: var(--muted); text-anchor: middle; }
+.mus-head { display: flex; align-items: baseline; gap: 8px; }
+.mus-head b { font-size: 40px; line-height: 1; }
+.mus-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; height: 120px; align-items: end; }
+.mus-bars .mb { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; min-width: 0; }
+.mus-bars .bar { width: 100%; max-width: 28px; min-height: 3px; border-radius: 6px; background: var(--accent); }
+.mus-bars .mb .bar[style*="height:0%"] { background: var(--line); }
+.mus-bars .v { font-size: 12px; font-weight: 600; min-height: 15px; }
+.mus-bars .d { font-size: 11px; color: var(--muted); }
+.mus-bars .today .d { color: var(--fg); font-weight: 600; }
