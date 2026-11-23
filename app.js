@@ -102,9 +102,12 @@ function thumbHTML(e, cls = 'thumb') {
 }
 
 /* ============ Nawigacja ============ */
+// Ekrany bez własnej zakładki: otwierane przyciskiem z innej zakładki, która zostaje podświetlona
+const TAB_PARENT = { cialo: 'dieta', cwiczenia: 'plany' };
 function setTab(t) {
   UI.tab = t;
-  $$('.tabs button').forEach(b => b.dataset.tab === t ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  const nav = TAB_PARENT[t] || t;
+  $$('.tabs button').forEach(b => b.dataset.tab === nav ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   $$('main > .view').forEach(v => v.hidden = v.id !== 'view-' + t);
   rerender();
   window.scrollTo(0, 0);
@@ -113,6 +116,8 @@ function rerender() {
   ({ dieta: renderDieta, cialo: renderCialo, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
 }
 $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+// przyciski „‹ Dieta”, „Pomiary ciała ›” itp.
+document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) setTab(g.dataset.go); });
 
 /* ============ Okno od dołu / komunikaty ============ */
 let SHEET_BACK = null; // gdy ustawione: zamknięcie okna wraca do poprzedniego (np. z wyboru ćwiczenia do edytora planu)
@@ -231,6 +236,62 @@ function chartSVG(weights = S.weights, rangeDays = UI.range) {
 }
 
 /* ============ DIETA: widok ============ */
+// Kafelek-przycisk prowadzący do ekranu bez własnej zakładki
+const navCard = (go, icon, title, sub) => `<button class="card nav-card" type="button" data-go="${go}">
+  <span class="nav-ic" aria-hidden="true">${icon}</span><span class="grow"><b>${title}</b><span class="small muted">${sub}</span></span><span class="chev" aria-hidden="true">›</span></button>`;
+function cialoNavCard() {
+  const last = S.measures[S.measures.length - 1];
+  return navCard('cialo', '📏', 'Pomiary ciała', last ? `${plural(S.measures.length, 'pomiar', 'pomiary', 'pomiarów')} · ostatni ${dayLabel(last.d)}` : 'obwody i tkanka tłuszczowa');
+}
+
+/* ---- losowy pozytywny fakt o postępach ---- */
+function positiveFacts() {
+  const out = [], st = stats(), w = S.weights;
+  const kg = v => fmt(v, v >= 10 ? 1 : v >= 1 ? 1 : 2) + ' kg';
+  if (st) {
+    if (st.lost >= 0.1) {
+      out.push(`Od startu masz już <b>${kg(st.lost)}</b> mniej. Tyle waży mniej więcej ${plural(Math.max(1, Math.round(st.lost / 0.2)), 'kostka', 'kostki', 'kostek')} masła.`);
+      if (st.day > 6) out.push(`Średnio ubywa ci <b>${kg(st.lost / st.day * 7)}</b> na tydzień od startu. Stałe tempo to najlepsze tempo.`);
+    }
+    if (st.m30 != null && st.m30 >= 0.1) out.push(`W ostatnich 30 dniach waga spadła o <b>${kg(st.m30)}</b>.`);
+    if (st.wk != null && st.pwk != null && st.pwk - st.wk >= 0.05) out.push(`Średnia z ostatnich 7 dni jest o <b>${kg(st.pwk - st.wk)}</b> niższa niż tydzień wcześniej.`);
+    if (st.pct != null && st.pct >= 1) out.push(st.pct >= 100 ? `Cel osiągnięty! Masz za sobą <b>${fmt(st.pct, 0)}%</b> zaplanowanej drogi. 🎉` : `Masz za sobą <b>${fmt(st.pct, 0)}%</b> drogi do celu.${st.pct >= 50 ? ' Z górki!' : ''}`);
+    const min = Math.min(...w.map(x => x.w));
+    if (w.length > 2 && st.cur <= min && st.cur < st.start) out.push(`Ostatni pomiar to <b>najniższa waga</b> od początku pomiarów: ${fmt(st.cur, 1)} kg.`);
+    const h = S.profile.height;
+    if (h && st.lost > 0) { const d = (st.start - st.cur) / (h * h); if (d >= 0.1) out.push(`Twoje BMI spadło od startu o <b>${fmt(d, 1)}</b>.`); }
+    if (w.length >= 5) out.push(`Zapisanych pomiarów wagi: <b>${w.length}</b>. Regularność to połowa sukcesu.`);
+    if (st.day >= 7) out.push(`To już <b>${st.day}.</b> dzień twojej drogi. Dobrze, że jesteś dalej w grze.`);
+    // najdłuższa seria dni z ważeniem pod rząd
+    let best = 1, run = 1; for (let i = 1; i < w.length; i++) { run = daysBetween(w[i - 1].d, w[i].d) === 1 ? run + 1 : 1; best = Math.max(best, run); }
+    if (best >= 5) out.push(`Rekord regularności: <b>${best} dni</b> ważenia pod rząd.`);
+  }
+  const mon = today().slice(0, 7), wm = S.workouts.filter(x => x.date.slice(0, 7) === mon).length;
+  if (wm >= 1) out.push(`W tym miesiącu ${wm === 1 ? 'zrobiony jest już' : 'masz już'} <b>${plural(wm, 'trening', 'treningi', 'treningów')}</b>.`);
+  if (S.workouts.length >= 3) out.push(`Łącznie <b>${plural(S.workouts.length, 'trening', 'treningi', 'treningów')}</b> w historii. Każdy się liczy.`);
+  const tons = S.workouts.reduce((s, x) => s + volume(x), 0) / 1000;
+  if (tons >= 1.5) out.push(`Łącznie podniesiono już <b>${fmt(tons, 1)} t</b>. To tyle, co ${plural(Math.floor(tons / 1.3), 'samochód osobowy', 'samochody osobowe', 'samochodów osobowych')}.`);
+  if (S.workouts.length) {
+    const prs = Object.values(prTimeline().byW).reduce((s, a) => s + a.length, 0);
+    if (prs >= 1) out.push(`Pobitych rekordów osobistych: <b>${prs}</b> 🏆`);
+  }
+  [['waist', 'Talia'], ['belly', 'Brzuch'], ['hips', 'Biodra']].forEach(([k, l]) => {
+    const xs = S.measures.filter(x => x.v && x.v[k] != null);
+    if (xs.length >= 2) { const d = xs[0].v[k] - xs[xs.length - 1].v[k]; if (d >= 0.5) out.push(`${l}: <b>−${fmt(d, 1)} cm</b> od pierwszego pomiaru.`); }
+  });
+  return out;
+}
+function factCardHTML() {
+  const facts = positiveFacts();
+  const txt = facts.length ? facts[((UI.fact ?? (UI.fact = Math.floor(Math.random() * 1000))) % facts.length)] : 'Każdy zapisany pomiar to krok do przodu. Dobrze, że tu jesteś.';
+  return `<button class="card fact" type="button" id="fact-card"${facts.length > 1 ? ' aria-label="Pokaż inny fakt"' : ''}>
+    <span class="fact-ic" aria-hidden="true">✨</span><span class="grow"><span class="fact-t">${txt}</span>${facts.length > 1 ? '<span class="small muted">Stuknij, żeby zobaczyć inny</span>' : ''}</span></button>`;
+}
+function wireFact(root) {
+  const c = $('#fact-card', root); if (!c) return;
+  c.onclick = () => { UI.fact = (UI.fact || 0) + 1; c.outerHTML = factCardHTML(); wireFact(root); };
+}
+
 function renderDieta() {
   $('#dieta-date').textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' });
   const st = stats();
@@ -252,6 +313,7 @@ function renderDieta() {
         <label class="btn primary file-btn">Importuj plik Excel<input type="file" id="imp-xlsx-empty" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
       </div>
       ${form}
+      ${cialoNavCard()}
       ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w zakładce Ustawienia, żeby zobaczyć BMI i postęp do celu.</p>'}`;
     $('#imp-xlsx-empty').addEventListener('change', onXlsxPicked);
   } else {
@@ -278,6 +340,8 @@ function renderDieta() {
         <div class="tile"><span class="k">Średnia 7 dni</span><span class="v">${fmt(st.wk, 1)}</span><span class="d ${wkDiff > 0 ? 'up' : wkDiff < 0 ? 'down' : ''}">${wkDiff != null ? fmtSigned(wkDiff, 2) + ' kg / tydz.' : 'za mało danych'}</span></div>
         <div class="tile"><span class="k">Ostatnie 30 dni</span><span class="v ${st.m30 > 0 ? 'down' : st.m30 < 0 ? 'up' : ''}">${st.m30 != null ? fmtSigned(-st.m30, 1) : '–'}</span><span class="d">kg</span></div>
       </div>
+      ${cialoNavCard()}
+      ${factCardHTML()}
       <section class="card chart">
         <div class="row"><h2>Waga</h2>
           <div class="seg" role="group" aria-label="Zakres wykresu">
@@ -301,6 +365,7 @@ function renderDieta() {
         ${list.length > 10 ? `<button class="link" type="button" id="w-more">${UI.showAll ? 'Pokaż mniej' : 'Pokaż wszystkie (' + list.length + ')'}</button>` : ''}
       </section>`;
     $$('[data-range]', body).forEach(b => b.addEventListener('click', () => { UI.range = +b.dataset.range; renderDieta(); }));
+    wireFact(body);
     $$('[data-wd]', body).forEach(b => b.addEventListener('click', () => editWeight(b.dataset.wd)));
     const more = $('#w-more'); more && more.addEventListener('click', () => { UI.showAll = !UI.showAll; renderDieta(); });
   }
@@ -1461,7 +1526,7 @@ const plural2 = (n, one, few, many) => n + ' ' + (n === 1 ? one : (n % 10 >= 2 &
 /* ============ PLANY TRENINGOWE ============ */
 function renderPlany() {
   const body = $('#plany-body');
-  body.innerHTML = S.plans.length ? `
+  body.innerHTML = navCard('cwiczenia', '🏋️', 'Baza ćwiczeń', `${EX.length} ćwiczeń${S.fav.length ? ` · ${plural(S.fav.length, 'ulubione', 'ulubione', 'ulubionych')}` : ''}${S.custom.length ? ` · ${plural(S.custom.length, 'własne', 'własne', 'własnych')}` : ''}`) + (S.plans.length ? `
     <div class="list">${S.plans.map(p => `
       <button class="li" type="button" data-plan="${p.id}">
         <div class="grow"><div class="t">${esc(p.name)}</div>
@@ -1469,7 +1534,7 @@ function renderPlany() {
         <span class="chev" aria-hidden="true">›</span>
       </button>`).join('')}</div>
     <p class="muted small" style="margin:0">Stuknij plan, żeby go edytować. Plan wybierasz w zakładce Trening przy „Rozpocznij trening”.</p>`
-    : `<div class="card empty"><strong>Nie masz jeszcze planów</strong><span>Ułóż plan, np. „Push”, „Nogi” albo „FBW A”. Na starcie treningu wybierzesz go, a ćwiczenia i liczba serii same się wpiszą.</span><button class="btn primary" type="button" id="plan-new2">Ułóż pierwszy plan</button></div>`;
+    : `<div class="card empty"><strong>Nie masz jeszcze planów</strong><span>Ułóż plan, np. „Push”, „Nogi” albo „FBW A”. Na starcie treningu wybierzesz go, a ćwiczenia i liczba serii same się wpiszą.</span><button class="btn primary" type="button" id="plan-new2">Ułóż pierwszy plan</button></div>`);
   const n2 = $('#plan-new2', body); if (n2) n2.onclick = () => editPlan(null);
   $$('[data-plan]', body).forEach(b => b.onclick = () => editPlan(b.dataset.plan));
 }
