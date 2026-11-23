@@ -190,7 +190,7 @@ function rerender() {
   ({ dieta: renderDieta, cialo: renderCialo, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
 }
 $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
-// przyciski „‹ Dieta”, „Pomiary ciała ›” itp.
+// przyciski „‹ Forma”, „Pomiary ciała ›” itp.
 document.addEventListener('click', e => {
   const g = e.target.closest('[data-go]'); if (!g) return;
   const [t, sec] = g.dataset.go.split(':'); // np. „wiecej:profil” = Ustawienia → Profil
@@ -470,7 +470,7 @@ function wireFact(root) {
   c.onclick = () => { UI.fact = (UI.fact || 0) + 1; c.outerHTML = factCardHTML(); wireFact(root); };
 }
 
-// Przełączniki kafelków na ekranie Dieta (S.prefs, zapisywane w chmurze); domyślnie włączone
+// Przełączniki kafelków na ekranie Forma (S.prefs, zapisywane w chmurze); domyślnie włączone
 const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu', '🔥'], ['fact', 'Losowy pozytywny fakt', 'kafelek nad wykresem wagi', '✨']];
 const pref = k => !(S.prefs && S.prefs[k] === false);
 // Kafelek „Kalorie”: zapotrzebowanie z profilu albo zachęta do uzupełnienia profilu
@@ -2027,7 +2027,7 @@ function renderWiecej() {
       </div>
     </section>
     <section class="card" data-sec="dieta">
-      <h2>Ekran Dieta</h2>
+      <h2>Ekran Forma</h2>
       <div class="pref-list">${PREFS.map(([k, l, s, ic]) => `<label class="pref-row"><span class="pref-ic" aria-hidden="true">${ic}</span>
         <span class="grow"><span class="pref-l">${l}</span><span class="small muted">${s}</span></span>
         <input type="checkbox" class="switch" role="switch" data-pref="${k}" ${pref(k) ? 'checked' : ''}></label>`).join('')}</div>
@@ -2115,7 +2115,7 @@ function renderWiecej() {
     <section class="card about" data-sec="about">
       <p class="big-note" style="text-align:left">Cześć! 👋</p>
       <p>Wszystko zaczęło się od zwykłego pliku Excel. Codziennie rano nowy wiersz: data i waga. Obok formuły liczyły BMI, zrzucone kilogramy, procent celu i średnią tygodniową, a w osobnej kolumnie świeciła brutalnie szczera „rodzaj otyłości”. Wzrost i cel miały swoje stałe komórki, żeby żadna formuła się nie zgubiła.</p>
-      <p>Działało, ale wpisywanie wagi w Excelu na telefonie o 7 rano to sport ekstremalny. W końcu padło pytanie: „a może by tak zrobić to porządnie?”. Tak powstał Rozpierdol. Zakładka Dieta wciąż liczy to samo co tamten arkusz, a kopia zapasowa zapisuje się w jego układzie.</p>
+      <p>Działało, ale wpisywanie wagi w Excelu na telefonie o 7 rano to sport ekstremalny. W końcu padło pytanie: „a może by tak zrobić to porządnie?”. Tak powstał Rozpierdol. Zakładka Forma wciąż liczy to samo co tamten arkusz, a kopia zapasowa zapisuje się w jego układzie.</p>
       <p>Teraz liczy treningi, rekordy, kalorie i ma motyw tak różowy, że aż boli.</p>
       <p>Robię ją sam, za darmo i bez reklam. Pomysły i błędy wrzucaj do „Sugestii”.</p>
       <p><i>Kurwy niech giną pod ciepłą pierzyną, a zwycięzcy mają czuć chłód zwycięstwa.</i> 💪</p>
@@ -2177,7 +2177,7 @@ function renderWiecej() {
 /* ---- Ustawienia jak w iPhonie: lista pozycji, każda otwiera osobny ekran ---- */
 const SECS = [
   ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], null,
-  ['profil', '🧍', 'Profil i cel'], ['dieta', '🥗', 'Ekran Dieta'], ['wyglad', '🎨', 'Wygląd'], null,
+  ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Forma'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
   ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
 ];
