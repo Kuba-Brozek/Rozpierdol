@@ -106,20 +106,84 @@ function thumbHTML(e, cls = 'thumb') {
 /* ============ Nawigacja ============ */
 // Ekrany bez własnej zakładki: otwierane przyciskiem z innej zakładki, która zostaje podświetlona
 const TAB_PARENT = { cialo: 'dieta', cwiczenia: 'plany' };
-function setTab(t) {
+function setTab(t, fromHistory) {
   UI.tab = t;
   const nav = TAB_PARENT[t] || t;
   $$('.tabs button').forEach(b => b.dataset.tab === nav ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   $$('main > .view').forEach(v => v.hidden = v.id !== 'view-' + t);
+  // historia: ekran podrzędny dostaje wpis, żeby działał gest/przycisk „wstecz”
+  if (!fromHistory) {
+    try {
+      if (TAB_PARENT[t]) { if (!(history.state && history.state.sub === t)) history.pushState({ sub: t }, ''); }
+      else if (history.state && history.state.sub) history.replaceState(null, '');
+    } catch (e) {}
+  }
   rerender();
   window.scrollTo(0, 0);
+}
+// „Wstecz” z ekranu podrzędnego: przez historię (żeby nie zostawiać w niej śmieci), inaczej wprost do rodzica
+let lastPop = 0, ignorePop = false;
+function goBack() {
+  const p = TAB_PARENT[UI.tab]; if (!p) return;
+  // ekran zmieniamy od razu (zdarzenie popstate potrafi przyjść z opóźnieniem), a wpis historii zdejmujemy w tle
+  if (history.state && history.state.sub) { ignorePop = true; history.back(); }
+  setTab(p, true);
+}
+window.addEventListener('popstate', e => {
+  if (ignorePop) { ignorePop = false; return; }
+  lastPop = Date.now();
+  if (!$('#sheet').hidden) { // najpierw zamknij okno, a ekran zostaw
+    sheetBack();
+    if (TAB_PARENT[UI.tab]) try { history.pushState({ sub: UI.tab }, ''); } catch (er) {}
+    return;
+  }
+  const st = e.state;
+  if (st && st.sub && st.sub !== UI.tab) setTab(st.sub, true);
+  else if (TAB_PARENT[UI.tab] && !(st && st.sub === UI.tab)) setTab(TAB_PARENT[UI.tab], true);
+});
+// Gest przesunięcia od lewej krawędzi w apce na ekranie głównym iPhone'a (w Safari robi to sama przeglądarka)
+if (navigator.standalone === true) {
+  let sx = null, sy = 0, dx = 0, tracking = false, target = null;
+  const reset = () => { if (!target) return; const t = target; t.style.transition = 'transform .2s ease'; t.style.transform = ''; setTimeout(() => { t.style.transition = ''; }, 220); };
+  document.addEventListener('touchstart', e => {
+    sx = null; tracking = false; dx = 0;
+    const t = e.touches[0], sheetOpen = !$('#sheet').hidden;
+    if (e.touches.length !== 1 || t.clientX > 28 || DRAG.on) return;
+    if (!sheetOpen && !TAB_PARENT[UI.tab]) return;
+    sx = t.clientX; sy = t.clientY;
+    target = sheetOpen ? $('#sheet .sheet') : $('#view-' + UI.tab);
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (sx == null) return;
+    const t = e.touches[0], mx = t.clientX - sx, my = t.clientY - sy;
+    if (!tracking) {
+      if (Math.abs(my) > 10 && Math.abs(my) > mx) { sx = null; return; } // to przewijanie
+      if (mx < 10) return;
+      tracking = true;
+    }
+    e.preventDefault();
+    dx = Math.max(0, mx);
+    target.style.transition = 'none'; target.style.transform = `translateX(${dx}px)`;
+  }, { passive: false });
+  document.addEventListener('touchend', () => {
+    if (sx == null) return; sx = null;
+    if (!tracking) return;
+    if (dx > Math.min(110, innerWidth * 0.3) && Date.now() - lastPop > 700) {
+      const t = target; t.style.transition = 'transform .18s ease'; t.style.transform = `translateX(${innerWidth}px)`;
+      setTimeout(() => { t.style.transition = ''; t.style.transform = ''; if (!$('#sheet').hidden) sheetBack(); else goBack(); }, 170);
+    } else reset();
+  });
+  document.addEventListener('touchcancel', () => { if (sx != null && tracking) reset(); sx = null; });
 }
 function rerender() {
   ({ dieta: renderDieta, cialo: renderCialo, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
 }
 $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 // przyciski „‹ Dieta”, „Pomiary ciała ›” itp.
-document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) setTab(g.dataset.go); });
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-go]'); if (!g) return;
+  if (g.classList.contains('back') && TAB_PARENT[UI.tab] === g.dataset.go) goBack(); else setTab(g.dataset.go);
+});
 
 /* ============ Okno od dołu / komunikaty ============ */
 let SHEET_BACK = null; // gdy ustawione: zamknięcie okna wraca do poprzedniego (np. z wyboru ćwiczenia do edytora planu)
@@ -136,10 +200,12 @@ function openSheet(title, html, onMount) {
   onMount && onMount(fresh);
 }
 function closeSheet() { SHEET_BACK = null; $('#sheet').hidden = true; document.body.style.overflow = ''; $('#sheet-body').innerHTML = ''; }
+// „✕” okna (i gest wstecz): wraca do poprzedniego okna, jeśli jest, inaczej zamyka
+function sheetBack() { if (SHEET_BACK) { const f = SHEET_BACK; SHEET_BACK = null; f(); } else closeSheet(); }
 $('#sheet').addEventListener('click', e => {
   if (!e.target.closest('[data-close]')) return;
   if (e.target.closest('#sheet-body')) { closeSheet(); return; }
-  if (SHEET_BACK) { const f = SHEET_BACK; SHEET_BACK = null; f(); } else closeSheet();
+  sheetBack();
 });
 function confirmBox(title, text, okLabel, danger) {
   return new Promise(res => {
