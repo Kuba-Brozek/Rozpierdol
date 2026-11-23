@@ -405,6 +405,83 @@ async function downloadCloudFile() {
   shareOrDownload(`Rozpierdol-kopia-${today()}.xlsx`, backupXlsx());
 }
 
+/* ---- SUGESTIE ----
+   Kolekcja suggestions/{auto-id}: text, uid, email, createdAt.
+   Każde zalogowane konto może tylko DODAĆ sugestię; czytać i usuwać może wyłącznie admin (reguła Firestore). */
+const sugUrl = id => `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FB_PROJECT)}/databases/(default)/documents/suggestions${id ? '/' + encodeURIComponent(id) : ''}`;
+const SUG_MAX = 2000;
+async function sendSuggestion(text) {
+  const fields = { text: { stringValue: text }, uid: { stringValue: SY.session.uid }, email: { stringValue: SY.session.email || '' }, createdAt: { integerValue: String(Date.now()) } };
+  await authed(sugUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
+}
+async function listSuggestions() {
+  const out = []; let page = '';
+  do {
+    const r = await authed(sugUrl() + '?pageSize=300' + (page ? '&pageToken=' + encodeURIComponent(page) : ''));
+    if (r.status === 404) break;
+    const j = await r.json();
+    (j.documents || []).forEach(d => { const f = d.fields || {}; out.push({ id: d.name.split('/').pop(), text: f.text && f.text.stringValue || '', email: f.email && f.email.stringValue || '', at: +(f.createdAt && f.createdAt.integerValue || 0) }); });
+    page = j.nextPageToken || '';
+  } while (page);
+  return out.sort((a, b) => b.at - a.at);
+}
+// Ekran „Sugestie” (w Ustawieniach): formularz rysowany w podanym kontenerze
+function renderSuggest(b) {
+  if (!cloudReady() || !SY.session) {
+    b.innerHTML = `<p style="margin:0">Żeby wysłać sugestię, zaloguj się w Ustawieniach → Konto i chmura.</p>`;
+    return;
+  }
+  b.innerHTML = `
+    <p class="muted small" style="margin:0">Co dodać, co poprawić, co cię wkurza? Sugestię przeczyta tylko autor apki. Dołączy się do niej twój e-mail (${esc(SY.session.email || '')}), żeby mógł odpisać.</p>
+    <textarea class="sug-text" id="sug-t" maxlength="${SUG_MAX}" placeholder="Np. przydałby się timer przerwy między seriami"></textarea>
+    <div class="row small"><span class="muted" id="sug-n">0 / ${SUG_MAX}</span><span class="small" id="sug-err" style="color:var(--bad)" role="alert"></span></div>
+    <button class="btn primary block" type="button" id="sug-send">Wyślij sugestię</button>`;
+  {
+    const t = $('#sug-t', b), n = $('#sug-n', b), err = $('#sug-err', b), btn = $('#sug-send', b);
+    t.addEventListener('input', () => { n.textContent = `${t.value.length} / ${SUG_MAX}`; err.textContent = ''; });
+    btn.onclick = async () => {
+      const v = t.value.trim();
+      if (v.length < 3) { err.textContent = 'Napisz coś więcej.'; return; }
+      let last = 0; try { last = +localStorage.getItem('rozpierdol-sugestia') || 0; } catch (e) {}
+      if (Date.now() - last < 30000) { err.textContent = 'Odczekaj chwilę przed kolejną sugestią.'; return; }
+      btn.disabled = true; btn.textContent = 'Wysyłam…';
+      try {
+        await sendSuggestion(v);
+        try { localStorage.setItem('rozpierdol-sugestia', String(Date.now())); } catch (e) {}
+        b.innerHTML = '<p class="big-note">Dzięki! 💡</p><p class="muted" style="margin:0;text-align:center">Sugestia wysłana. Autor apki ją przeczyta.</p><button class="btn block" type="button" id="sug-more">Napisz kolejną</button>';
+        $('#sug-more', b).onclick = () => renderSuggest(b);
+      } catch (e) {
+        err.textContent = /odmówił dostępu/i.test(e.message) ? 'Serwer jeszcze nie przyjmuje sugestii (brak reguł w Firebase).' : e.message;
+        btn.disabled = false; btn.textContent = 'Wyślij sugestię';
+      }
+    };
+  }
+}
+// Ekran „Sugestie użytkowników” (tylko admin): lista z możliwością usuwania
+async function renderSuggestAdmin(b) {
+  b.innerHTML = '<p class="muted small" style="margin:0">Wczytuję…</p>';
+  let list;
+  try { list = await listSuggestions(); }
+  catch (e) {
+    b.innerHTML = `<p class="small" style="margin:0;color:var(--bad)">${esc(e.message)}</p>
+      <p class="muted small" style="margin:0">Odczyt działa tylko z konta admina z <b>potwierdzonym</b> e-mailem i po wklejeniu reguł z FIREBASE.md.</p>`;
+    return;
+  }
+  const when = at => at ? new Date(at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  b.innerHTML = list.length ? `
+    <div class="row small"><span class="muted">${plural(list.length, 'sugestia', 'sugestie', 'sugestii')}, od najnowszych</span><button class="link" type="button" id="sug-reload">Odśwież</button></div>
+    <div class="list">${list.map(s => `<div class="li sug-item">
+      <div class="row small"><span class="muted">${esc(s.email || 'bez e-maila')} · ${when(s.at)}</span><button class="icon-btn" type="button" data-sdel="${esc(s.id)}" aria-label="Usuń sugestię">✕</button></div>
+      <div class="txt">${esc(s.text)}</div></div>`).join('')}</div>`
+    : '<p class="muted" style="margin:0">Na razie nikt nic nie napisał.</p><button class="link" type="button" id="sug-reload">Odśwież</button>';
+  const rl = $('#sug-reload', b); if (rl) rl.onclick = () => renderSuggestAdmin(b);
+  $$('[data-sdel]', b).forEach(d => d.onclick = async () => {
+    if (!await confirmBox('Usunąć sugestię?', 'Zniknie na zawsze.', 'Usuń', true)) return;
+    try { await authed(sugUrl(d.dataset.sdel), { method: 'DELETE' }); toast('Usunięto'); } catch (x) { toast(x.message); }
+    renderSuggestAdmin(b);
+  });
+}
+
 /* ---- interfejs: okna zarządzania kontem ---- */
 const passField = (id, label, auto) => `<div class="field"><label for="${id}">${label}</label>
   <input type="password" id="${id}" autocomplete="${auto}" minlength="6" required></div>`;

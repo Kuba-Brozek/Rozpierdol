@@ -108,6 +108,7 @@ function thumbHTML(e, cls = 'thumb') {
 const TAB_PARENT = { cialo: 'dieta', cwiczenia: 'plany' };
 function setTab(t, fromHistory) {
   UI.tab = t;
+  if (!fromHistory) UI.sec = null; // zakładka z dolnego paska zawsze otwiera listę ustawień
   const nav = TAB_PARENT[t] || t;
   $$('.tabs button').forEach(b => b.dataset.tab === nav ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   $$('main > .view').forEach(v => v.hidden = v.id !== 'view-' + t);
@@ -124,6 +125,10 @@ function setTab(t, fromHistory) {
 // „Wstecz” z ekranu podrzędnego: przez historię (żeby nie zostawiać w niej śmieci), inaczej wprost do rodzica
 let lastPop = 0, ignorePop = false;
 function goBack() {
+  if (UI.tab === 'wiecej' && UI.sec) { // z ekranu ustawień do listy ustawień
+    if (history.state && history.state.sec) { ignorePop = true; history.back(); }
+    UI.sec = null; renderWiecej(); window.scrollTo(0, 0); return;
+  }
   const p = TAB_PARENT[UI.tab]; if (!p) return;
   // ekran zmieniamy od razu (zdarzenie popstate potrafi przyjść z opóźnieniem), a wpis historii zdejmujemy w tle
   if (history.state && history.state.sub) { ignorePop = true; history.back(); }
@@ -135,9 +140,15 @@ window.addEventListener('popstate', e => {
   if (!$('#sheet').hidden) { // najpierw zamknij okno, a ekran zostaw
     sheetBack();
     if (TAB_PARENT[UI.tab]) try { history.pushState({ sub: UI.tab }, ''); } catch (er) {}
+    else if (UI.tab === 'wiecej' && UI.sec) try { history.pushState({ sub: 'wiecej', sec: UI.sec }, ''); } catch (er) {}
     return;
   }
   const st = e.state;
+  if (UI.tab === 'wiecej' && !(st && st.sub && st.sub !== 'wiecej')) { // ekrany w Ustawieniach
+    const s = st && st.sec || null;
+    if (s !== UI.sec) { UI.sec = s; renderWiecej(); window.scrollTo(0, 0); }
+    return;
+  }
   if (st && st.sub && st.sub !== UI.tab) setTab(st.sub, true);
   else if (TAB_PARENT[UI.tab] && !(st && st.sub === UI.tab)) setTab(TAB_PARENT[UI.tab], true);
 });
@@ -149,7 +160,7 @@ if (navigator.standalone === true) {
     sx = null; tracking = false; dx = 0;
     const t = e.touches[0], sheetOpen = !$('#sheet').hidden;
     if (e.touches.length !== 1 || t.clientX > 28 || DRAG.on) return;
-    if (!sheetOpen && !TAB_PARENT[UI.tab]) return;
+    if (!sheetOpen && !TAB_PARENT[UI.tab] && !(UI.tab === 'wiecej' && UI.sec)) return;
     sx = t.clientX; sy = t.clientY;
     target = sheetOpen ? $('#sheet .sheet') : $('#view-' + UI.tab);
   }, { passive: true });
@@ -182,7 +193,9 @@ $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.datas
 // przyciski „‹ Dieta”, „Pomiary ciała ›” itp.
 document.addEventListener('click', e => {
   const g = e.target.closest('[data-go]'); if (!g) return;
-  if (g.classList.contains('back') && TAB_PARENT[UI.tab] === g.dataset.go) goBack(); else setTab(g.dataset.go);
+  const [t, sec] = g.dataset.go.split(':'); // np. „wiecej:profil” = Ustawienia → Profil
+  if (g.classList.contains('back') && TAB_PARENT[UI.tab] === t) goBack();
+  else { setTab(t); if (sec) openSec(sec); }
 });
 
 /* ============ Okno od dołu / komunikaty ============ */
@@ -465,7 +478,7 @@ function kcalCardHTML(st) {
   const ref = st.wk != null ? st.wk : st.cur, k = calories(ref);
   if (!k) {
     const p = S.profile, miss = [!p.height && 'wzrost', !p.sex && 'płeć', !ageNow() && 'rok urodzenia', !p.activity && 'aktywność'].filter(Boolean);
-    return navCard('wiecej', '🔥', 'Dzienne kalorie', `Brakuje w profilu (Ustawienia): ${miss.join(', ') || 'wagi'}. Wtedy policzę zapotrzebowanie.`);
+    return navCard('wiecej:profil', '🔥', 'Dzienne kalorie', `Brakuje w profilu (Ustawienia): ${miss.join(', ') || 'wagi'}. Wtedy policzę zapotrzebowanie.`);
   }
   const r = n => fmt(Math.round(n / 10) * 10, 0);
   const what = k.dir < 0 ? `na redukcję −${fmtN(k.rate)} kg/tydz.` : k.dir > 0 ? `na masę +${fmtN(k.rate)} kg/tydz.` : 'na utrzymanie wagi';
@@ -475,7 +488,7 @@ function kcalCardHTML(st) {
 }
 function showKcal() {
   const st = stats(); if (!st) return;
-  const ref = st.wk != null ? st.wk : st.cur, k = calories(ref); if (!k) { setTab('wiecej'); return; }
+  const ref = st.wk != null ? st.wk : st.cur, k = calories(ref); if (!k) { setTab('wiecej'); openSec('profil'); return; }
   const r = n => fmt(Math.round(n / 10) * 10, 0), act = ACTIVITY.find(a => a.k === S.profile.activity);
   openSheet('Dzienne kalorie', `
     <div class="card">
@@ -1679,7 +1692,7 @@ function navyCardHTML() {
   const need = p.sex === 'f' ? 'szyję, talię i biodra' : 'szyję i brzuch (na wysokości pępka)';
   if (!p.height || !p.sex) return `<section class="card"><h2>Tkanka tłuszczowa z obwodów</h2>
     <p class="muted small" style="margin:0">Podaj w Ustawieniach wzrost i płeć, a policzę % tkanki tłuszczowej z obwodów (wzór US Navy).</p>
-    <button class="btn" type="button" data-go="wiecej">Uzupełnij profil</button></section>`;
+    <button class="btn" type="button" data-go="wiecej:profil">Uzupełnij profil</button></section>`;
   if (!ser.length) return `<section class="card"><h2>Tkanka tłuszczowa z obwodów</h2>
     <p class="muted small" style="margin:0">Zmierz ${need}, a policzę % tkanki tłuszczowej (wzór US Navy). Zaznacz te pomiary przez „Wybierz pomiary”.</p></section>`;
   const cur = ser[ser.length - 1], diff = ser.length > 1 ? cur.w - ser[0].w : null;
@@ -1962,9 +1975,14 @@ async function sha256hex(s) {
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 // Wywoływane przy starcie, po zalogowaniu i po wylogowaniu
+// Konto admina (czyta sugestie) — też tylko jako skrót, bez adresu w publicznym kodzie.
+// Prawdziwą ochronę daje reguła Firestore; ta flaga tylko pokazuje przycisk.
+const ADMIN_HASH = '70e7cfed3d3bccc14147962aa0ab55fc4a21e8395a0b51c549cf486fcbfffa18';
+let IS_ADMIN = false;
 async function checkSpecialTheme(email) {
-  try { IS_OLIWKA = !!email && window.crypto && crypto.subtle ? (await sha256hex(String(email).trim().toLowerCase())) === OLIWKA_HASH : false; }
-  catch (e) { IS_OLIWKA = false; }
+  let h = '';
+  try { h = !!email && window.crypto && crypto.subtle ? await sha256hex(String(email).trim().toLowerCase()) : ''; } catch (e) {}
+  IS_OLIWKA = h === OLIWKA_HASH; IS_ADMIN = h === ADMIN_HASH;
   const th = getTheme();
   if (IS_OLIWKA) {
     let welcomed = false; try { welcomed = localStorage.getItem('oliwka-powitanie') === '1'; } catch (e) {}
@@ -1997,9 +2015,9 @@ function renderWiecej() {
   const p = S.profile, th = getTheme();
   const body = $('#wiecej-body');
   body.innerHTML = `
-    <section class="card" id="sync-card"></section>
-    <section class="card" id="share-card"></section>
-    <section class="card">
+    <section class="card" id="sync-card" data-sec="konto"></section>
+    <section class="card" id="share-card" data-sec="share"></section>
+    <section class="card" data-sec="wyglad">
       <h2>Wygląd</h2>
       <div class="swatches" role="group" aria-label="Kolor apki">
         ${ACCENTS.filter(a => !a.only || (a.only === 'oliwka' && IS_OLIWKA)).map(a => `<button class="swatch" type="button" data-accent="${a.id}" aria-pressed="${th.accent === a.id}"><i style="background:${a.c}"></i><span>${a.label}</span></button>`).join('')}
@@ -2008,13 +2026,13 @@ function renderWiecej() {
         ${MODES.map(([v, l]) => `<button type="button" data-mode="${v}" aria-pressed="${th.mode === v}">${l}</button>`).join('')}
       </div>
     </section>
-    <section class="card">
+    <section class="card" data-sec="dieta">
       <h2>Ekran Dieta</h2>
       <div class="pref-list">${PREFS.map(([k, l, s, ic]) => `<label class="pref-row"><span class="pref-ic" aria-hidden="true">${ic}</span>
         <span class="grow"><span class="pref-l">${l}</span><span class="small muted">${s}</span></span>
         <input type="checkbox" class="switch" role="switch" data-pref="${k}" ${pref(k) ? 'checked' : ''}></label>`).join('')}</div>
     </section>
-    <section class="card">
+    <section class="card" data-sec="profil">
       <h2>Profil</h2>
       <p class="muted small" style="margin:0">Wszystkie pola są opcjonalne. Płeć, rok urodzenia i aktywność są potrzebne do kalorii i % tkanki tłuszczowej z obwodów. Te dane nie trafiają do udostępniania.</p>
       <div class="add-weight" style="grid-template-columns:1fr 1fr">
@@ -2037,7 +2055,7 @@ function renderWiecej() {
       <div class="row"><span>Treningi w tygodniu (plan)</span>
         <div class="stepper"><button class="icon-btn" type="button" data-wk="-1" aria-label="Mniej">−</button><b class="num" id="p-wk">${p.weekly || '–'}</b><button class="icon-btn" type="button" data-wk="1" aria-label="Więcej">+</button></div></div>
     </section>
-    <section class="card">
+    <section class="card" data-sec="excel">
       <h2>Kopia zapasowa w Excelu</h2>
       <p class="muted small" style="margin:0">Zapisuje wszystko do jednego pliku .xlsx: arkusz <b>DIETA</b> (w układzie jak „DIETA 2026”), <b>TRENINGI</b> (każda seria w osobnym wierszu), <b>PLANY</b>, <b>ULUBIONE</b> i <b>WŁASNE ĆWICZENIA</b>. Plik otworzysz w Excelu, a wczytasz z powrotem przyciskiem obok.</p>
       <div class="btns">
@@ -2046,7 +2064,7 @@ function renderWiecej() {
       </div>
       <p class="muted small" style="margin:0">„Wczytaj plik” przyjmie też twój arkusz z wagą (kolumny DATA i WAGA). Plik czyta tylko telefon, nic nie jest wysyłane.</p>
     </section>
-    <section class="card">
+    <section class="card" data-sec="dane">
       <h2>Dane na tym telefonie</h2>
       <div class="row small"><span>Pomiary wagi</span><b class="num">${S.weights.length}</b></div>
       <div class="row small"><span>Treningi</span><b class="num">${S.workouts.length}</b></div>
@@ -2056,8 +2074,12 @@ function renderWiecej() {
       <div class="row small"><span>Własne ćwiczenia</span><b class="num">${(S.custom || []).length}</b></div>
       <button class="btn danger" type="button" id="wipe">Usuń wszystkie dane</button>
     </section>
-    <p class="muted small">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
-    <p class="muted small" id="app-version" style="margin:0">Wersja apki: …</p>`;
+    <section class="card" data-sec="sug" id="sug-box"></section>
+    ${IS_ADMIN ? '<section class="card" data-sec="sugadmin" id="sugadmin-box"></section>' : ''}
+    <section class="card" data-sec="priv"><p class="big-note">Używaj jak chcesz, tylko nie wkurwiaj kodera.</p></section>
+    <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
+    <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
+    <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: …</p>`;
   // numer wersji = nazwa schowka plików apki (ustawiana przy budowaniu)
   if (window.caches) caches.keys().then(k => {
     const v = k.find(n => /^rozpierdol-(?!img)/.test(n));
@@ -2071,6 +2093,8 @@ function renderWiecej() {
     const st = stats(), el = $('#p-info'), g = P().goalLoss; if (!el) return;
     el.textContent = st && g && goalDir() ? `Waga docelowa: ${fmt(st.start + goalDir() * g, 1)} kg (start ${fmt(st.start, 1)} kg)` : '';
   };
+  if (UI.sec === 'sug') { if (typeof renderSuggest === 'function') renderSuggest($('#sug-box', body)); else $('#sug-box', body).innerHTML = '<p style="margin:0">Sugestie wymagają połączenia z chmurą.</p>'; }
+  if (UI.sec === 'sugadmin' && typeof renderSuggestAdmin === 'function') renderSuggestAdmin($('#sugadmin-box', body));
   $$('[data-pref]', body).forEach(c => c.onchange = () => { S.prefs = Object.assign({}, S.prefs, { [c.dataset.pref]: c.checked }); save(); toast(c.checked ? 'Włączone' : 'Wyłączone'); });
   const rerenderKeep = () => { const y = window.scrollY; renderWiecej(); window.scrollTo(0, y); };
   $$('[data-sex]', body).forEach(b => b.onclick = () => { P().sex = b.dataset.sex; save(); rerenderKeep(); toast('Zapisano płeć'); });
@@ -2104,7 +2128,55 @@ function renderWiecej() {
       save(); rebuildExMap(); UI.cw = newFilter(); toast('Usunięto dane'); renderWiecej();
     }
   };
+  applySettingsNav(body);
 }
+
+/* ---- Ustawienia jak w iPhonie: lista pozycji, każda otwiera osobny ekran ---- */
+const SECS = [
+  ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], null,
+  ['profil', '🧍', 'Profil i cel'], ['dieta', '🥗', 'Ekran Dieta'], ['wyglad', '🎨', 'Wygląd'], null,
+  ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
+  ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
+];
+function secSub(k) {
+  const p = S.profile, th = getTheme(), sy = typeof SY !== 'undefined' ? SY : null;
+  switch (k) {
+    case 'konto': return sy && sy.session ? esc(sy.session.email || '') : 'Nie zalogowano';
+    case 'share': { const n = ((S.share || {}).viewers || []).length; return n ? 'Udostępniasz: ' + plural(n, 'osoba', 'osoby', 'osób') : 'Nikomu nie udostępniasz'; }
+    case 'profil': return [GOALS[goalType()].l, p.height ? fmt(p.height, 2) + ' m' : '', p.weekly ? p.weekly + ' tr./tydz.' : ''].filter(Boolean).join(' · ');
+    case 'dieta': return PREFS.filter(([k2]) => pref(k2)).map(([, l]) => l).join(', ') || 'Wszystko wyłączone';
+    case 'wyglad': { const a = ACCENTS.find(x => x.id === th.accent), m = MODES.find(([v]) => v === th.mode); return [a && a.label, m && m[1]].filter(Boolean).join(' · '); }
+    case 'excel': return 'Zapisz albo wczytaj plik .xlsx';
+    case 'dane': return `${plural(S.weights.length, 'pomiar', 'pomiary', 'pomiarów')} wagi, ${plural(S.workouts.length, 'trening', 'treningi', 'treningów')}`;
+    case 'sug': return 'Napisz, co ulepszyć w apce';
+    case 'sugadmin': return 'Widoczne tylko dla admina';
+    default: return '';
+  }
+}
+function applySettingsNav(body) {
+  const avail = new Set($$('[data-sec]', body).map(s => s.dataset.sec));
+  if (UI.sec && !avail.has(UI.sec)) UI.sec = null;
+  const sec = SECS.find(s => s && s[0] === UI.sec);
+  $('#h-wiecej').textContent = sec ? sec[2] : 'Ustawienia';
+  $('#wiecej-back').hidden = !UI.sec;
+  $$('[data-sec]', body).forEach(s => s.hidden = s.dataset.sec !== UI.sec);
+  $$('.settings-foot', body).forEach(x => x.hidden = !!UI.sec);
+  if (UI.sec) return;
+  // menu: grupy oddzielone null-ami
+  const groups = [[]];
+  SECS.forEach(s => { if (!s) groups.push([]); else if (avail.has(s[0])) groups[groups.length - 1].push(s); });
+  body.insertAdjacentHTML('afterbegin', groups.filter(g => g.length).map(g => `<div class="list set-menu">${g.map(([k, ic, l]) => {
+    const sub = secSub(k);
+    return `<button class="li" type="button" data-open-sec="${k}"><span class="nav-ic" aria-hidden="true">${ic}</span><span class="grow"><span class="t">${l}</span>${sub ? `<span class="s">${sub}</span>` : ''}</span><span class="chev" aria-hidden="true">›</span></button>`;
+  }).join('')}</div>`).join(''));
+  $$('[data-open-sec]', body).forEach(b => b.onclick = () => openSec(b.dataset.openSec));
+}
+function openSec(k) {
+  UI.sec = k;
+  try { history.pushState({ sub: 'wiecej', sec: k }, ''); } catch (e) {}
+  renderWiecej(); window.scrollTo(0, 0);
+}
+$('#wiecej-back').addEventListener('click', () => goBack());
 
 /* ============ Przycisk ✕ do czyszczenia pola ============
    Jeden wspólny przycisk: pojawia się po prawej stronie aktywnego pola, gdy coś w nim jest.

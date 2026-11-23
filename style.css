@@ -421,6 +421,18 @@ input.has-clear { padding-right: 38px !important; }
 .share-opts { display: flex; flex-direction: column; gap: 2px; }
 .share-opt { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 16px; cursor: pointer; }
 .share-opt input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+/* Ustawienia: lista pozycji + osobne ekrany (tytuł ekranu jest w nagłówku, więc nagłówek karty chowamy) */
+#wiecej-body > [data-sec] > h2:first-child { display: none; }
+.set-menu .li { padding-top: 13px; padding-bottom: 13px; }
+.set-menu .grow, #sync-card .list .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.set-menu .nav-ic { font-size: 22px; width: 28px; text-align: center; }
+/* Polityka prywatności / Reklamacje / Sugestie */
+.big-note { font-size: 20px; line-height: 1.4; font-weight: 600; margin: 8px 0 4px; text-align: center; }
+.xd { font: 800 clamp(120px, 45vw, 220px)/1 var(--num); text-align: center; color: var(--accent); padding: 20px 0 10px; letter-spacing: -.04em; }
+.sug-text { width: 100%; min-height: 140px; resize: vertical; font: inherit; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); box-sizing: border-box; }
+.sug-text:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.sug-item { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.sug-item .txt { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Przełączniki w stylu iOS */
 .pref-list { display: flex; flex-direction: column; }
 .pref-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); cursor: pointer; }
