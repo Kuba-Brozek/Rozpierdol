@@ -420,6 +420,12 @@ input.has-clear { padding-right: 38px !important; }
 .share-opts { display: flex; flex-direction: column; gap: 2px; }
 .share-opt { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 16px; cursor: pointer; }
 .share-opt input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+/* Kompaktowy widok treningu */
+.ex-card.compact { padding: 10px 10px 10px 12px; }
+.ex-card.compact .thumb { width: 48px; height: 48px; }
+.ex-open { border: 0; background: none; padding: 4px 0; text-align: left; color: inherit; font: inherit; min-width: 0; cursor: pointer; }
+.ex-open .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-detail { display: flex; flex-direction: column; gap: 10px; }
 /* Rekordy osobiste */
 .pill.pr { background: color-mix(in srgb, #f5b301 22%, transparent); color: inherit; }
 .pr-line { color: var(--fg) !important; font-weight: 600; margin-top: 3px; }

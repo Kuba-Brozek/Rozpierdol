@@ -924,30 +924,31 @@ function renderTrening() {
         <p class="muted small" style="margin:0">Zmień serie, dodaj lub usuń ćwiczenia, potem stuknij „Zapisz trening”.</p>
       </section>`
     : A.planName ? `<div class="row"><span class="pill good">Plan: ${esc(A.planName)}</span><span class="muted small">${dayLabel(A.date, { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>` : ''}
+    ${A.ex.length ? `<div class="seg seg-full" role="group" aria-label="Widok ćwiczeń">
+        <button type="button" data-view="full" aria-pressed="${!compactView()}">Pełny widok</button>
+        <button type="button" data-view="compact" aria-pressed="${compactView()}">Kompaktowy</button>
+      </div>` : ''}
     ${A.ex.map((e, ei) => {
-      const ex = EXMAP[e.id], prev = lastSetsFor(e.id, A.id), fs = exFields(e.id).map(f => FIELD[f]);
+      const ex = EXMAP[e.id], prev = lastSetsFor(e.id, A.id);
+      if (compactView()) {
+        const n = e.sets.filter(filled).length;
+        return `<section class="ex-card compact drag-item" data-ei="${ei}">
+          <div class="head">${A.ex.length > 1 ? GRIP : ''}${thumbHTML(ex)}
+            <button class="grow ex-open" type="button" data-act="open"><div class="t" style="font-weight:650">${esc(exName(ex))}</div>
+              <div class="small muted">${n ? `${n}/${e.sets.length} · ${esc(setsSummary(ex, e.sets))}` : `${setsWord(e.sets.length)} · nic nie wpisane`}</div></button>
+            <span class="chev" aria-hidden="true">›</span>
+            <button class="icon-btn" type="button" data-act="rm" aria-label="Usuń ćwiczenie">✕</button>
+          </div>
+        </section>`;
+      }
       return `<section class="ex-card drag-item" data-ei="${ei}">
         <div class="head">${A.ex.length > 1 ? GRIP : ''}${thumbHTML(ex)}
           <div class="grow"><div class="t" style="font-weight:650">${esc(exName(ex))}</div>
           <div class="small muted">${prev ? `Ostatnio (${dayLabel(prev.date)}): ${setsSummary(ex, prev.sets)}` : 'Pierwszy raz'}</div></div>
-          <button class="icon-btn" type="button" data-act="more" aria-label="Opcje ćwiczenia: zamień, co wpisujesz">
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
+          <button class="icon-btn" type="button" data-act="more" aria-label="Opcje ćwiczenia: zamień, co wpisujesz">${MORE_ICON}</button>
           <button class="icon-btn" type="button" data-act="rm" aria-label="Usuń ćwiczenie">✕</button>
         </div>
-        <div class="sets${fs.length > 3 ? ' many' : ''}" style="grid-template-columns:24px ${fs.map(F => F.text ? 'minmax(0, 1.6fr)' : 'minmax(0, 1fr)').join(' ')} 44px">
-          <span class="hd">#</span>${fs.map(F => `<span class="hd">${F.h}</span>`).join('')}<span class="hd">✓</span>
-          ${e.sets.map((s, si) => {
-            const ph = prev && prev.sets[Math.min(si, prev.sets.length - 1)];
-            return `<span class="n">${si + 1}</span>
-            ${fs.map(F => { const k = fieldKey(ex, F.id), v = s[k], p = ph && hasVal(ph[k]) ? ph[k] : '';
-              return F.text
-                ? `<input type="text" inputmode="text" autocomplete="off" maxlength="12" data-si="${si}" data-f="${k}" data-text="1" value="${esc(v ?? '')}" placeholder="${esc(p)}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`
-                : `<input type="number" inputmode="${F.im}" step="${F.step}" data-si="${si}" data-f="${k}" value="${v ?? ''}" placeholder="${p}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`;
-            }).join('')}
-            <button class="check" type="button" data-act="done" data-si="${si}" aria-pressed="${!!s.done}" aria-label="Seria ${si + 1} zrobiona">✓</button>`;
-          }).join('')}
-        </div>
-        <div class="row"><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length ? '<button class="link" type="button" data-act="pop" style="color:var(--muted)">Usuń ostatnią</button>' : ''}</div>
+        ${setsEditorHTML(e, prev)}
       </section>`;
     }).join('')}
     ${A.ex.length ? '' : `<div class="card empty"><strong>${editing ? 'Brak ćwiczeń' : 'Trening trwa'}</strong><span>Dodaj ${editing ? '' : 'pierwsze '}ćwiczenie.</span></div>`}
@@ -956,29 +957,20 @@ function renderTrening() {
   const dateInp = $('#t-date', body);
   if (dateInp) dateInp.onchange = () => { if (dateInp.value) { A.date = dateInp.value; save(); } };
 
-  body.oninput = e => {
-    const inp = e.target.closest('input[data-f]'); if (!inp) return;
-    const ei = +inp.closest('[data-ei]').dataset.ei;
-    A.ex[ei].sets[+inp.dataset.si][inp.dataset.f] = inp.dataset.text ? (inp.value.trim() || null) : num(inp.value);
-    save();
-  };
+  body.oninput = setsInput;
   body.onclick = e => {
+    const v = e.target.closest('[data-view]');
+    if (v) { setCompactView(v.dataset.view === 'compact'); renderTrening(); return; }
     const b = e.target.closest('[data-act]'); if (!b) return;
-    const ei = +b.closest('[data-ei]').dataset.ei, ex = A.ex[ei];
-    const act = b.dataset.act;
-    if (act === 'more') { exMenu(ei); return; }
-    if (act === 'rm') A.ex.splice(ei, 1);
-    if (act === 'add') { const l = [...ex.sets].reverse().find(filled); ex.sets.push(Object.assign(l ? setVals(l) : { a: null, b: null }, { done: false })); }
-    if (act === 'pop') ex.sets.pop();
-    if (act === 'done') {
-      const s = ex.sets[+b.dataset.si];
-      if (!s.done) { // uzupełnij puste pola podpowiedzią z poprzedniego treningu
-        $$(`input[data-si="${b.dataset.si}"]`, b.closest('[data-ei]')).forEach(i => { if (i.value === '' && i.placeholder !== '') s[i.dataset.f] = i.dataset.text ? i.placeholder : num(i.placeholder); });
-      }
-      s.done = !s.done;
-      if (s.done && navigator.vibrate) navigator.vibrate(10);
+    const ei = +b.closest('[data-ei]').dataset.ei;
+    if (b.dataset.act === 'open') { exDetail(ei); return; }
+    if (b.dataset.act === 'rm') {
+      const n = A.ex[ei].sets.filter(filled).length;
+      // w kompaktowym widoku serii nie widać, więc przy wpisanych seriach pytamy
+      if (compactView() && n) { confirmBox('Usunąć ćwiczenie?', `Wpisane serie (${n}) zostaną usunięte z tego treningu.`, 'Usuń', true).then(ok => { if (ok) { A.ex.splice(ei, 1); save(); renderTrening(); } }); return; }
+      A.ex.splice(ei, 1); save(); renderTrening(); return;
     }
-    save(); renderTrening();
+    if (setsAction(b, ei)) renderTrening();
   };
   dragSort(body, '.ex-card', (from, to) => { moveItem(A.ex, from, to); save(); renderTrening(); });
   $('#t-add').onclick = () => pickExercise(id => { addExToActive(id); closeSheet(); renderTrening(); toast('Dodano: ' + exName(EXMAP[id])); });
@@ -989,6 +981,71 @@ function renderTrening() {
     if (ok) { S.active = null; save(); renderTrening(); }
   };
   $('#t-finish').onclick = finishWorkout;
+}
+/* ---- edytor serii (wspólny dla pełnego widoku i szczegółów ćwiczenia) ---- */
+const MORE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+const compactView = () => { try { return localStorage.getItem('rozpierdol-kompakt') === '1'; } catch (e) { return false; } };
+const setCompactView = on => { try { localStorage.setItem('rozpierdol-kompakt', on ? '1' : '0'); } catch (e) {} };
+function setsEditorHTML(e, prev) {
+  const ex = EXMAP[e.id], fs = exFields(e.id).map(f => FIELD[f]);
+  return `<div class="sets${fs.length > 3 ? ' many' : ''}" style="grid-template-columns:24px ${fs.map(F => F.text ? 'minmax(0, 1.6fr)' : 'minmax(0, 1fr)').join(' ')} 44px">
+      <span class="hd">#</span>${fs.map(F => `<span class="hd">${F.h}</span>`).join('')}<span class="hd">✓</span>
+      ${e.sets.map((s, si) => {
+        const ph = prev && prev.sets[Math.min(si, prev.sets.length - 1)];
+        return `<span class="n">${si + 1}</span>
+        ${fs.map(F => { const k = fieldKey(ex, F.id), v = s[k], p = ph && hasVal(ph[k]) ? ph[k] : '';
+          return F.text
+            ? `<input type="text" inputmode="text" autocomplete="off" maxlength="12" data-si="${si}" data-f="${k}" data-text="1" value="${esc(v ?? '')}" placeholder="${esc(p)}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`
+            : `<input type="number" inputmode="${F.im}" step="${F.step}" data-si="${si}" data-f="${k}" value="${v ?? ''}" placeholder="${p}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`;
+        }).join('')}
+        <button class="check" type="button" data-act="done" data-si="${si}" aria-pressed="${!!s.done}" aria-label="Seria ${si + 1} zrobiona">✓</button>`;
+      }).join('')}
+    </div>
+    <div class="row"><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length ? '<button class="link" type="button" data-act="pop" style="color:var(--muted)">Usuń ostatnią</button>' : ''}</div>`;
+}
+function setsInput(e) {
+  const inp = e.target.closest('input[data-f]'); if (!inp || !S.active) return;
+  const ei = +inp.closest('[data-ei]').dataset.ei;
+  S.active.ex[ei].sets[+inp.dataset.si][inp.dataset.f] = inp.dataset.text ? (inp.value.trim() || null) : num(inp.value);
+  save();
+}
+// zwraca true, gdy trzeba przerysować
+function setsAction(b, ei) {
+  const ex = S.active.ex[ei], act = b.dataset.act;
+  if (act === 'more') { exMenu(ei); return false; }
+  if (act === 'add') { const l = [...ex.sets].reverse().find(filled); ex.sets.push(Object.assign(l ? setVals(l) : { a: null, b: null }, { done: false })); }
+  else if (act === 'pop') ex.sets.pop();
+  else if (act === 'done') {
+    const s = ex.sets[+b.dataset.si];
+    if (!s.done) { // uzupełnij puste pola podpowiedzią z poprzedniego treningu
+      $$(`input[data-si="${b.dataset.si}"]`, b.closest('[data-ei]')).forEach(i => { if (i.value === '' && i.placeholder !== '') s[i.dataset.f] = i.dataset.text ? i.placeholder : num(i.placeholder); });
+    }
+    s.done = !s.done;
+    if (s.done && navigator.vibrate) navigator.vibrate(10);
+  } else return false;
+  save(); return true;
+}
+// Szczegóły ćwiczenia w trwającym/edytowanym treningu: tu w widoku kompaktowym wpisuje się serie
+function exDetail(ei) {
+  const A = S.active, e = A && A.ex[ei]; if (!e) return;
+  const ex = EXMAP[e.id], prev = lastSetsFor(e.id, A.id);
+  const redraw = () => { const st = $('#sheet-body').scrollTop; exDetail(ei); $('#sheet-body').scrollTop = st; renderTrening(); };
+  openSheet(exName(ex), `
+    <div data-ei="${ei}" class="ex-detail">
+      <div class="row" style="align-items:flex-start">
+        <div class="small muted" style="flex:1">${prev ? `Ostatnio (${dayLabel(prev.date)}): ${setsSummary(ex, prev.sets)}` : 'Pierwszy raz'}</div>
+        <button class="icon-btn" type="button" data-act="more" aria-label="Opcje ćwiczenia: zamień, co wpisujesz">${MORE_ICON}</button>
+      </div>
+      ${setsEditorHTML(e, prev)}
+    </div>
+    <button class="btn primary block" type="button" data-close>Gotowe</button>`, b => {
+    b.addEventListener('input', e2 => { setsInput(e2); renderTrening(); });
+    b.addEventListener('click', e2 => {
+      const btn = e2.target.closest('[data-act]'); if (!btn) return;
+      if (btn.dataset.act === 'more') { exMenu(ei); SHEET_BACK = () => exDetail(ei); return; }
+      if (setsAction(btn, ei)) redraw();
+    });
+  });
 }
 // Menu ćwiczenia w trwającym treningu: zamiana na inne (serie zostają), pola serii, usunięcie
 function exMenu(ei) {
