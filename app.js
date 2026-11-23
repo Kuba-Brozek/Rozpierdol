@@ -2093,8 +2093,6 @@ function renderWiecej() {
     const st = stats(), el = $('#p-info'), g = P().goalLoss; if (!el) return;
     el.textContent = st && g && goalDir() ? `Waga docelowa: ${fmt(st.start + goalDir() * g, 1)} kg (start ${fmt(st.start, 1)} kg)` : '';
   };
-  if (UI.sec === 'sug') { if (typeof renderSuggest === 'function') renderSuggest($('#sug-box', body)); else $('#sug-box', body).innerHTML = '<p style="margin:0">Sugestie wymagają połączenia z chmurą.</p>'; }
-  if (UI.sec === 'sugadmin' && typeof renderSuggestAdmin === 'function') renderSuggestAdmin($('#sugadmin-box', body));
   $$('[data-pref]', body).forEach(c => c.onchange = () => { S.prefs = Object.assign({}, S.prefs, { [c.dataset.pref]: c.checked }); save(); toast(c.checked ? 'Włączone' : 'Wyłączone'); });
   const rerenderKeep = () => { const y = window.scrollY; renderWiecej(); window.scrollTo(0, y); };
   $$('[data-sex]', body).forEach(b => b.onclick = () => { P().sex = b.dataset.sex; save(); rerenderKeep(); toast('Zapisano płeć'); });
@@ -2153,28 +2151,32 @@ function secSub(k) {
     default: return '';
   }
 }
+// Ustawienia na jednej stronie z kartami. Sugestie / polityka / reklamacje: karta „Inne”, każda pozycja otwiera okno.
+const SHEET_SECS = ['sug', 'sugadmin', 'priv', 'compl'];
 function applySettingsNav(body) {
-  const avail = new Set($$('[data-sec]', body).map(s => s.dataset.sec));
-  if (UI.sec && !avail.has(UI.sec)) UI.sec = null;
-  const sec = SECS.find(s => s && s[0] === UI.sec);
-  $('#h-wiecej').textContent = sec ? sec[2] : 'Ustawienia';
-  $('#wiecej-back').hidden = !UI.sec;
-  $$('[data-sec]', body).forEach(s => s.hidden = s.dataset.sec !== UI.sec);
-  $$('.settings-foot', body).forEach(x => x.hidden = !!UI.sec);
-  if (UI.sec) return;
-  // menu: grupy oddzielone null-ami
-  const groups = [[]];
-  SECS.forEach(s => { if (!s) groups.push([]); else if (avail.has(s[0])) groups[groups.length - 1].push(s); });
-  body.insertAdjacentHTML('afterbegin', groups.filter(g => g.length).map(g => `<div class="list set-menu">${g.map(([k, ic, l]) => {
+  UI.sec = null;
+  $('#h-wiecej').textContent = 'Ustawienia';
+  $('#wiecej-back').hidden = true;
+  $$('[data-sec]', body).forEach(s => s.hidden = SHEET_SECS.includes(s.dataset.sec));
+  const rows = SECS.filter(s => s && SHEET_SECS.includes(s[0]) && $(`[data-sec="${s[0]}"]`, body));
+  const foot = $('.settings-foot', body);
+  foot.insertAdjacentHTML('beforebegin', `<section class="card"><h2>Inne</h2><div class="list set-menu">${rows.map(([k, ic, l]) => {
     const sub = secSub(k);
     return `<button class="li" type="button" data-open-sec="${k}"><span class="nav-ic" aria-hidden="true">${ic}</span><span class="grow"><span class="t">${l}</span>${sub ? `<span class="s">${sub}</span>` : ''}</span><span class="chev" aria-hidden="true">›</span></button>`;
-  }).join('')}</div>`).join(''));
+  }).join('')}</div></section>`);
   $$('[data-open-sec]', body).forEach(b => b.onclick = () => openSec(b.dataset.openSec));
 }
+// Otwiera część ustawień: pozycje z karty „Inne” w oknie, pozostałe karty — przewija do nich
 function openSec(k) {
-  UI.sec = k;
-  try { history.pushState({ sub: 'wiecej', sec: k }, ''); } catch (e) {}
-  renderWiecej(); window.scrollTo(0, 0);
+  const s = SECS.find(x => x && x[0] === k), src = $(`#wiecej-body [data-sec="${k}"]`);
+  if (!s || !src) return;
+  if (!SHEET_SECS.includes(k)) { src.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  openSheet(s[2], `<div class="view" style="gap:12px" id="sec-box"></div>`, b => {
+    const box = $('#sec-box', b);
+    if (k === 'sug') typeof renderSuggest === 'function' ? renderSuggest(box) : box.innerHTML = '<p style="margin:0">Sugestie wymagają połączenia z chmurą.</p>';
+    else if (k === 'sugadmin') { if (typeof renderSuggestAdmin === 'function') renderSuggestAdmin(box); }
+    else box.innerHTML = src.innerHTML + '<button class="btn block" type="button" data-close>OK</button>';
+  });
 }
 $('#wiecej-back').addEventListener('click', () => goBack());
 

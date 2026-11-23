@@ -422,7 +422,6 @@ input.has-clear { padding-right: 38px !important; }
 .share-opt { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 16px; cursor: pointer; }
 .share-opt input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
 /* Ustawienia: lista pozycji + osobne ekrany (tytuł ekranu jest w nagłówku, więc nagłówek karty chowamy) */
-#wiecej-body > [data-sec] > h2:first-child { display: none; }
 .set-menu .li { padding-top: 13px; padding-bottom: 13px; }
 .set-menu .grow, #sync-card .list .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .set-menu .nav-ic { font-size: 22px; width: 28px; text-align: center; }
