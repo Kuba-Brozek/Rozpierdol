@@ -2124,7 +2124,8 @@ function renderWiecej() {
     <section class="card" data-sec="priv"><p class="big-note">Używaj jak chcesz, tylko nie wkurwiaj kodera.</p></section>
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
     <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
-    <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: …</p>`;
+    <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: …</p>
+    <p class="muted small settings-foot" style="margin:4px 0 0">© 2026${new Date().getFullYear() > 2026 ? '–' + new Date().getFullYear() : ''} Rozpierdol. Wszelkie prawa zastrzeżone.<br>Zrobione z miłością i odrobiną bólu mięśni 💪</p>`;
   // numer wersji = nazwa schowka plików apki (ustawiana przy budowaniu)
   if (window.caches) caches.keys().then(k => {
     const v = k.find(n => /^rozpierdol-(?!img)/.test(n));
