@@ -426,6 +426,7 @@ input.has-clear { padding-right: 38px !important; }
 .set-menu .grow, #sync-card .list .grow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .set-menu .nav-ic { font-size: 22px; width: 28px; text-align: center; }
 /* Polityka prywatności / Reklamacje / Sugestie */
+.about p { margin: 0; font-size: 16px; line-height: 1.5; }
 .rodo h3 { margin: 6px 0 0; }
 .rodo p, .rodo ul { margin: 0; font-size: 15px; line-height: 1.5; }
 .rodo ul { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }

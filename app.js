@@ -2112,6 +2112,14 @@ function renderWiecej() {
         <li>Pytania i inne żądania: przez „Sugestie”.</li>
       </ul>
     </section>
+    <section class="card about" data-sec="about">
+      <p class="big-note" style="text-align:left">Cześć! 👋</p>
+      <p>Ta apka zaczęła się od jednego pliku Excel z wagą i zdania „a może by tak zrobić to porządnie?”.</p>
+      <p>Teraz liczy treningi, rekordy, kalorie i ma motyw tak różowy, że aż boli.</p>
+      <p>Robię ją sam, za darmo i bez reklam. Pomysły i błędy wrzucaj do „Sugestii”.</p>
+      <p><i>Gdy wiatry nie sprzyjają, to buduje się charakter.</i> 💪</p>
+      <p>Na co dzień jestem Senior SAP ABAP Developerem z 5-letnim stażem komercyjnym. Ten projekt robię czysto dla zabawy.</p>
+    </section>
     <section class="card" data-sec="priv"><p class="big-note">Używaj jak chcesz, tylko nie wkurwiaj kodera.</p></section>
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
     <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
@@ -2170,7 +2178,7 @@ const SECS = [
   ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], null,
   ['profil', '🧍', 'Profil i cel'], ['dieta', '🥗', 'Ekran Dieta'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
-  ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
+  ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
 ];
 function secSub(k) {
   const p = S.profile, th = getTheme(), sy = typeof SY !== 'undefined' ? SY : null;
@@ -2189,7 +2197,7 @@ function secSub(k) {
   }
 }
 // Ustawienia na jednej stronie z kartami. Sugestie / polityka / reklamacje: karta „Inne”, każda pozycja otwiera okno.
-const SHEET_SECS = ['sug', 'sugadmin', 'rodo', 'priv', 'compl'];
+const SHEET_SECS = ['sug', 'sugadmin', 'about', 'rodo', 'priv', 'compl'];
 function applySettingsNav(body) {
   UI.sec = null;
   $('#h-wiecej').textContent = 'Ustawienia';
