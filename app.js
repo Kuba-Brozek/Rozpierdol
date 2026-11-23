@@ -256,7 +256,7 @@ function positiveFacts() {
       if (st.day > 6) out.push(`Średnio ubywa ci <b>${kg(st.lost / st.day * 7)}</b> na tydzień od startu. Stałe tempo to najlepsze tempo.`);
     }
     if (st.m30 != null && st.m30 >= 0.1) out.push(`W ostatnich 30 dniach waga spadła o <b>${kg(st.m30)}</b>.`);
-    if (st.wk != null && st.pwk != null && st.pwk - st.wk >= 0.05) out.push(`Średnia z ostatnich 7 dni jest o <b>${kg(st.pwk - st.wk)}</b> niższa niż tydzień wcześniej.`);
+    if (st.wk != null && st.pwk != null && st.pwk - st.wk >= 0.05) out.push(`Średnia waga z ostatnich 7 dni jest o <b>${kg(st.pwk - st.wk)}</b> niższa niż średnia z tygodnia wcześniej.`);
     if (st.pct != null && st.pct >= 1) out.push(st.pct >= 100 ? `Cel osiągnięty! Masz za sobą <b>${fmt(st.pct, 0)}%</b> zaplanowanej drogi. 🎉` : `Masz za sobą <b>${fmt(st.pct, 0)}%</b> drogi do celu.${st.pct >= 50 ? ' Z górki!' : ''}`);
     const min = Math.min(...w.map(x => x.w));
     if (w.length > 2 && st.cur <= min && st.cur < st.start) out.push(`Ostatni pomiar to <b>najniższa waga</b> od początku pomiarów: ${fmt(st.cur, 1)} kg.`);
