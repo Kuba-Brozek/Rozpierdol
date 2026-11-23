@@ -2076,6 +2076,42 @@ function renderWiecej() {
     </section>
     <section class="card" data-sec="sug" id="sug-box"></section>
     ${IS_ADMIN ? '<section class="card" data-sec="sugadmin" id="sugadmin-box"></section>' : ''}
+    <section class="card rodo" data-sec="rodo">
+      <h3>Kto przetwarza dane</h3>
+      <p>Apkę prowadzi jej autor, osoba prywatna, na własny i znajomych użytek. Kontakt: przez „Sugestie” w tej karcie.</p>
+      <h3>Jakie dane</h3>
+      <ul>
+        <li><b>Konto:</b> adres e-mail i hasło. Hasło trzyma Google (Firebase Authentication) w postaci zaszyfrowanej. Autor apki go nie zna.</li>
+        <li><b>To, co wpisujesz:</b> waga, pomiary ciała, treningi, plany, ulubione i własne ćwiczenia oraz profil: wzrost, płeć, rok urodzenia, aktywność i cel.</li>
+        <li><b>Sugestie:</b> treść i twój e-mail, żeby dało się odpisać.</li>
+      </ul>
+      <p>Waga, pomiary ciała i inne dane o zdrowiu są danymi wrażliwymi. Podajesz je dobrowolnie, a wszystkie pola profilu są opcjonalne.</p>
+      <h3>Gdzie leżą</h3>
+      <ul>
+        <li><b>Na telefonie:</b> w pamięci przeglądarki. Bez konta dane nigdzie nie wychodzą.</li>
+        <li><b>W chmurze</b> (po zalogowaniu): w bazie Google Firebase (Firestore). Google działa tu jako dostawca usługi.</li>
+        <li><b>Apka</b> jest hostowana na GitHub Pages. GitHub, jak każdy serwer, może zapisywać techniczne logi wejść, np. adres IP.</li>
+      </ul>
+      <h3>Po co</h3>
+      <p>Tylko żeby apka działała: zapis, synchronizacja między telefonami i udostępnianie, które sam włączysz. Nie ma reklam, analityki ani śledzenia. Dane nie są sprzedawane ani nikomu przekazywane.</p>
+      <h3>Kto ma dostęp</h3>
+      <ul>
+        <li>Do swoich danych masz dostęp tylko ty. Pilnują tego reguły bezpieczeństwa bazy.</li>
+        <li>Osoby, którym coś udostępnisz, widzą tylko zaznaczone rzeczy: plany, ulubione albo wagę. Dostęp zabierasz w każdej chwili.</li>
+        <li>Sugestie czyta tylko autor apki.</li>
+        <li>Autor, jako właściciel projektu Firebase, ma techniczny dostęp do bazy, ale z niego nie korzysta.</li>
+      </ul>
+      <h3>Jak długo</h3>
+      <p>Dopóki ich nie usuniesz. Usunięcie konta kasuje wszystkie twoje dane w chmurze od razu.</p>
+      <h3>Twoje prawa</h3>
+      <ul>
+        <li><b>Wgląd i kopia:</b> „Zapisz kopię” w karcie Excel.</li>
+        <li><b>Poprawianie:</b> edycja wpisów w apce.</li>
+        <li><b>Usunięcie:</b> „Usuń konto” w karcie Konto i chmura albo „Usuń wszystkie dane”.</li>
+        <li><b>Wycofanie zgody na udostępnianie:</b> usunięcie osoby z listy.</li>
+        <li>Pytania i inne żądania: przez „Sugestie”.</li>
+      </ul>
+    </section>
     <section class="card" data-sec="priv"><p class="big-note">Używaj jak chcesz, tylko nie wkurwiaj kodera.</p></section>
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
     <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
@@ -2134,7 +2170,7 @@ const SECS = [
   ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], null,
   ['profil', '🧍', 'Profil i cel'], ['dieta', '🥗', 'Ekran Dieta'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
-  ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
+  ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
 ];
 function secSub(k) {
   const p = S.profile, th = getTheme(), sy = typeof SY !== 'undefined' ? SY : null;
@@ -2148,11 +2184,12 @@ function secSub(k) {
     case 'dane': return `${plural(S.weights.length, 'pomiar', 'pomiary', 'pomiarów')} wagi, ${plural(S.workouts.length, 'trening', 'treningi', 'treningów')}`;
     case 'sug': return 'Napisz, co ulepszyć w apce';
     case 'sugadmin': return 'Widoczne tylko dla admina';
+    case 'rodo': return 'Jakie dane, gdzie leżą, kto ma dostęp';
     default: return '';
   }
 }
 // Ustawienia na jednej stronie z kartami. Sugestie / polityka / reklamacje: karta „Inne”, każda pozycja otwiera okno.
-const SHEET_SECS = ['sug', 'sugadmin', 'priv', 'compl'];
+const SHEET_SECS = ['sug', 'sugadmin', 'rodo', 'priv', 'compl'];
 function applySettingsNav(body) {
   UI.sec = null;
   $('#h-wiecej').textContent = 'Ustawienia';
@@ -2175,7 +2212,7 @@ function openSec(k) {
     const box = $('#sec-box', b);
     if (k === 'sug') typeof renderSuggest === 'function' ? renderSuggest(box) : box.innerHTML = '<p style="margin:0">Sugestie wymagają połączenia z chmurą.</p>';
     else if (k === 'sugadmin') { if (typeof renderSuggestAdmin === 'function') renderSuggestAdmin(box); }
-    else box.innerHTML = src.innerHTML + '<button class="btn block" type="button" data-close>OK</button>';
+    else { src.classList.forEach(c => c !== 'card' && box.classList.add(c)); box.innerHTML = src.innerHTML + '<button class="btn block" type="button" data-close>OK</button>'; }
   });
 }
 $('#wiecej-back').addEventListener('click', () => goBack());
