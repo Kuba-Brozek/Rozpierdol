@@ -457,6 +457,9 @@ function wireFact(root) {
   c.onclick = () => { UI.fact = (UI.fact || 0) + 1; c.outerHTML = factCardHTML(); wireFact(root); };
 }
 
+// Przełączniki kafelków na ekranie Dieta (S.prefs, zapisywane w chmurze); domyślnie włączone
+const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu'], ['fact', 'Losowy pozytywny fakt', 'kafelek nad wykresem wagi']];
+const pref = k => !(S.prefs && S.prefs[k] === false);
 // Kafelek „Kalorie”: zapotrzebowanie z profilu albo zachęta do uzupełnienia profilu
 function kcalCardHTML(st) {
   const ref = st.wk != null ? st.wk : st.cur, k = calories(ref);
@@ -544,9 +547,9 @@ function renderDieta() {
         <div class="tile"><span class="k">Średnia 7 dni</span><span class="v">${fmt(st.wk, 1)}</span><span class="d ${wcls(wkDiff)}">${wkDiff != null ? fmtSigned(wkDiff, 2) + ' kg / tydz.' : 'za mało danych'}</span></div>
         <div class="tile"><span class="k">Ostatnie 30 dni</span><span class="v ${st.m30 != null ? wcls(-st.m30) : ''}">${st.m30 != null ? fmtSigned(-st.m30, 1) : '–'}</span><span class="d">kg</span></div>
       </div>
-      ${kcalCardHTML(st)}
+      ${pref('kcal') ? kcalCardHTML(st) : ''}
       ${cialoNavCard()}
-      ${factCardHTML()}
+      ${pref('fact') ? factCardHTML() : ''}
       <section class="card chart">
         <div class="row"><h2>Waga</h2>
           <div class="seg" role="group" aria-label="Zakres wykresu">
@@ -1999,6 +2002,10 @@ function renderWiecej() {
       </div>
     </section>
     <section class="card">
+      <h2>Ekran Dieta</h2>
+      <div class="share-opts">${PREFS.map(([k, l, s]) => `<label class="share-opt"><input type="checkbox" data-pref="${k}" ${pref(k) ? 'checked' : ''}><span>${l} <span class="muted small">· ${s}</span></span></label>`).join('')}</div>
+    </section>
+    <section class="card">
       <h2>Profil</h2>
       <p class="muted small" style="margin:0">Wszystkie pola są opcjonalne. Płeć, rok urodzenia i aktywność są potrzebne do kalorii i % tkanki tłuszczowej z obwodów. Te dane nie trafiają do udostępniania.</p>
       <div class="add-weight" style="grid-template-columns:1fr 1fr">
@@ -2053,6 +2060,7 @@ function renderWiecej() {
     const st = stats(), el = $('#p-info');
     el.textContent = st && p.goalLoss && goalDir() ? `Waga docelowa: ${fmt(st.start + goalDir() * p.goalLoss, 1)} kg (start ${fmt(st.start, 1)} kg)` : '';
   };
+  $$('[data-pref]', body).forEach(c => c.onchange = () => { S.prefs = Object.assign({}, S.prefs, { [c.dataset.pref]: c.checked }); save(); toast(c.checked ? 'Włączone' : 'Wyłączone'); });
   const rerenderKeep = () => { const y = window.scrollY; renderWiecej(); window.scrollTo(0, y); };
   $$('[data-sex]', body).forEach(b => b.onclick = () => { p.sex = b.dataset.sex; save(); rerenderKeep(); toast('Zapisano płeć'); });
   $$('[data-goal]', body).forEach(b => b.onclick = () => { p.goalType = b.dataset.goal; save(); rerenderKeep(); toast('Cel: ' + GOALS[b.dataset.goal].l); });
