@@ -20,7 +20,7 @@ try { Object.assign(SY, JSON.parse(localStorage.getItem(SYNC_KEY) || '{}')); } c
 if (SY.session && !SY.session.idToken) SY.session = null; // sesja ze starej wersji (Supabase)
 SY.status = 'idle'; SY.error = '';
 function sySave() {
-  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ session: SY.session, lastSyncAt: SY.lastSyncAt, lastRemoteAt: SY.lastRemoteAt, dirty: SY.dirty, sharedPublished: SY.sharedPublished, yearSeen: SY.yearSeen, splitBlocked: SY.splitBlocked })); } catch (e) {}
+  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ session: SY.session, lastSyncAt: SY.lastSyncAt, lastRemoteAt: SY.lastRemoteAt, dirty: SY.dirty, sharedPublished: SY.sharedPublished, yearSeen: SY.yearSeen, splitBlocked: SY.splitBlocked, userTouched: SY.userTouched, userEmail: SY.userEmail })); } catch (e) {}
 }
 
 /* ---- błędy po polsku ---- */
@@ -89,6 +89,7 @@ const authPost = (method, body) => call(AUTH_URL + method + '?key=' + FB_KEY, { 
 async function cloudLogin(email, password) {
   const r = await authPost('signInWithPassword', { email, password, returnSecureToken: true });
   setSession(await r.json());
+  if (await isBlocked()) { await cloudLogout(); throw new Error('To konto zostało usunięte przez admina.'); }
   checkSpecialTheme(SY.session.email);
   fetchAccountCreated();
   await firstSyncAfterLogin();
@@ -130,6 +131,7 @@ async function deleteAccount(password) {
   for (const y of years) await soft(authed(yearUrl(uid, y), { method: 'DELETE' }));
   await authed(docUrl(uid), { method: 'DELETE' });
   await soft(authed(sharedUrl(uid), { method: 'DELETE' }));
+  await soft(authed(usersUrl(uid), { method: 'DELETE' }));
   await authPost('delete', { idToken: SY.session.idToken });
   await cloudLogout();
 }
@@ -137,7 +139,7 @@ async function cloudResetPassword(email) {
   await authPost('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 async function cloudLogout() {
-  SY.session = null; SY.lastRemoteAt = 0; SY.lastSyncAt = 0; SY.dirty = false; SY.sharedPublished = undefined; SY.yearSeen = {}; SY.splitBlocked = false; SY.status = 'idle'; sySave();
+  SY.session = null; SY.lastRemoteAt = 0; SY.lastSyncAt = 0; SY.dirty = false; SY.sharedPublished = undefined; SY.yearSeen = {}; SY.splitBlocked = false; SY.userTouched = 0; SY.userEmail = ''; SY.status = 'idle'; sySave();
   checkSpecialTheme(null);
 }
 
@@ -286,6 +288,8 @@ async function fetchAccountCreated() {
     if (u.email && u.email !== SY.session.email) { SY.session.email = u.email; checkSpecialTheme(u.email); }
     SY.session.verified = !!u.emailVerified;
     sySave();
+    if (await checkBlocked()) return;
+    if (!hadDate) touchUser(true);
     if (!hadDate && UI.tab === 'dieta' && $('#sheet').hidden) renderDieta();
     if (UI.tab === 'wiecej' && $('#sheet').hidden) renderWiecej();
   } catch (e) { /* bez tych danych apka działa normalnie */ }
@@ -368,8 +372,10 @@ async function syncNow() {
       if (SY.dirty || differs || (!remote.fmt2 && !SY.splitBlocked)) await pushRemote(remote.fmt2 ? remote.years : null);
     }
     SY.dirty = false; dirtySince = 0; SY.lastSyncAt = Date.now(); SY.status = 'ok'; SY.error = '';
+    touchUser();
   } catch (e) {
     SY.status = e.code === 'net' ? 'offline' : 'error'; SY.error = e.message;
+    if (e.status === 403) setTimeout(checkBlocked, 0); // odmowa zapisu: może admin zablokował konto
   } finally {
     syncing = false; sySave(); updateSyncUI();
     if (syncAgain) { syncAgain = false; syncSoon(500); }
@@ -476,9 +482,124 @@ async function renderSuggestAdmin(b) {
     : '<p class="muted" style="margin:0">Na razie nikt nic nie napisał.</p><button class="link" type="button" id="sug-reload">Odśwież</button>';
   const rl = $('#sug-reload', b); if (rl) rl.onclick = () => renderSuggestAdmin(b);
   $$('[data-sdel]', b).forEach(d => d.onclick = async () => {
-    if (!await confirmBox('Usunąć sugestię?', 'Zniknie na zawsze.', 'Usuń', true)) return;
+    if (!await confirmBox('Usunąć sugestię?', 'Zniknie na zawsze.', 'Usuń', true)) { openSec('sugadmin'); return; }
     try { await authed(sugUrl(d.dataset.sdel), { method: 'DELETE' }); toast('Usunięto'); } catch (x) { toast(x.message); }
-    renderSuggestAdmin(b);
+    openSec('sugadmin');
+  });
+}
+
+/* ---- REJESTR KONT I PANEL ADMINA ----
+   users/{uid}: e-mail, data założenia, ostatnia aktywność i liczby wpisów — każde konto zapisuje swój wpis (najwyżej co 6 h).
+   blocked/{uid}: konto usunięte przez admina. Reguły Firestore nie pozwalają mu nic zapisać, a apka je wylogowuje.
+   Konta logowania (Firebase Authentication) z poziomu apki usunąć się nie da — to wymaga klucza serwerowego,
+   którego w publicznej apce być nie może. Admin kasuje więc wszystkie dane i blokuje konto, a sam login usuwa w konsoli. */
+const FS_BASE = () => `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FB_PROJECT)}/databases/(default)/documents/`;
+const usersUrl = uid => FS_BASE() + 'users' + (uid ? '/' + encodeURIComponent(uid) : '');
+const blockedUrl = uid => FS_BASE() + 'blocked' + (uid ? '/' + encodeURIComponent(uid) : '');
+const fNum = (f, k) => +(f[k] && (f[k].integerValue || f[k].doubleValue) || 0);
+const fStr = (f, k) => (f[k] && f[k].stringValue) || '';
+async function listDocs(url, mask) {
+  const out = []; let page = '';
+  do {
+    const r = await authed(url + '?pageSize=300' + (mask || []).map(m => '&mask.fieldPaths=' + encodeURIComponent(m)).join('') + (page ? '&pageToken=' + encodeURIComponent(page) : ''));
+    if (r.status === 404) break;
+    const j = await r.json();
+    (j.documents || []).forEach(d => out.push({ id: d.name.split('/').pop(), f: d.fields || {} }));
+    page = j.nextPageToken || '';
+  } while (page);
+  return out;
+}
+async function touchUser(force) {
+  const s = SY.session; if (!s) return;
+  if (!force && SY.userTouched && Date.now() - SY.userTouched < 6 * 3600e3 && SY.userEmail === s.email) return;
+  let ver = '';
+  try { if (window.caches) ver = ((await caches.keys()).find(n => /^rozpierdol-(?!img)/.test(n)) || '').replace('rozpierdol-', ''); } catch (e) {}
+  const fields = {
+    email: { stringValue: s.email || '' }, createdAt: { integerValue: String(s.createdAt || 0) }, lastSeen: { integerValue: String(Date.now()) },
+    weights: { integerValue: String(S.weights.length) }, workouts: { integerValue: String(S.workouts.length) }, plans: { integerValue: String(S.plans.length) },
+    // same numery lat z treningami (bez treści) — żeby przy usuwaniu konta wiadomo było, które dokumenty roczne skasować
+    years: { arrayValue: { values: [...new Set([...Object.keys(SY.yearSeen || {}), ...S.workouts.map(wYear)])].map(y => ({ stringValue: y })) } },
+    standalone: { booleanValue: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches }, ver: { stringValue: ver },
+  };
+  try {
+    await authed(usersUrl(s.uid), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
+    SY.userTouched = Date.now(); SY.userEmail = s.email; sySave();
+  } catch (e) { /* stare reguły Firestore albo brak sieci — spróbujemy przy kolejnej synchronizacji */ }
+}
+// Czy admin zablokował to konto? Jeśli tak — wyloguj (dane w telefonie zostają).
+async function isBlocked() {
+  if (!SY.session) return false;
+  try { return (await authed(blockedUrl(SY.session.uid))).status !== 404; }
+  catch (e) { return false; } // brak sieci albo stare reguły (403) — nie blokujemy
+}
+async function checkBlocked() {
+  if (!await isBlocked()) return false;
+  await cloudLogout();
+  openSheet('Konto usunięte', `<p style="margin:0">Admin usunął to konto z chmury i wylogował je. Dane zapisane w tym telefonie zostały.</p>
+    <p class="muted small" style="margin:0">Jeśli to pomyłka, napisz do autora apki.</p><button class="btn block" type="button" data-close>OK</button>`);
+  rerender();
+  return true;
+}
+// Usuwa z chmury wszystko, co należy do konta, i blokuje je (tylko admin)
+async function adminDeleteUser(uid, email, knownYears) {
+  const soft = async p => { try { await p; } catch (e) { if (e.status !== 403 && e.status !== 404) throw e; } };
+  // blokada najpierw: od tej chwili telefon tej osoby nie odtworzy danych kolejną synchronizacją
+  await authed(blockedUrl(uid), { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: { email: { stringValue: email || '' }, at: { integerValue: String(Date.now()) } } }) });
+  // admin nie może czytać danych kont (także listy lat), więc kasuje lata z rejestru i na wszelki wypadek każdy rok od 2020
+  // (usunięcie nieistniejącego dokumentu niczego nie psuje)
+  const years = new Set(knownYears || []), now = new Date().getFullYear();
+  for (let y = 2020; y <= now + 1; y++) years.add(String(y));
+  years.add('0000');
+  for (const y of years) await soft(authed(yearUrl(uid, y), { method: 'DELETE' }));
+  await soft(authed(docUrl(uid), { method: 'DELETE' }));
+  await soft(authed(sharedUrl(uid), { method: 'DELETE' }));
+  await soft(authed(usersUrl(uid), { method: 'DELETE' }));
+}
+async function renderAdmin(b) {
+  b.innerHTML = '<p class="muted small" style="margin:0">Wczytuję…</p>';
+  let users, blocked;
+  try {
+    [users, blocked] = await Promise.all([listDocs(usersUrl()), listDocs(blockedUrl())]);
+  } catch (e) {
+    b.innerHTML = `<p class="small" style="margin:0;color:var(--bad)">${esc(e.message)}</p>
+      <p class="muted small" style="margin:0">Panel działa tylko z konta admina z <b>potwierdzonym</b> e-mailem i po wklejeniu nowych reguł z FIREBASE.md.</p>`;
+    return;
+  }
+  const blockedIds = new Set(blocked.map(x => x.id));
+  const map = {};
+  users.forEach(u => map[u.id] = { uid: u.id, email: fStr(u.f, 'email'), created: fNum(u.f, 'createdAt'), seen: fNum(u.f, 'lastSeen'),
+    weights: fNum(u.f, 'weights'), workouts: fNum(u.f, 'workouts'), plans: fNum(u.f, 'plans'), app: !!(u.f.standalone && u.f.standalone.booleanValue), ver: fStr(u.f, 'ver'),
+    years: ((u.f.years && u.f.years.arrayValue && u.f.years.arrayValue.values) || []).map(v => v.stringValue) });
+  const list = Object.values(map).filter(u => !blockedIds.has(u.uid)).sort((a, b2) => b2.seen - a.seen);
+  const when = at => at ? new Date(at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–';
+  const day = at => at ? new Date(at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' }) : '–';
+  const me = SY.session && SY.session.uid;
+  b.innerHTML = `
+    <div class="row small"><span class="muted">${plural(list.length, 'konto', 'konta', 'kont')} (konto pojawia się po otwarciu nowej wersji apki)</span><button class="link" type="button" id="adm-reload">Odśwież</button></div>
+    <div class="list">${list.map(u => `<div class="li sug-item">
+      <div class="row"><b style="overflow-wrap:anywhere">${u.email ? esc(u.email) : '<span class="muted">e-mail nieznany</span>'}${u.uid === me ? ' <span class="muted small">(ty)</span>' : ''}</b>
+        ${u.uid === me ? '' : `<button class="btn danger" type="button" style="padding:6px 12px;min-height:0" data-udel="${esc(u.uid)}">Usuń</button>`}</div>
+      <div class="muted small">Konto od ${day(u.created)} · ostatnio ${when(u.seen)}<br>
+        ${plural(u.weights, 'pomiar', 'pomiary', 'pomiarów')} wagi, ${plural(u.workouts, 'trening', 'treningi', 'treningów')}, ${plural(u.plans, 'plan', 'plany', 'planów')}<br>
+        ${u.app ? 'Apka na ekranie początkowym' : 'W przeglądarce'}${u.ver ? ' · wersja ' + esc(u.ver) : ''}</div>
+    </div>`).join('') || '<p class="muted" style="margin:0">Brak kont.</p>'}</div>
+    ${blocked.length ? `<h3 style="margin:8px 0 0">Usunięte i zablokowane</h3>
+    <div class="list">${blocked.map(x => `<div class="li"><span class="grow small">${esc(fStr(x.f, 'email') || x.id)}<br><span class="muted">${when(fNum(x.f, 'at'))}</span></span>
+      <button class="link" type="button" data-unblock="${esc(x.id)}">Odblokuj</button></div>`).join('')}</div>` : ''}
+    <p class="muted small" style="margin:0">„Usuń” kasuje z chmury wszystkie dane konta i blokuje je: apka tej osoby wyloguje się przy następnym uruchomieniu. Dane w jej telefonie zostają. Sam login (e-mail i hasło) usuniesz w konsoli Firebase → Authentication → Users.</p>`;
+  $('#adm-reload', b).onclick = () => renderAdmin(b);
+  $$('[data-udel]', b).forEach(d => d.onclick = async () => {
+    const u = map[d.dataset.udel];
+    if (!await confirmBox('Usunąć konto?', `Wszystkie dane <b>${esc(u.email || u.uid)}</b> znikną z chmury (waga, treningi, plany, udostępnienia), a konto zostanie zablokowane. Tego nie da się cofnąć.`, 'Usuń', true)) { openSec('admin'); return; }
+    toast('Usuwam…');
+    try { await adminDeleteUser(u.uid, u.email, u.years); toast('Usunięto konto'); } catch (x) { toast(x.message); }
+    openSec('admin');
+  });
+  $$('[data-unblock]', b).forEach(d => d.onclick = async () => {
+    if (!await confirmBox('Odblokować konto?', 'Ta osoba znów będzie mogła się zalogować i zapisywać dane. Usunięte dane nie wrócą.', 'Odblokuj')) { openSec('admin'); return; }
+    try { await authed(blockedUrl(d.dataset.unblock), { method: 'DELETE' }); toast('Odblokowano'); } catch (x) { toast(x.message); }
+    openSec('admin');
   });
 }
 

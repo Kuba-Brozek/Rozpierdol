@@ -2075,7 +2075,7 @@ function renderWiecej() {
       <button class="btn danger" type="button" id="wipe">Usuń wszystkie dane</button>
     </section>
     <section class="card" data-sec="sug" id="sug-box"></section>
-    ${IS_ADMIN ? '<section class="card" data-sec="sugadmin" id="sugadmin-box"></section>' : ''}
+    ${IS_ADMIN ? '<section class="card" data-sec="sugadmin" id="sugadmin-box"></section><section class="card" data-sec="admin"></section>' : ''}
     <section class="card rodo" data-sec="rodo">
       <h3>Kto przetwarza dane</h3>
       <p>Apkę prowadzi jej autor, osoba prywatna, na własny i znajomych użytek. Kontakt: przez „Sugestie” w tej karcie.</p>
@@ -2084,6 +2084,7 @@ function renderWiecej() {
         <li><b>Konto:</b> adres e-mail i hasło. Hasło trzyma Google (Firebase Authentication) w postaci zaszyfrowanej. Autor apki go nie zna.</li>
         <li><b>To, co wpisujesz:</b> waga, pomiary ciała, treningi, plany, ulubione i własne ćwiczenia oraz profil: wzrost, płeć, rok urodzenia, aktywność i cel.</li>
         <li><b>Sugestie:</b> treść i twój e-mail, żeby dało się odpisać.</li>
+        <li><b>Lista kont:</b> e-mail, data założenia konta, kiedy ostatnio otwarto apkę i ile jest wpisów (sama liczba, bez treści). Autor używa jej do porządków, np. usuwania nieużywanych kont.</li>
       </ul>
       <p>Waga, pomiary ciała i inne dane o zdrowiu są danymi wrażliwymi. Podajesz je dobrowolnie, a wszystkie pola profilu są opcjonalne.</p>
       <h3>Gdzie leżą</h3>
@@ -2180,7 +2181,7 @@ const SECS = [
   ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], null,
   ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Forma'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
-  ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
+  ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
 ];
 function secSub(k) {
   const p = S.profile, th = getTheme(), sy = typeof SY !== 'undefined' ? SY : null;
@@ -2194,12 +2195,13 @@ function secSub(k) {
     case 'dane': return `${plural(S.weights.length, 'pomiar', 'pomiary', 'pomiarów')} wagi, ${plural(S.workouts.length, 'trening', 'treningi', 'treningów')}`;
     case 'sug': return 'Napisz, co ulepszyć w apce';
     case 'sugadmin': return 'Widoczne tylko dla admina';
+    case 'admin': return 'Konta użytkowników';
     case 'rodo': return 'Jakie dane, gdzie leżą, kto ma dostęp';
     default: return '';
   }
 }
 // Ustawienia na jednej stronie z kartami. Sugestie / polityka / reklamacje: karta „Inne”, każda pozycja otwiera okno.
-const SHEET_SECS = ['sug', 'sugadmin', 'about', 'rodo', 'priv', 'compl'];
+const SHEET_SECS = ['sug', 'sugadmin', 'admin', 'about', 'rodo', 'priv', 'compl'];
 function applySettingsNav(body) {
   UI.sec = null;
   $('#h-wiecej').textContent = 'Ustawienia';
@@ -2222,6 +2224,7 @@ function openSec(k) {
     const box = $('#sec-box', b);
     if (k === 'sug') typeof renderSuggest === 'function' ? renderSuggest(box) : box.innerHTML = '<p style="margin:0">Sugestie wymagają połączenia z chmurą.</p>';
     else if (k === 'sugadmin') { if (typeof renderSuggestAdmin === 'function') renderSuggestAdmin(box); }
+    else if (k === 'admin') { if (typeof renderAdmin === 'function') renderAdmin(box); }
     else { src.classList.forEach(c => c !== 'card' && box.classList.add(c)); box.innerHTML = src.innerHTML + '<button class="btn block" type="button" data-close>OK</button>'; }
   });
 }
