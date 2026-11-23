@@ -463,7 +463,10 @@ const pref = k => !(S.prefs && S.prefs[k] === false);
 // Kafelek „Kalorie”: zapotrzebowanie z profilu albo zachęta do uzupełnienia profilu
 function kcalCardHTML(st) {
   const ref = st.wk != null ? st.wk : st.cur, k = calories(ref);
-  if (!k) return navCard('wiecej', '🔥', 'Dzienne kalorie', 'Uzupełnij w Ustawieniach płeć, rok urodzenia i aktywność, a policzę zapotrzebowanie');
+  if (!k) {
+    const p = S.profile, miss = [!p.height && 'wzrost', !p.sex && 'płeć', !ageNow() && 'rok urodzenia', !p.activity && 'aktywność'].filter(Boolean);
+    return navCard('wiecej', '🔥', 'Dzienne kalorie', `Brakuje w profilu (Ustawienia): ${miss.join(', ') || 'wagi'}. Wtedy policzę zapotrzebowanie.`);
+  }
   const r = n => fmt(Math.round(n / 10) * 10, 0);
   const what = k.dir < 0 ? `na redukcję −${fmtN(k.rate)} kg/tydz.` : k.dir > 0 ? `na masę +${fmtN(k.rate)} kg/tydz.` : 'na utrzymanie wagi';
   return `<button class="card nav-card kcal" type="button" id="kcal-card"><span class="nav-ic" aria-hidden="true">🔥</span>
@@ -2056,23 +2059,33 @@ function renderWiecej() {
   }).catch(() => {});
   if (typeof renderSyncCard === 'function') renderSyncCard($('#sync-card', body)); else $('#sync-card', body).remove();
   if (typeof renderShareCard === 'function') renderShareCard($('#share-card', body)); else $('#share-card', body).remove();
+  // Zawsze aktualny profil (synchronizacja w tle może podmienić obiekt S)
+  const P = () => S.profile;
   const info = () => {
-    const st = stats(), el = $('#p-info');
-    el.textContent = st && p.goalLoss && goalDir() ? `Waga docelowa: ${fmt(st.start + goalDir() * p.goalLoss, 1)} kg (start ${fmt(st.start, 1)} kg)` : '';
+    const st = stats(), el = $('#p-info'), g = P().goalLoss; if (!el) return;
+    el.textContent = st && g && goalDir() ? `Waga docelowa: ${fmt(st.start + goalDir() * g, 1)} kg (start ${fmt(st.start, 1)} kg)` : '';
   };
   $$('[data-pref]', body).forEach(c => c.onchange = () => { S.prefs = Object.assign({}, S.prefs, { [c.dataset.pref]: c.checked }); save(); toast(c.checked ? 'Włączone' : 'Wyłączone'); });
   const rerenderKeep = () => { const y = window.scrollY; renderWiecej(); window.scrollTo(0, y); };
-  $$('[data-sex]', body).forEach(b => b.onclick = () => { p.sex = b.dataset.sex; save(); rerenderKeep(); toast('Zapisano płeć'); });
-  $$('[data-goal]', body).forEach(b => b.onclick = () => { p.goalType = b.dataset.goal; save(); rerenderKeep(); toast('Cel: ' + GOALS[b.dataset.goal].l); });
-  $$('[data-wk]', body).forEach(b => b.onclick = () => { p.weekly = Math.max(0, Math.min(14, (p.weekly || 0) + +b.dataset.wk)) || null; save(); $('#p-wk').textContent = p.weekly || '–'; });
-  $('#p-born').addEventListener('change', e => { const v = Math.round(num(e.target.value)); p.born = v >= 1920 && v <= new Date().getFullYear() - 10 ? v : null; save(); toast(p.born ? 'Zapisano rok urodzenia' : 'Wpisz rok, np. 1998'); });
-  $('#p-act').addEventListener('change', e => { p.activity = num(e.target.value); save(); toast('Zapisano aktywność'); });
-  const pr = $('#p-rate'); if (pr) pr.addEventListener('change', e => { p.rate = num(e.target.value); save(); toast('Zapisano tempo'); });
+  $$('[data-sex]', body).forEach(b => b.onclick = () => { P().sex = b.dataset.sex; save(); rerenderKeep(); toast('Zapisano płeć'); });
+  $$('[data-goal]', body).forEach(b => b.onclick = () => { P().goalType = b.dataset.goal; save(); rerenderKeep(); toast('Cel: ' + GOALS[b.dataset.goal].l); });
+  $$('[data-wk]', body).forEach(b => b.onclick = () => { const p2 = P(); p2.weekly = Math.max(0, Math.min(14, (p2.weekly || 0) + +b.dataset.wk)) || null; save(); $('#p-wk').textContent = p2.weekly || '–'; });
+  // Pola liczbowe zapisują się już przy wpisywaniu: na iPhonie zdarzenie „change” nie przychodzi,
+  // gdy po wpisaniu stuknie się w inne miejsce zamiast „Gotowe”
+  const numField = (sel, read, okMsg) => {
+    const el = $(sel, body); if (!el) return;
+    el.addEventListener('input', () => { read(el.value); save(true); info(); syncSoonSafe(); });
+    el.addEventListener('change', () => { const ok = read(el.value); save(); info(); toast(ok === false ? okMsg[1] : okMsg[0]); });
+  };
+  const syncSoonSafe = () => { if (typeof syncSoon === 'function') syncSoon(); };
+  numField('#p-h', v => { let n = num(v); if (n > 3) n = n / 100; P().height = n; }, ['Zapisano wzrost']);
+  numField('#p-born', v => { const n = Math.round(num(v)); const ok = n >= 1920 && n <= new Date().getFullYear() - 10; P().born = ok ? n : null; return ok; }, ['Zapisano rok urodzenia', 'Wpisz rok, np. 1998']);
+  numField('#p-g', v => { P().goalLoss = num(v); }, ['Zapisano cel']);
+  $('#p-act').addEventListener('change', e => { P().activity = num(e.target.value); save(); toast('Zapisano aktywność'); });
+  const pr = $('#p-rate'); if (pr) pr.addEventListener('change', e => { P().rate = num(e.target.value); save(); toast('Zapisano tempo'); });
   info();
   body.querySelectorAll('[data-accent]').forEach(b => b.onclick = () => { setTheme({ accent: b.dataset.accent }); body.querySelectorAll('[data-accent]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   body.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { setTheme({ mode: b.dataset.mode }); body.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
-  $('#p-h').addEventListener('change', e => { let v = num(e.target.value); if (v > 3) v = v / 100; p.height = v; save(); info(); toast('Zapisano wzrost'); });
-  const pg = $('#p-g'); if (pg) pg.addEventListener('change', e => { p.goalLoss = num(e.target.value); save(); info(); toast('Zapisano cel'); });
   $('#imp-xlsx').addEventListener('change', onXlsxPicked);
   $('#exp-xlsx').onclick = () => {
     if (!S.weights.length && !S.workouts.length && !S.fav.length && !S.plans.length && !(S.custom || []).length) { toast('Nie ma jeszcze danych do zapisania'); return; }
