@@ -458,7 +458,7 @@ function wireFact(root) {
 }
 
 // Przełączniki kafelków na ekranie Dieta (S.prefs, zapisywane w chmurze); domyślnie włączone
-const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu'], ['fact', 'Losowy pozytywny fakt', 'kafelek nad wykresem wagi']];
+const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu', '🔥'], ['fact', 'Losowy pozytywny fakt', 'kafelek nad wykresem wagi', '✨']];
 const pref = k => !(S.prefs && S.prefs[k] === false);
 // Kafelek „Kalorie”: zapotrzebowanie z profilu albo zachęta do uzupełnienia profilu
 function kcalCardHTML(st) {
@@ -1177,11 +1177,15 @@ function renderTrening() {
       ${hist.length ? `
         <div class="tiles">
           <div class="tile"><span class="k">Treningi</span><span class="v">${hist.length}</span><span class="d">łącznie</span></div>
-          ${(() => { const n = workoutsInWeek(weekStart(today())), t = S.profile.weekly, st = weeklyStreak();
-            return t ? `<div class="tile"><span class="k">Ten tydzień</span><span class="v">${n}<small class="muted">/${t}</small></span>
-              <div class="bar" style="margin:2px 0" aria-hidden="true"><i style="width:${Math.min(100, n / t * 100)}%"></i></div>
-              <span class="d ${n >= t ? 'down' : ''}">${n >= t ? 'plan wykonany ✓' : 'zostało ' + (t - n)}${st >= 2 ? ` · 🔥 ${st} tyg.` : ''}</span></div>`
-            : `<div class="tile"><span class="k">Ten tydzień</span><span class="v">${n}</span><span class="d">od poniedziałku</span></div>`; })()}
+          ${(() => { // ostatnie 7 dni (dziś + 6 wcześniejszych), a nie tydzień kalendarzowy
+            const from = addDays(today(), -6), n = S.workouts.filter(w => w.date >= from && w.date <= today()).length, t = S.profile.weekly;
+            if (!t) return `<div class="tile"><span class="k">Ostatnie 7 dni</span><span class="v">${n}</span><span class="d">${n === 1 ? 'trening' : n >= 2 && n <= 4 ? 'treningi' : 'treningów'}</span></div>`;
+            const C = 2 * Math.PI * 26, frac = Math.min(1, n / t);
+            return `<div class="tile donut-tile" role="img" aria-label="Treningi w ostatnich 7 dniach: ${n} z ${t}"><span class="k">Ostatnie 7 dni</span>
+              <div class="donut${n >= t ? ' done' : ''}"><svg viewBox="0 0 64 64" aria-hidden="true"><circle class="bg" cx="32" cy="32" r="26" fill="none" stroke-width="8"/>
+                <circle class="fg" cx="32" cy="32" r="26" fill="none" stroke-width="8" stroke-linecap="round" stroke-dasharray="${frac ? Math.max(0.01, frac * C).toFixed(1) : 0} ${C.toFixed(1)}"/></svg>
+                <b>${n}<small>/${t}</small></b></div>
+              <span class="d ${n >= t ? 'down' : ''}">${n >= t ? 'plan wykonany ✓' : 'zostało ' + (t - n)}</span></div>`; })()}
           <div class="tile"><span class="k">Ostatni</span><span class="v" style="font-size:17px">${dayLabel(hist[0].date)}</span><span class="d">${(n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : n + ' dni temu')(daysBetween(hist[0].date, today()))}</span></div>
         </div>
         <button class="btn block" type="button" id="t-prs">🏆 Rekordy osobiste</button>
@@ -2006,7 +2010,9 @@ function renderWiecej() {
     </section>
     <section class="card">
       <h2>Ekran Dieta</h2>
-      <div class="share-opts">${PREFS.map(([k, l, s]) => `<label class="share-opt"><input type="checkbox" data-pref="${k}" ${pref(k) ? 'checked' : ''}><span>${l} <span class="muted small">· ${s}</span></span></label>`).join('')}</div>
+      <div class="pref-list">${PREFS.map(([k, l, s, ic]) => `<label class="pref-row"><span class="pref-ic" aria-hidden="true">${ic}</span>
+        <span class="grow"><span class="pref-l">${l}</span><span class="small muted">${s}</span></span>
+        <input type="checkbox" class="switch" role="switch" data-pref="${k}" ${pref(k) ? 'checked' : ''}></label>`).join('')}</div>
     </section>
     <section class="card">
       <h2>Profil</h2>
