@@ -28,7 +28,9 @@ function fbError(status, j) {
   const raw = (j && j.error && (j.error.message || j.error.status)) || '';
   const map = [
     [/INVALID_LOGIN_CREDENTIALS|INVALID_PASSWORD|EMAIL_NOT_FOUND/, 'Zły e-mail albo hasło.'],
-    [/EMAIL_EXISTS/, 'To konto już istnieje. Zaloguj się.'],
+    [/EMAIL_EXISTS/, 'Na ten adres jest już założone konto.'],
+    [/CREDENTIAL_TOO_OLD|requires-recent-login/i, 'Ze względów bezpieczeństwa zaloguj się ponownie i spróbuj jeszcze raz.'],
+    [/INVALID_NEW_EMAIL/, 'Nowy adres e-mail wygląda na niepoprawny.'],
     [/WEAK_PASSWORD/, 'Hasło musi mieć co najmniej 6 znaków.'],
     [/INVALID_EMAIL|MISSING_EMAIL/, 'Ten adres e-mail wygląda na niepoprawny.'],
     [/TOO_MANY_ATTEMPTS/, 'Za dużo prób. Odczekaj chwilę.'],
@@ -55,6 +57,7 @@ function setSession(j) {
   const old = SY.session, uidNew = j.localId || j.user_id || (old && old.uid);
   SY.session = {
     createdAt: old && old.uid === uidNew ? old.createdAt : undefined, // data założenia konta (ms), z accounts:lookup
+    verified: old && old.uid === uidNew ? old.verified : undefined,
     idToken: j.idToken || j.id_token, refresh: j.refreshToken || j.refresh_token,
     expiresAt: Date.now() + (+(j.expiresIn || j.expires_in) || 3600) * 1000,
     uid: j.localId || j.user_id || (SY.session && SY.session.uid), email: j.email || (SY.session && SY.session.email),
@@ -97,6 +100,38 @@ async function cloudSignup(email, password) {
   checkSpecialTheme(SY.session.email);
   await firstSyncAfterLogin();
   return 'in';
+}
+/* ---- zarządzanie kontem: zmiana hasła / e-maila, usunięcie konta ----
+   Firebase wymaga świeżego logowania przy tych operacjach, więc każda zaczyna się od podania obecnego hasła. */
+async function reauth(password) {
+  const r = await authPost('signInWithPassword', { email: SY.session.email, password, returnSecureToken: true });
+  setSession(await r.json());
+}
+async function changePassword(oldPass, newPass) {
+  await reauth(oldPass);
+  const r = await authPost('update', { idToken: SY.session.idToken, password: newPass, returnSecureToken: true });
+  setSession(await r.json()); // zmiana hasła wylogowuje pozostałe urządzenia
+}
+async function changeEmail(password, newEmail) {
+  await reauth(password);
+  // link trafia na NOWY adres; e-mail zmieni się dopiero po jego kliknięciu
+  await authPost('sendOobCode', { requestType: 'VERIFY_AND_CHANGE_EMAIL', idToken: SY.session.idToken, newEmail });
+}
+async function deleteAccount(password) {
+  await reauth(password);
+  const uid = SY.session.uid;
+  const soft = async p => { try { await p; } catch (e) { if (e.status !== 403) throw e; } };
+  // dokumenty roczne: znane lata + lista z serwera
+  const years = new Set([...Object.keys(SY.yearSeen || {}), ...S.workouts.map(wYear)]);
+  await soft((async () => {
+    const r = await authed(docUrl(uid) + '/years?pageSize=300');
+    if (r.status !== 404) ((await r.json()).documents || []).forEach(d => years.add(d.name.split('/').pop()));
+  })());
+  for (const y of years) await soft(authed(yearUrl(uid, y), { method: 'DELETE' }));
+  await authed(docUrl(uid), { method: 'DELETE' });
+  await soft(authed(sharedUrl(uid), { method: 'DELETE' }));
+  await authPost('delete', { idToken: SY.session.idToken });
+  await cloudLogout();
 }
 async function cloudResetPassword(email) {
   await authPost('sendOobCode', { requestType: 'PASSWORD_RESET', email });
@@ -237,14 +272,23 @@ async function listSharedWithMe() {
 }
 // Weryfikacja e-maila (potrzebna osobie, która ogląda cudze dane)
 // Data założenia konta — do faktu „dbasz o siebie od …”; pobierana raz i zapamiętywana w sesji
+// Raz przy starcie: data założenia konta, aktualny e-mail (mógł się zmienić linkiem) i czy jest potwierdzony
+let accountChecked = false;
 async function fetchAccountCreated() {
-  if (!cloudReady() || !SY.session || SY.session.createdAt || !navigator.onLine) return;
+  if (!cloudReady() || !SY.session || accountChecked || !navigator.onLine) return;
   try {
     const t = await idToken(); if (!t) return;
     const j = await (await authPost('lookup', { idToken: t })).json();
-    const c = +(j.users && j.users[0] && j.users[0].createdAt);
-    if (c && SY.session) { SY.session.createdAt = c; sySave(); if (UI.tab === 'dieta' && $('#sheet').hidden) renderDieta(); }
-  } catch (e) { /* bez daty fakt po prostu się nie pokaże */ }
+    const u = j.users && j.users[0]; if (!u || !SY.session) return;
+    accountChecked = true;
+    const hadDate = !!SY.session.createdAt;
+    if (+u.createdAt) SY.session.createdAt = +u.createdAt;
+    if (u.email && u.email !== SY.session.email) { SY.session.email = u.email; checkSpecialTheme(u.email); }
+    SY.session.verified = !!u.emailVerified;
+    sySave();
+    if (!hadDate && UI.tab === 'dieta' && $('#sheet').hidden) renderDieta();
+    if (UI.tab === 'wiecej' && $('#sheet').hidden) renderWiecej();
+  } catch (e) { /* bez tych danych apka działa normalnie */ }
 }
 async function emailVerified() {
   const t = await idToken(); if (!t) throw Object.assign(new Error('Brak połączenia z serwerem.'), { code: 'net' });
@@ -361,6 +405,64 @@ async function downloadCloudFile() {
   shareOrDownload(`Rozpierdol-kopia-${today()}.xlsx`, backupXlsx());
 }
 
+/* ---- interfejs: okna zarządzania kontem ---- */
+const passField = (id, label, auto) => `<div class="field"><label for="${id}">${label}</label>
+  <input type="password" id="${id}" autocomplete="${auto}" minlength="6" required></div>`;
+// wspólny formularz: walidacja, blokada przycisku na czas wysyłki, błąd pod formularzem
+function accountForm(title, html, submitLabel, danger, run) {
+  openSheet(title, `<form id="ac-form" class="view" style="gap:12px" autocomplete="on">${html}
+    <p class="small" id="ac-err" style="margin:0;color:var(--bad)" role="alert"></p>
+    <button class="btn ${danger ? 'danger' : 'primary'} block" type="submit">${submitLabel}</button></form>`, b => {
+    const f = $('#ac-form', b), err = $('#ac-err', b), btn = f.querySelector('[type=submit]');
+    f.addEventListener('submit', async e => {
+      e.preventDefault(); err.textContent = '';
+      if (!navigator.onLine) { err.textContent = 'Brak internetu.'; return; }
+      btn.disabled = true; const t = btn.textContent; btn.textContent = 'Chwila…';
+      try { await run(f, err); } catch (x) { err.textContent = x.message; }
+      finally { if (btn.isConnected) { btn.disabled = false; btn.textContent = t; } }
+    });
+  });
+}
+function showChangePassword() {
+  accountForm('Zmień hasło', `
+    ${passField('ac-old', 'Obecne hasło', 'current-password')}
+    ${passField('ac-new', 'Nowe hasło (min. 6 znaków)', 'new-password')}
+    ${passField('ac-new2', 'Powtórz nowe hasło', 'new-password')}
+    <p class="muted small" style="margin:0">Po zmianie hasła inne telefony zalogowane na to konto trzeba będzie zalogować ponownie.</p>`, 'Zmień hasło', false, async (f, err) => {
+    const o = f.querySelector('#ac-old').value, n = f.querySelector('#ac-new').value, n2 = f.querySelector('#ac-new2').value;
+    if (n.length < 6) { err.textContent = 'Nowe hasło musi mieć co najmniej 6 znaków.'; return; }
+    if (n !== n2) { err.textContent = 'Nowe hasła się różnią.'; return; }
+    if (n === o) { err.textContent = 'Nowe hasło jest takie samo jak obecne.'; return; }
+    await changePassword(o, n);
+    closeSheet(); toast('Hasło zmienione'); renderWiecej();
+  });
+}
+function showChangeEmail() {
+  accountForm('Zmień adres e-mail', `
+    <p class="muted small" style="margin:0">Obecny adres: <b>${esc(SY.session.email || '')}</b>. Na nowy adres przyjdzie link. Adres zmieni się dopiero po jego kliknięciu.</p>
+    <div class="field"><label for="ac-mail">Nowy adres e-mail</label><input type="email" id="ac-mail" inputmode="email" autocapitalize="off" spellcheck="false" autocomplete="email" required></div>
+    ${passField('ac-pw', 'Obecne hasło', 'current-password')}
+    <p class="muted small" style="margin:0">Osoby, którym coś udostępniasz, nadal cię zobaczą. Jeśli ktoś udostępnia coś tobie, musi dopisać u siebie nowy adres.</p>`, 'Wyślij link', false, async (f, err) => {
+    const m = normEmail(f.querySelector('#ac-mail').value);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m)) { err.textContent = 'Wpisz poprawny e-mail.'; return; }
+    if (m === normEmail(SY.session.email)) { err.textContent = 'To twój obecny adres.'; return; }
+    await changeEmail(f.querySelector('#ac-pw').value, m);
+    closeSheet(); toast('Wysłano link na ' + m + '. Kliknij go, żeby zmienić adres.');
+  });
+}
+function showDeleteAccount() {
+  accountForm('Usuń konto', `
+    <p style="margin:0">Konto <b>${esc(SY.session.email || '')}</b> i wszystkie twoje dane w chmurze zostaną <b>trwale usunięte</b>: waga, treningi, plany, pomiary i udostępnienia. Tego nie da się cofnąć.</p>
+    <p class="muted small" style="margin:0">Jeśli chcesz zachować kopię, najpierw stuknij „Pobierz kopię Excel”.</p>
+    <label class="share-opt"><input type="checkbox" id="ac-local" checked><span>Usuń też dane z tego telefonu</span></label>
+    ${passField('ac-pw', 'Hasło (potwierdzenie)', 'current-password')}`, 'Usuń konto na zawsze', true, async f => {
+    const local = f.querySelector('#ac-local').checked;
+    await deleteAccount(f.querySelector('#ac-pw').value);
+    if (local) { S = { profile: { height: null, goalLoss: null }, weights: [], workouts: [], active: null, custom: [], fav: [], plans: [], measures: [] }; save(true); rebuildExMap(); UI.cw = newFilter(); }
+    closeSheet(); toast('Konto usunięte'); setTab('wiecej');
+  });
+}
+
 /* ---- interfejs: sekcja „Konto i chmura” w Ustawieniach ---- */
 function syncStatusText() {
   if (!SY.session) return '';
@@ -396,7 +498,21 @@ function renderSyncCard(card) {
       <button class="btn" type="button" id="sy-now">Synchronizuj teraz</button>
       <button class="btn" type="button" id="sy-file">Pobierz kopię Excel</button>
     </div>
-    <button class="link" type="button" id="sy-out" style="align-self:flex-start;color:var(--muted)">Wyloguj</button>`;
+    <hr class="sep">
+    <h3 style="margin:0">Konto</h3>
+    <div class="row small"><span>E-mail</span><span>${SY.session.verified === true ? '<span class="pill good">potwierdzony</span>' : SY.session.verified === false ? '<button class="link" type="button" id="ac-verify">Potwierdź e-mail</button>' : ''}</span></div>
+    ${SY.session.createdAt ? `<div class="row small"><span>Konto założone</span><b>${new Date(SY.session.createdAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })}</b></div>` : ''}
+    <div class="list">
+      <button class="li" type="button" id="ac-pass"><span class="grow"><span class="t">Zmień hasło</span></span><span class="chev" aria-hidden="true">›</span></button>
+      <button class="li" type="button" id="ac-email"><span class="grow"><span class="t">Zmień adres e-mail</span></span><span class="chev" aria-hidden="true">›</span></button>
+      <button class="li" type="button" id="sy-out"><span class="grow"><span class="t">Wyloguj</span></span><span class="chev" aria-hidden="true">›</span></button>
+      <button class="li" type="button" id="ac-del"><span class="grow"><span class="t" style="color:var(--bad)">Usuń konto</span></span><span class="chev" aria-hidden="true">›</span></button>
+    </div>`;
+  card.querySelector('#ac-pass').onclick = showChangePassword;
+  card.querySelector('#ac-email').onclick = showChangeEmail;
+  card.querySelector('#ac-del').onclick = showDeleteAccount;
+  const av = card.querySelector('#ac-verify');
+  if (av) av.onclick = async () => { try { await sendVerifyEmail(); toast('Wysłano link na ' + SY.session.email + '. Sprawdź też spam.'); } catch (e) { toast(e.message); } };
   card.querySelector('#sy-now').onclick = () => { SY.dirty = true; sySave(); syncNow(); };
   card.querySelector('#sy-file').onclick = downloadCloudFile;
   card.querySelector('#sy-out').onclick = async () => {
