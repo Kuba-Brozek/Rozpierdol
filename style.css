@@ -561,3 +561,5 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .mus-bars .v { font-size: 12px; font-weight: 600; min-height: 15px; }
 .mus-bars .d { font-size: 11px; color: var(--muted); }
 .mus-bars .today .d { color: var(--fg); font-weight: 600; }
+.bodymap .mzr { cursor: pointer; transition: opacity .15s; }
+.bodymap .mzr:active { opacity: .7; }

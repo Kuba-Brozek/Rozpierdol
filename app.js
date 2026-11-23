@@ -1214,51 +1214,59 @@ const BODY_BACK = [
 const BODY_BASE = '<ellipse cx="50" cy="15" rx="8.5" ry="10.5"/><path d="M45 25 L55 25 L56 31 L44 31 Z"/>'
   + '<ellipse cx="21" cy="109" rx="3.5" ry="5.5"/><ellipse cx="79" cy="109" rx="3.5" ry="5.5"/>'
   + '<path d="M37 199 L43 199 L44 206 L34 206 Z"/><path d="M63 199 L57 199 L56 206 L66 206 Z"/>';
-// Rozbudowana sylwetka męska (profil „Mężczyzna” albo brak logowania): szerokie barki, kaloryfer, głowy mięśni
+// Realistyczna sylwetka (profil „Mężczyzna” albo brak logowania): szare, cieniowane mięśnie z włóknami,
+// ćwiczone partie świecą na czerwono. Każdy wpis: [partia, kształt lewej połowy, kąt włókien w stopniach].
+const BODY_SIL = 'M50 2 C44 2 41 7 41 13 C41 19 44 23 45 25 L45 28 C40 31 34 32 28 34 C21 36 18 42 17 50 C16 60 16 70 15 80 C14 90 13 100 13 108 C13 113 18 114 19 109 C20 100 22 90 24 82 C26 74 27 66 28 60 C29 68 31 76 32 84 C31 95 30 104 31 114 C31 130 32 146 34 158 C33 172 34 186 35 198 L34 206 L44 206 L44 198 C45 184 46 170 46 158 C47 140 48 124 49 112 L50 112 Z';
 const BODY_FRONT_M = [
-  ['neck', 'M45 22 C45.5 26 44.5 29 42 31 L47 32 L48.5 25 Z'],
-  ['traps', 'M42 31 C38 33 34 34 29 35.5 L42 35.5 Z'],
-  ['shoulders', 'M29 36 C22 37 18 43 18 51 C19 55 22 57 25 57 C26 50 29 44 36 40 Z'],
-  ['chest', 'M49 37.5 L38 38.5 C32 40.5 28.5 46 28.5 52 C32.5 58 41 60.5 49 58.5 Z'],
-  ['lats', 'M29.5 55.5 L33.5 58.5 L30.5 60.5 Z'], ['lats', 'M30.5 61.5 L34.5 63.5 L31.5 66 Z'],
-  ['biceps', 'M25.5 58 C21.5 64 20.5 71 21.5 78 C23.5 80 26.5 80 28.5 78 C29.5 71 29.5 64 28.5 58 Z'],
-  ['forearms', 'M20.5 81 C17.5 89 16.5 97 16.5 105 L19.5 105 C21.5 97 23.5 89 24.5 81 Z'],
-  ['forearms', 'M25 81 C24 89 22.5 97 21 105 L24 105 C26 97 28 89 29 81 Z'],
-  ['abdominals', 'M42.5 61 L49 61 L49 68 L42 68 Z'], ['abdominals', 'M42 69.5 L49 69.5 L49 77 L42 77 Z'],
-  ['abdominals', 'M42 78.5 L49 78.5 L49 86 L42.5 86 Z'], ['abdominals', 'M43 87.5 L49 87.5 L49 101 C46 99 44 95 43 87.5 Z'],
-  ['abdominals', 'M41 61 C37 62 34.5 63 32.5 64 C33 73 35 82 37.5 90 L41.5 93 Z'],
-  ['abductors', 'M36.5 92 C33 96 31 102 31 108 L35 104.5 C35 99.5 36 96 38.5 94 Z'],
-  ['quadriceps', 'M35.5 106 C32 118 32 132 35 146 L39.5 146 C38 134 38 118 39.5 105 Z'],
-  ['quadriceps', 'M40.5 104 C39 116 39 130 40.5 142 L44.5 142 C45.5 130 45.5 116 44 106 Z'],
-  ['quadriceps', 'M45 133 C44 138 43.5 144 44.5 149 L48 147 C48 141 47 136 45 133 Z'],
-  ['adductors', 'M45 104 L49 102 L49 125 C48 128 47 130 46 131 C46 122 45.5 112 45 104 Z'],
-  ['calves', 'M35 156 C33 164 33 172 35 180 L38 176 C37 169 37 162 38 156 Z'],
-  ['calves', 'M38.5 156 C38 167 39 179 40 193 L43 193 C44 179 44 167 43 156 Z'],
-  ['calves', 'M43.5 157 C45 163 46 171 45 179 L44 180 C44 171 44 163 43.5 157 Z'],
+  ['neck', 'M45 22 C45.5 26 45 29 43 31.5 C45 32 47 32 48.5 31 C48.5 28 48.5 25 48 22 Z', -10],
+  ['traps', 'M44 27 C40 31 35 33 31 34.5 C35 35.5 40 36 44 36 Z', 65],
+  ['shoulders', 'M33 36 C27 35 21 38 19 44 C18 49 19 54 21 57 C23 52 26 47 31 43 C32 41 33 38 33 36 Z', 15],
+  ['chest', 'M49.5 37 C44 36 37 37 33 41 C30 44 29 49 30 53 C33 57 38 59 43 59 C46 59 48.5 58 49.5 57 Z', 75],
+  ['lats', 'M30.5 55 C32 56 33.5 57 34 58.5 C32.5 59 31 58.5 30.5 57 Z', -40],
+  ['lats', 'M31 60 C32.5 61 34 62 34.5 63.5 C33 64 31.5 63.5 31 62 Z', -40],
+  ['biceps', 'M21 58 C19 64 19 72 21 78 C23 80 26 80 27 78 C29 72 29 64 27 58 C25 56 22 56 21 58 Z', 4],
+  ['forearms', 'M20 81 C17 88 16 96 17 104 C18 105 20 105 21 104 C24 96 27 88 27 81 C25 79 22 79 20 81 Z', 12],
+  ['abdominals', 'M42.5 61 Q42 60.5 43 60.5 L48.8 60.5 L48.8 67.5 L43 67.5 Q42 67.5 42.3 66.5 Z', 0],
+  ['abdominals', 'M42.2 69 L48.8 69 L48.8 76.5 L42.5 76.5 Q41.8 76 42 75 Z', 0],
+  ['abdominals', 'M42.3 78 L48.8 78 L48.8 85.5 L43 85.5 Q42.2 85 42.3 84 Z', 0],
+  ['abdominals', 'M43 87 L48.8 87 L48.8 100 C46 98.5 44 95 43 87 Z', 0],
+  ['abdominals', 'M41 61 C37 61 33 61 31 60 C31 70 33 82 37 91 C39 93 41 94 41.5 93 Z', 35],
+  ['abductors', 'M36.5 92 C33 96 31 102 31 108 C33 107 34.5 105.5 35 104 C35 99.5 36 96 38.5 94 Z', 20],
+  ['quadriceps', 'M36 100 C32 110 31 125 33 140 C34 146 36 149 39 150 C38 135 38 115 40 104 Z', 6],
+  ['quadriceps', 'M41 102 C39 112 39 128 41 142 C42 144 44 144 45 142 C46 128 46 112 44 104 Z', 0],
+  ['quadriceps', 'M45.5 128 C44 134 43.5 142 45 149 C47 150 49 148 48.5 143 C48 137 47 132 45.5 128 Z', -20],
+  ['adductors', 'M45 103 C46 110 47 118 47 126 C48 120 49 112 49.5 104 Z', -12],
+  ['calves', 'M35 157 C32 165 33 175 36 182 C38 178 39 170 39 162 C38 159 37 157 35 157 Z', 0],
+  ['calves', 'M40 157 C39.5 168 40 180 41 193 L43 193 C44 180 44 168 43 157 Z', 0],
+  ['calves', 'M44 158 C46 164 46.5 172 45 180 C44.5 172 44 164 44 158 Z', 0],
 ];
 const BODY_BACK_M = [
-  ['traps', 'M49 21 L45 23 C43 29 38 32 29 35.5 L40 37.5 L49 40 Z'],
-  ['traps', 'M49 41 L41 38.5 L43 46 L49 61 Z'],
-  ['shoulders', BODY_FRONT_M[2][1]],
-  ['middle back', 'M40 38.5 L30.5 41 C29.5 45 30.5 48 32.5 50.5 L42 46.5 Z'],
-  ['middle back', 'M33 51.5 L42.5 47.5 L43.5 52.5 L35 55.5 Z'],
-  ['lats', 'M35 56.5 L43.5 53.5 L45.5 62 L44.5 80 C42 82 40 83 38 84 C35 76 32 66 30.5 57 Z'],
-  ['lower back', 'M49 62 L46.5 63 L45.5 80 L42.5 95 L49 95 Z'],
-  ['triceps', 'M25.5 57.5 C21.5 63 20.5 71 21.5 78 L25.5 79 C26.5 71 26.5 64 27.5 58 Z'],
-  ['triceps', 'M28 58 C27.5 65 27 72 26 79 L29 78 C30 71 30 64 29 58 Z'],
-  ['forearms', BODY_FRONT_M[7][1]], ['forearms', BODY_FRONT_M[8][1]],
-  ['abductors', 'M38 91.5 C34 93.5 32 98.5 32 103.5 L36 102.5 C37 98.5 38 96 41 94 Z'],
-  ['glutes', 'M49 96 L41.5 95 C35.5 99 33.5 108 35.5 117 C40 122 46 121.5 49 118.5 Z'],
-  ['hamstrings', 'M35.5 121 C33 133 34 145 37 153 L41 153 C40 143 40 132 41 122 Z'],
-  ['hamstrings', 'M41.5 122 C41 133 41 143 42 153 L46 152 C47 142 47 132 46.5 122 Z'],
-  ['adductors', 'M47 121 L49 120 L49 135 L47.5 138 Z'],
-  ['calves', 'M35 157 C33 165 34 174 37 182 L40.5 180 C40 172 40 164 40 157 Z'],
-  ['calves', 'M41 157 C42 165 43 173 42 181 L45 178 C46 170 46 163 44.5 157 Z'],
-  ['calves', 'M37.5 183.5 C38.5 188 39 192 40 195 L43 195 L43.5 182.5 Z'],
+  ['traps', 'M49.5 22 C47 24 45 27 44 29 C40 32 35 34 31 35.5 C36 37 41 39 44 42 C46 48 48 55 49.5 61 Z', 55],
+  ['shoulders', BODY_FRONT_M[2][1], 15],
+  ['middle back', 'M41 39 C37 38 33 39 31 41.5 C30 45 31 48 33 50.5 C36 49 40 47 43 45 C42.5 43 42 41 41 39 Z', 70],
+  ['middle back', 'M33.5 51.5 C36.5 50 40 48.5 43 46.5 C43.5 49 43.5 51 43 53 C40 54 37 55 35 55.5 Z', 65],
+  ['lats', 'M35 56.5 C38 55.5 41 54.5 43.5 54 C45 58 46 64 45.5 72 C45 76 44.5 79 44 81 C41 82.5 39 83.5 37.5 84 C35 76 32.5 66 31 57.5 Z', -35],
+  ['lower back', 'M49.5 62 C48 63 47 64 46.5 66 C46 72 45.5 78 45 82 C44 87 43 91 42.5 95 L49.5 95 Z', 0],
+  ['triceps', 'M21 58 C19 64 19 71 21 78 C22.5 79 24 79 25 78 C25.5 71 26 64 26.5 58 C25 56.5 22.5 56.5 21 58 Z', 4],
+  ['triceps', 'M27 58 C27 65 26.5 72 26 78.5 C27 79 28 78.5 28.5 77.5 C29.5 71 29.5 64 28.5 58.5 Z', 4],
+  ['forearms', BODY_FRONT_M[7][1], 12],
+  ['abductors', 'M38 91.5 C35 93 32.5 97 32 102 C34 102 36 101 37.5 100 C38.5 97 39.5 95 41 94 Z', 40],
+  ['glutes', 'M49.5 96 C46 95 43 95 41 95.5 C36 99 34 107 35.5 115 C38 119 43 121 49.5 119 Z', 50],
+  ['hamstrings', 'M35.5 121 C33 133 34 145 37 153 C38.5 153.5 40 153 41 152 C40.5 142 40.5 132 41 122 C39 121.5 37 121 35.5 121 Z', 3],
+  ['hamstrings', 'M41.5 122 C41 133 41 143 42 152 C43.5 153 45 152.5 46 151 C47 142 47.5 132 47 122 C45 122.5 43 122.5 41.5 122 Z', -3],
+  ['calves', 'M35 157 C33 164 33.5 173 36.5 181 C38.5 180 40 178 40.5 176 C40.5 169 40 162 39.5 157 C38 156 36.5 156 35 157 Z', 0],
+  ['calves', 'M41 157 C42 163 43.5 170 43 178 C44.5 177 45.5 175 46 172 C46.5 166 46 161 44.5 157 C43.5 156 42 156 41 157 Z', 0],
+  ['calves', 'M37.5 183 C38.5 188 39.5 192 40.5 196 L43.5 196 C43.5 190 43.5 185 43.5 181 C41.5 182 39.5 183 37.5 183 Z', 0],
 ];
-const BODY_BASE_M = '<ellipse cx="50" cy="13.5" rx="8" ry="10"/>'
-  + '<ellipse cx="18.5" cy="110" rx="3.5" ry="5.5"/><ellipse cx="81.5" cy="110" rx="3.5" ry="5.5"/>'
-  + '<path d="M37 196 L43.5 196 L44.5 205 L33.5 205 Z"/><path d="M63 196 L56.5 196 L55.5 205 L66.5 205 Z"/>';
+// gradienty (szary + 3 stopnie „rozgrzania”) i wzory włókien pod każdy kąt
+const MUS_GRAD = [['#eceef0', '#a3a8b0', '#6f747c'], ['#ffc9a8', '#f08a5d', '#b9502c'], ['#ffad8a', '#f2603a', '#b52d17'], ['#ff8f6e', '#e8361f', '#99140c']];
+function bodyDefs() {
+  const angles = [...new Set([...BODY_FRONT_M, ...BODY_BACK_M].map(x => x[2]))];
+  return `<defs>${MUS_GRAD.map((c, i) => `<radialGradient id="mg${i}" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="${c[0]}"/><stop offset=".55" stop-color="${c[1]}"/><stop offset="1" stop-color="${c[2]}"/></radialGradient>`).join('')}
+    <linearGradient id="msil" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4a4e55"/><stop offset=".5" stop-color="#5f646c"/><stop offset="1" stop-color="#4a4e55"/></linearGradient>
+    <radialGradient id="mhead" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#d9dce0"/><stop offset="1" stop-color="#7d828a"/></radialGradient>
+    ${angles.map(a => `<pattern id="mf${String(a).replace('-', 'm')}" width="1.1" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(${a})"><path d="M.3 0 V4" stroke="#fff" stroke-opacity=".28" stroke-width=".22"/><path d="M.85 0 V4" stroke="#000" stroke-opacity=".12" stroke-width=".18"/></pattern>`).join('')}</defs>`;
+}
 const detailedBody = () => S.profile.sex === 'm' || !(typeof SY !== 'undefined' && SY.session);
 function muscleSets(days = 7) {
   const from = addDays(today(), -(days - 1)), out = {};
@@ -1277,12 +1285,21 @@ function bodyMapHTML() {
   const data = muscleSets(), det = detailedBody();
   const fig = (list, dx, label) => {
     const shapes = list.map(([m, d]) => `<path d="${d}" data-m="${m}" class="mz l${muscleLevel(muscleScore(data[m]))}"/>`).join('');
-    return `<g transform="translate(${dx} 0)"><g class="mbase">${det ? BODY_BASE_M : BODY_BASE}</g>${shapes}
+    return `<g transform="translate(${dx} 0)"><g class="mbase">${BODY_BASE}</g>${shapes}
       <g transform="matrix(-1 0 0 1 100 0)">${shapes}</g><text x="50" y="218" class="mlab">${label}</text></g>`;
+  };
+  // realistyczna: ciemna sylwetka pod spodem (szczeliny między mięśniami), mięśnie z gradientem i włóknami
+  const figR = (list, dx, label) => {
+    const half = `<path d="${BODY_SIL}" fill="url(#msil)"/>` + list.map(([m, d, a]) => {
+      const lv = muscleLevel(muscleScore(data[m]));
+      return `<g data-m="${m}" class="mzr"><path d="${d}" fill="url(#mg${lv})" stroke="#3d4147" stroke-width=".35"/><path d="${d}" fill="url(#mf${String(a).replace('-', 'm')})"/></g>`;
+    }).join('');
+    return `<g transform="translate(${dx} 0)">${half}<g transform="matrix(-1 0 0 1 100 0)">${half}</g>
+      <ellipse cx="50" cy="13.5" rx="7.6" ry="9.6" fill="url(#mhead)"/><text x="50" y="218" class="mlab">${label}</text></g>`;
   };
   return `<section class="card bodymap">
     <p class="muted small" style="margin:0;text-align:center">Serie z ostatnich 7 dni</p>
-    <svg viewBox="0 0 210 222" role="group" aria-label="Sylwetka: stuknij partię, żeby zobaczyć serie">${det ? fig(BODY_FRONT_M, 0, 'Przód') + fig(BODY_BACK_M, 110, 'Tył') : fig(BODY_FRONT, 0, 'Przód') + fig(BODY_BACK, 110, 'Tył')}</svg>
+    <svg viewBox="0 0 210 222" role="group" aria-label="Sylwetka: stuknij partię, żeby zobaczyć serie">${det ? bodyDefs() + figR(BODY_FRONT_M, 0, 'Przód') + figR(BODY_BACK_M, 110, 'Tył') : fig(BODY_FRONT, 0, 'Przód') + fig(BODY_BACK, 110, 'Tył')}</svg>
     <p class="muted small" style="margin:0;text-align:center">Stuknij partię, żeby zobaczyć serie</p></section>`;
 }
 function musclesNavCard() {
