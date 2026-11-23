@@ -107,7 +107,6 @@ async function cloudLogout() {
 }
 
 /* ---- dane (dokument backups/{uid}: json = cała baza apki, updatedAt, xlsx = plik Excel) ---- */
-const plural = (n, one, few, many) => n + ' ' + (n === 1 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? few : many);
 const hasLocalData = () => S.weights.length || S.workouts.length || S.plans.length || S.fav.length || (S.custom || []).length || (S.measures || []).length;
 async function blobToB64(blob) {
   const u8 = new Uint8Array(await blob.arrayBuffer()); let s = '';

@@ -16,6 +16,8 @@ const addDays = (s, n) => { const d = parseD(s); d.setDate(d.getDate() + n); ret
 const daysBetween = (a, b) => Math.round((parseD(b) - parseD(a)) / 864e5);
 const dayLabel = (s, opts = { day: 'numeric', month: 'short' }) => parseD(s).toLocaleDateString('pl-PL', opts);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+// liczba + odmiana: plural(3, 'plan', 'plany', 'planów') → „3 plany” (używane też w sync.js)
+const plural = (n, one, few, many) => n + ' ' + (n === 1 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? few : many);
 const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? null : n; };
 
 /* ============ Stan ============ */
@@ -1898,13 +1900,16 @@ function renderWiecej() {
 
 /* ============ Start ============ */
 const splashStart = performance.now();
-applyTheme(getTheme());
-rebuildExMap();
-setTab(S.active ? 'trening' : 'dieta');
-loadExercises().finally(() => {
-  const sp = $('#splash'); if (!sp) return;
+function hideSplash() {
+  const sp = $('#splash'); if (!sp || sp.dataset.out) return;
+  sp.dataset.out = '1';
   setTimeout(() => { sp.classList.add('hide'); setTimeout(() => sp.remove(), 400); }, Math.max(0, 2000 - (performance.now() - splashStart)));
-});
+}
+setTimeout(hideSplash, 6000); // zabezpieczenie: ekran startowy znika zawsze, nawet po błędzie niżej
+try { applyTheme(getTheme()); } catch (e) { console.error(e); }
+rebuildExMap();
+try { setTab(S.active ? 'trening' : 'dieta'); } catch (e) { console.error(e); }
+loadExercises().finally(hideSplash);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && UI.tab === 'dieta') renderDieta(); });
 // Apka działa z pamięci telefonu. Nowa wersja pobiera się w tle (raz), a potem proponujemy odświeżenie.
 if ('serviceWorker' in navigator) {
