@@ -266,22 +266,29 @@ function positiveFacts() {
     let best = 1, run = 1; for (let i = 1; i < w.length; i++) { run = daysBetween(w[i - 1].d, w[i].d) === 1 ? run + 1 : 1; best = Math.max(best, run); }
     if (best >= 5) out.push(`Rekord regularności: <b>${best} dni</b> ważenia pod rząd.`);
   }
-  // Ile już dbasz o siebie: od założenia konta (bez konta: od pierwszego pomiaru),
-  // tylko gdy ważenie jest regularne: co najmniej raz w każdym z ostatnich (do 4) tygodni
+  // Ile już dbasz o siebie: od założenia konta (bez konta: od pierwszego wpisu).
+  // Tydzień jest aktywny, jeśli było w nim cokolwiek: ważenie, trening albo pomiar ciała.
+  // Pokazujemy, gdy aktywnych tygodni jest min. 75% i aktywne są ostatnie 2 tygodnie.
   {
+    const acts = [...w.map(x => x.d), ...S.workouts.map(x => x.date), ...S.measures.map(x => x.d)].filter(Boolean).sort();
     const created = typeof SY !== 'undefined' && SY.session && SY.session.createdAt;
-    const since = created ? dstr(new Date(created)) : (w[0] && w[0].d);
+    const since = created ? dstr(new Date(created)) : acts[0];
     const days = since ? daysBetween(since, today()) : 0;
     if (days >= 7) {
-      const weeks = Math.min(4, Math.floor(days / 7));
-      let regular = true;
-      for (let k = 0; k < weeks && regular; k++) {
+      // tygodnie liczone wstecz od dziś (7-dniowe okna); najstarsze może być niepełne
+      const total = Math.ceil((days + 1) / 7), active = [];
+      for (let k = 0; k < total; k++) {
         const to = addDays(today(), -7 * k), from = addDays(to, -6);
-        regular = w.some(x => x.d >= from && x.d <= to);
+        active.push(acts.some(d => d >= from && d <= to && d >= since));
       }
-      if (regular) {
-        const wk = Math.floor(days / 7), extra = days % 7;
-        out.push(`${created ? 'Od założenia konta' : 'Od pierwszego pomiaru'} dbasz o siebie już <b>${plural(days, 'dzień', 'dni', 'dni')}</b>${wk >= 2 ? ` (${extra ? 'ponad ' : ''}${plural(wk, 'tydzień', 'tygodnie', 'tygodni')})` : ''} i regularnie się ważysz. Tak trzymaj! 💪`);
+      const n = active.filter(Boolean).length;
+      const recentOk = active[0] && (total < 2 || active[1]);
+      if (recentOk && n / total >= 0.75) {
+        const head = `${created ? 'Od założenia konta' : 'Od pierwszego wpisu'} dbasz o siebie już <b>${plural(days, 'dzień', 'dni', 'dni')}</b>`;
+        out.push(n === total && total >= 2
+          ? `<b>${plural(total, 'tydzień', 'tygodnie', 'tygodni')} z rzędu</b> dbasz o siebie, bez ani jednej przerwy. 🔥`
+          : `${head}. Aktywnie w <b>${n} z ${total}</b> ${total === 1 ? 'tygodnia' : 'tygodni'}. 💪`);
+        if (n === total && total >= 2) out.push(`${head}. Każdy tydzień z jakimś pomiarem albo treningiem. 💪`);
       }
     }
   }
