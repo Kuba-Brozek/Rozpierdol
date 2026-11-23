@@ -930,8 +930,8 @@ function renderTrening() {
         <div class="head">${A.ex.length > 1 ? GRIP : ''}${thumbHTML(ex)}
           <div class="grow"><div class="t" style="font-weight:650">${esc(exName(ex))}</div>
           <div class="small muted">${prev ? `Ostatnio (${dayLabel(prev.date)}): ${setsSummary(ex, prev.sets)}` : 'Pierwszy raz'}</div></div>
-          <button class="icon-btn" type="button" data-act="fields" aria-label="Co wpisujesz przy tym ćwiczeniu">
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+          <button class="icon-btn" type="button" data-act="more" aria-label="Opcje ćwiczenia: zamień, co wpisujesz">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
           <button class="icon-btn" type="button" data-act="rm" aria-label="Usuń ćwiczenie">✕</button>
         </div>
         <div class="sets${fs.length > 3 ? ' many' : ''}" style="grid-template-columns:24px ${fs.map(F => F.text ? 'minmax(0, 1.6fr)' : 'minmax(0, 1fr)').join(' ')} 44px">
@@ -966,7 +966,7 @@ function renderTrening() {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const ei = +b.closest('[data-ei]').dataset.ei, ex = A.ex[ei];
     const act = b.dataset.act;
-    if (act === 'fields') { pickFields(ex.id); return; }
+    if (act === 'more') { exMenu(ei); return; }
     if (act === 'rm') A.ex.splice(ei, 1);
     if (act === 'add') { const l = [...ex.sets].reverse().find(filled); ex.sets.push(Object.assign(l ? setVals(l) : { a: null, b: null }, { done: false })); }
     if (act === 'pop') ex.sets.pop();
@@ -989,6 +989,30 @@ function renderTrening() {
     if (ok) { S.active = null; save(); renderTrening(); }
   };
   $('#t-finish').onclick = finishWorkout;
+}
+// Menu ćwiczenia w trwającym treningu: zamiana na inne (serie zostają), pola serii, usunięcie
+function exMenu(ei) {
+  const A = S.active, e = A && A.ex[ei]; if (!e) return;
+  const ex = EXMAP[e.id], n = e.sets.filter(filled).length;
+  openSheet(exName(ex), `
+    <button class="btn block" type="button" id="em-swap">Zamień na inne ćwiczenie<br><span class="small muted" style="font-weight:400">${n ? `wpisane serie (${n}) przejdą do nowego` : 'liczba serii zostaje'}</span></button>
+    <button class="btn block" type="button" id="em-fields">Co wpisujesz w serii<br><span class="small muted" style="font-weight:400">${exFields(e.id).map(f => FIELD[f].h).join(', ')}</span></button>
+    <button class="btn danger block" type="button" id="em-rm">Usuń z treningu</button>`, b => {
+    $('#em-fields', b).onclick = () => { pickFields(e.id); SHEET_BACK = () => exMenu(ei); };
+    $('#em-rm', b).onclick = async () => {
+      if (n && !await confirmBox('Usunąć ćwiczenie?', `Wpisane serie (${n}) zostaną usunięte z tego treningu.`, 'Usuń', true)) return;
+      A.ex.splice(ei, 1); save(); closeSheet(); renderTrening();
+    };
+    $('#em-swap', b).onclick = () => pickExercise(newId => {
+      if (newId === e.id) { closeSheet(); return; }
+      const oldId = e.id, nw = EXMAP[newId];
+      // własny wybór pól starego ćwiczenia przechodzi na nowe, jeśli nowe go nie ma (żeby np. tempo i RIR nie zniknęły z widoku)
+      if (S.exFields && S.exFields[oldId] && !S.exFields[newId] && isCardio(ex) === isCardio(nw)) S.exFields[newId] = S.exFields[oldId].slice();
+      e.id = newId;
+      save(); closeSheet(); renderTrening();
+      toast(`Zamieniono: ${exName(ex)} → ${exName(nw)}`);
+    }, 'Zamień na…', () => exMenu(ei));
+  });
 }
 // Wybór pól serii dla ćwiczenia (zapamiętywany dla tego ćwiczenia na kolejne treningi)
 function pickFields(exId) {
