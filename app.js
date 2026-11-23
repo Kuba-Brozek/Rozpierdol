@@ -386,6 +386,18 @@ function wireFact(root) {
   c.onclick = () => { UI.fact = (UI.fact || 0) + 1; c.outerHTML = factCardHTML(); wireFact(root); };
 }
 
+// Duże liczby w kafelku wagi: jeśli nie mieszczą się w swojej kolumnie (np. szersza czcionka iPhone'a), zmniejsz je
+function fitHero(root = document) {
+  $$('.hero-nums', root).forEach(h => {
+    const bigs = $$('.big', h); if (!bigs.length) return;
+    bigs.forEach(b => b.style.fontSize = '');
+    let size = parseFloat(getComputedStyle(bigs[0]).fontSize);
+    const tooWide = () => bigs.some(b => b.scrollWidth > b.clientWidth + 1) || h.scrollWidth > h.clientWidth + 1;
+    while (tooWide() && size > 22) { size -= 1; bigs.forEach(b => b.style.fontSize = size + 'px'); }
+  });
+}
+window.addEventListener('resize', () => { if (UI.tab === 'dieta') fitHero($('#dieta-body')); });
+
 function renderDieta() {
   $('#dieta-date').textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' });
   const st = stats();
@@ -460,6 +472,7 @@ function renderDieta() {
       </section>`;
     $$('[data-range]', body).forEach(b => b.addEventListener('click', () => { UI.range = +b.dataset.range; renderDieta(); }));
     wireFact(body);
+    fitHero(body);
     $$('[data-wd]', body).forEach(b => b.addEventListener('click', () => editWeight(b.dataset.wd)));
     const more = $('#w-more'); more && more.addEventListener('click', () => { UI.showAll = !UI.showAll; renderDieta(); });
   }

@@ -498,6 +498,7 @@ function showShared(x) {
   openSheet(x.owner || 'Udostępnione', `
     <p class="muted small" style="margin:0">Podgląd danych udostępnionych przez tę osobę${x.updatedAt ? ' · stan z ' + new Date(x.updatedAt).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}. Gwiazdką dodasz ćwiczenie do swoich ulubionych.</p>
     ${weightHTML}${plansHTML}${favHTML}`, b => {
+    requestAnimationFrame(() => fitHero(b));
     b.addEventListener('click', e => {
       const c = e.target.closest('[data-copy]');
       if (c) {
