@@ -105,7 +105,7 @@ function thumbHTML(e, cls = 'thumb') {
 
 /* ============ Nawigacja ============ */
 // Ekrany bez własnej zakładki: otwierane przyciskiem z innej zakładki, która zostaje podświetlona
-const TAB_PARENT = { cialo: 'dieta', cwiczenia: 'plany' };
+const TAB_PARENT = { cialo: 'dieta', miesnie: 'dieta', cwiczenia: 'plany' };
 function setTab(t, fromHistory) {
   UI.tab = t;
   if (!fromHistory) UI.sec = null; // zakładka z dolnego paska zawsze otwiera listę ustawień
@@ -187,7 +187,7 @@ if (navigator.standalone === true) {
   document.addEventListener('touchcancel', () => { if (sx != null && tracking) reset(); sx = null; });
 }
 function rerender() {
-  ({ dieta: renderDieta, cialo: renderCialo, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
+  ({ dieta: renderDieta, cialo: renderCialo, miesnie: renderMiesnie, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
 }
 $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 // przyciski „‹ Forma”, „Pomiary ciała ›” itp.
@@ -536,6 +536,7 @@ function renderDieta() {
       </div>
       ${form}
       ${cialoNavCard()}
+      ${musclesNavCard()}
       ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w zakładce Ustawienia, żeby zobaczyć BMI i postęp do celu.</p>'}`;
     $('#imp-xlsx-empty').addEventListener('change', onXlsxPicked);
   } else {
@@ -565,6 +566,7 @@ function renderDieta() {
       </div>
       ${pref('kcal') ? kcalCardHTML(st) : ''}
       ${cialoNavCard()}
+      ${musclesNavCard()}
       ${pref('fact') ? factCardHTML() : ''}
       <section class="card chart">
         <div class="row"><h2>Waga</h2>
@@ -1212,6 +1214,52 @@ const BODY_BACK = [
 const BODY_BASE = '<ellipse cx="50" cy="15" rx="8.5" ry="10.5"/><path d="M45 25 L55 25 L56 31 L44 31 Z"/>'
   + '<ellipse cx="21" cy="109" rx="3.5" ry="5.5"/><ellipse cx="79" cy="109" rx="3.5" ry="5.5"/>'
   + '<path d="M37 199 L43 199 L44 206 L34 206 Z"/><path d="M63 199 L57 199 L56 206 L66 206 Z"/>';
+// Rozbudowana sylwetka męska (profil „Mężczyzna” albo brak logowania): szerokie barki, kaloryfer, głowy mięśni
+const BODY_FRONT_M = [
+  ['neck', 'M45 22 C45.5 26 44.5 29 42 31 L47 32 L48.5 25 Z'],
+  ['traps', 'M42 31 C38 33 34 34 29 35.5 L42 35.5 Z'],
+  ['shoulders', 'M29 36 C22 37 18 43 18 51 C19 55 22 57 25 57 C26 50 29 44 36 40 Z'],
+  ['chest', 'M49 37.5 L38 38.5 C32 40.5 28.5 46 28.5 52 C32.5 58 41 60.5 49 58.5 Z'],
+  ['lats', 'M29.5 55.5 L33.5 58.5 L30.5 60.5 Z'], ['lats', 'M30.5 61.5 L34.5 63.5 L31.5 66 Z'],
+  ['biceps', 'M25.5 58 C21.5 64 20.5 71 21.5 78 C23.5 80 26.5 80 28.5 78 C29.5 71 29.5 64 28.5 58 Z'],
+  ['forearms', 'M20.5 81 C17.5 89 16.5 97 16.5 105 L19.5 105 C21.5 97 23.5 89 24.5 81 Z'],
+  ['forearms', 'M25 81 C24 89 22.5 97 21 105 L24 105 C26 97 28 89 29 81 Z'],
+  ['abdominals', 'M42.5 61 L49 61 L49 68 L42 68 Z'], ['abdominals', 'M42 69.5 L49 69.5 L49 77 L42 77 Z'],
+  ['abdominals', 'M42 78.5 L49 78.5 L49 86 L42.5 86 Z'], ['abdominals', 'M43 87.5 L49 87.5 L49 101 C46 99 44 95 43 87.5 Z'],
+  ['abdominals', 'M41 61 C37 62 34.5 63 32.5 64 C33 73 35 82 37.5 90 L41.5 93 Z'],
+  ['abductors', 'M36.5 92 C33 96 31 102 31 108 L35 104.5 C35 99.5 36 96 38.5 94 Z'],
+  ['quadriceps', 'M35.5 106 C32 118 32 132 35 146 L39.5 146 C38 134 38 118 39.5 105 Z'],
+  ['quadriceps', 'M40.5 104 C39 116 39 130 40.5 142 L44.5 142 C45.5 130 45.5 116 44 106 Z'],
+  ['quadriceps', 'M45 133 C44 138 43.5 144 44.5 149 L48 147 C48 141 47 136 45 133 Z'],
+  ['adductors', 'M45 104 L49 102 L49 125 C48 128 47 130 46 131 C46 122 45.5 112 45 104 Z'],
+  ['calves', 'M35 156 C33 164 33 172 35 180 L38 176 C37 169 37 162 38 156 Z'],
+  ['calves', 'M38.5 156 C38 167 39 179 40 193 L43 193 C44 179 44 167 43 156 Z'],
+  ['calves', 'M43.5 157 C45 163 46 171 45 179 L44 180 C44 171 44 163 43.5 157 Z'],
+];
+const BODY_BACK_M = [
+  ['traps', 'M49 21 L45 23 C43 29 38 32 29 35.5 L40 37.5 L49 40 Z'],
+  ['traps', 'M49 41 L41 38.5 L43 46 L49 61 Z'],
+  ['shoulders', BODY_FRONT_M[2][1]],
+  ['middle back', 'M40 38.5 L30.5 41 C29.5 45 30.5 48 32.5 50.5 L42 46.5 Z'],
+  ['middle back', 'M33 51.5 L42.5 47.5 L43.5 52.5 L35 55.5 Z'],
+  ['lats', 'M35 56.5 L43.5 53.5 L45.5 62 L44.5 80 C42 82 40 83 38 84 C35 76 32 66 30.5 57 Z'],
+  ['lower back', 'M49 62 L46.5 63 L45.5 80 L42.5 95 L49 95 Z'],
+  ['triceps', 'M25.5 57.5 C21.5 63 20.5 71 21.5 78 L25.5 79 C26.5 71 26.5 64 27.5 58 Z'],
+  ['triceps', 'M28 58 C27.5 65 27 72 26 79 L29 78 C30 71 30 64 29 58 Z'],
+  ['forearms', BODY_FRONT_M[7][1]], ['forearms', BODY_FRONT_M[8][1]],
+  ['abductors', 'M38 91.5 C34 93.5 32 98.5 32 103.5 L36 102.5 C37 98.5 38 96 41 94 Z'],
+  ['glutes', 'M49 96 L41.5 95 C35.5 99 33.5 108 35.5 117 C40 122 46 121.5 49 118.5 Z'],
+  ['hamstrings', 'M35.5 121 C33 133 34 145 37 153 L41 153 C40 143 40 132 41 122 Z'],
+  ['hamstrings', 'M41.5 122 C41 133 41 143 42 153 L46 152 C47 142 47 132 46.5 122 Z'],
+  ['adductors', 'M47 121 L49 120 L49 135 L47.5 138 Z'],
+  ['calves', 'M35 157 C33 165 34 174 37 182 L40.5 180 C40 172 40 164 40 157 Z'],
+  ['calves', 'M41 157 C42 165 43 173 42 181 L45 178 C46 170 46 163 44.5 157 Z'],
+  ['calves', 'M37.5 183.5 C38.5 188 39 192 40 195 L43 195 L43.5 182.5 Z'],
+];
+const BODY_BASE_M = '<ellipse cx="50" cy="13.5" rx="8" ry="10"/>'
+  + '<ellipse cx="18.5" cy="110" rx="3.5" ry="5.5"/><ellipse cx="81.5" cy="110" rx="3.5" ry="5.5"/>'
+  + '<path d="M37 196 L43.5 196 L44.5 205 L33.5 205 Z"/><path d="M63 196 L56.5 196 L55.5 205 L66.5 205 Z"/>';
+const detailedBody = () => S.profile.sex === 'm' || !(typeof SY !== 'undefined' && SY.session);
 function muscleSets(days = 7) {
   const from = addDays(today(), -(days - 1)), out = {};
   S.workouts.filter(w => w.date >= from && w.date <= today()).forEach(w => w.ex.forEach(e => {
@@ -1226,16 +1274,26 @@ function muscleSets(days = 7) {
 const muscleScore = o => o ? o.main + o.help / 2 : 0;
 const muscleLevel = v => v <= 0 ? 0 : v < 4 ? 1 : v < 10 ? 2 : 3;
 function bodyMapHTML() {
-  const data = muscleSets();
+  const data = muscleSets(), det = detailedBody();
   const fig = (list, dx, label) => {
     const shapes = list.map(([m, d]) => `<path d="${d}" data-m="${m}" class="mz l${muscleLevel(muscleScore(data[m]))}"/>`).join('');
-    return `<g transform="translate(${dx} 0)"><g class="mbase">${BODY_BASE}</g>${shapes}
+    return `<g transform="translate(${dx} 0)"><g class="mbase">${det ? BODY_BASE_M : BODY_BASE}</g>${shapes}
       <g transform="matrix(-1 0 0 1 100 0)">${shapes}</g><text x="50" y="218" class="mlab">${label}</text></g>`;
   };
   return `<section class="card bodymap">
-    <div class="row"><h3 style="margin:0">Partie mięśni</h3><span class="muted small">ostatnie 7 dni</span></div>
-    <svg viewBox="0 0 210 222" role="group" aria-label="Sylwetka: stuknij partię, żeby zobaczyć serie">${fig(BODY_FRONT, 0, 'Przód')}${fig(BODY_BACK, 110, 'Tył')}</svg>
+    <p class="muted small" style="margin:0;text-align:center">Serie z ostatnich 7 dni</p>
+    <svg viewBox="0 0 210 222" role="group" aria-label="Sylwetka: stuknij partię, żeby zobaczyć serie">${det ? fig(BODY_FRONT_M, 0, 'Przód') + fig(BODY_BACK_M, 110, 'Tył') : fig(BODY_FRONT, 0, 'Przód') + fig(BODY_BACK, 110, 'Tył')}</svg>
     <p class="muted small" style="margin:0;text-align:center">Stuknij partię, żeby zobaczyć serie</p></section>`;
+}
+function musclesNavCard() {
+  const n = Object.values(muscleSets()).reduce((s, o) => s + o.main, 0);
+  return navCard('miesnie', '💪', 'Partie mięśni', n ? `ostatnie 7 dni: ${plural(n, 'seria', 'serie', 'serii')}` : 'serie na każdą partię z ostatnich 7 dni');
+}
+// Osobny ekran w zakładce Forma
+function renderMiesnie() {
+  const body = $('#miesnie-body');
+  body.innerHTML = bodyMapHTML();
+  $('.bodymap svg', body).addEventListener('click', e => { const p = e.target.closest('[data-m]'); if (p) showMuscle(p.dataset.m); });
 }
 function showMuscle(m) {
   const o = muscleSets()[m] || { main: 0, help: 0, items: [] }, name = MUSCLE[m] || m;
@@ -1282,7 +1340,6 @@ function renderTrening() {
           <div class="tile"><span class="k">Ostatni</span><span class="v" style="font-size:17px">${dayLabel(hist[0].date)}</span><span class="d">${(n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : n + ' dni temu')(daysBetween(hist[0].date, today()))}</span></div>
         </div>
         <button class="btn block" type="button" id="t-prs">🏆 Rekordy osobiste</button>
-        ${bodyMapHTML()}
         <h3>Historia</h3>
         <div class="list">${hist.map(w => `
           <button class="li" type="button" data-w="${w.id}">
@@ -1292,9 +1349,7 @@ function renderTrening() {
           </button>`).join('')}</div>`
       : `<div class="card empty"><strong>Brak treningów</strong><span>Rozpocznij trening, dodaj ćwiczenia z bazy i zapisuj serie: ciężar i powtórzenia. Przy kolejnym treningu zobaczysz, co zrobiłeś ostatnio.</span></div>`}`;
     $('#t-start').onclick = startWorkoutSheet;
-    const prb = $('#t-prs', body); if (prb) prb.onclick = showRecords;
-    const bm = $('.bodymap svg', body); if (bm) bm.addEventListener('click', e => { const p = e.target.closest('[data-m]'); if (p) showMuscle(p.dataset.m); });
-    $$('[data-w]', body).forEach(b => b.onclick = () => showWorkout(b.dataset.w));
+    const prb = $('#t-prs', body); if (prb) prb.onclick = showRecords;    $$('[data-w]', body).forEach(b => b.onclick = () => showWorkout(b.dataset.w));
     return;
   }
   const editing = !!A.editId;
