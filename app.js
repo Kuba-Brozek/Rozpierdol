@@ -469,8 +469,9 @@ function interpretBook(sheets) {
       if (r['PLAN'] && !w.planName) w.planName = String(r['PLAN']);
       let e = w.ex.find(x => x.id === exId);
       if (!e) { e = { id: exId, sets: [] }; w.ex.push(e); }
-      const sa = num(r['KG / MIN']), sb = num(r['POWT. / KM']);
-      if (sa != null || sb != null || num(r['SERIA']) != null) e.sets.push({ a: sa, b: sb });
+      const set = { a: num(r['KG / MIN']), b: num(r['POWT. / KM']) };
+      FIELDS.forEach(F => { const v = r[normTxt(F.x)]; if (hasVal(v)) set[F.id] = F.text ? String(v) : num(v); });
+      if (filled(set) || num(r['SERIA']) != null) e.sets.push(set);
     }
     res.workouts = [...byId.values()];
     if (extraCustom.length) res.custom = [...(res.custom || []), ...extraCustom];
@@ -494,6 +495,15 @@ function interpretBook(sheets) {
       byPlan.get(pid).ex.push({ id: exId, sets: Math.max(1, Math.round(num(r['SERIE']) || 3)) });
     }
     res.plans = [...byPlan.values()];
+  }
+  const fls = find('POLA CWICZEN');
+  if (fls) {
+    res.exFields = {};
+    sheetTable(fls.cells).forEach(r => {
+      const id = r['ID CWICZENIA'] != null ? String(r['ID CWICZENIA']) : '';
+      const f = String(r['POLA'] || '').split(/[\s,;]+/).filter(x => FIELD[x]).slice(0, FIELDS_MAX);
+      if (id && f.length) res.exFields[id] = f;
+    });
   }
   const ms = find('POMIARY', 'POMIARY CIALA');
   if (ms) {
@@ -535,6 +545,7 @@ function applyData(R, replace) {
     if (replace) S.fav = [];
     R.fav.forEach(id => { if (!S.fav.includes(id)) S.fav.push(id); });
   }
+  if (R.exFields) S.exFields = Object.assign(replace ? {} : (S.exFields || {}), R.exFields);
   if (R.measures) {
     if (replace) S.measures = [];
     R.measures.forEach(m => { const i = S.measures.findIndex(x => x.d === m.d); if (i >= 0) S.measures[i] = { d: m.d, v: Object.assign({}, S.measures[i].v, m.v) }; else S.measures.push({ d: m.d, v: Object.assign({}, m.v) }); });
@@ -544,7 +555,7 @@ function applyData(R, replace) {
 // Pełny stan apki → format dla applyData
 const stateAsData = d => ({
   diet: d.weights && d.weights.length ? { rows: d.weights, height: d.profile && d.profile.height, goal: d.profile && d.profile.goalLoss } : null,
-  workouts: d.workouts || [], plans: d.plans || [], fav: d.fav || [], custom: d.custom || [], measures: d.measures || [],
+  workouts: d.workouts || [], plans: d.plans || [], fav: d.fav || [], custom: d.custom || [], measures: d.measures || [], exFields: d.exFields || null,
 });
 async function onXlsxPicked(ev) {
   const file = ev.target.files && ev.target.files[0]; ev.target.value = '';
@@ -555,7 +566,7 @@ async function onXlsxPicked(ev) {
       const j = JSON.parse(await file.text());
       if (!j || j.app !== 'postep' || !j.data) throw new Error('To nie jest plik kopii z tej apki.');
       const d = j.data;
-      R = { diet: d.weights && d.weights.length ? { rows: d.weights, height: d.profile && d.profile.height, goal: d.profile && d.profile.goalLoss } : null, workouts: d.workouts || null, fav: d.fav || null, custom: d.custom || null, plans: d.plans || null, measures: d.measures || null };
+      R = { diet: d.weights && d.weights.length ? { rows: d.weights, height: d.profile && d.profile.height, goal: d.profile && d.profile.goalLoss } : null, workouts: d.workouts || null, fav: d.fav || null, custom: d.custom || null, plans: d.plans || null, measures: d.measures || null, exFields: d.exFields || null };
     } else {
       R = interpretBook(await readXlsxBook(file));
     }
@@ -665,10 +676,13 @@ function backupXlsx() {
   });
   if (diet.length < 2) diet.push([]);
   diet[1][9] = N1(g); diet[1][10] = '<- cel: ile kg zrzucić';
-  const tr = [[H('DATA'), H('TRENING'), H('ĆWICZENIE'), H('ID ĆWICZENIA'), H('SERIA'), H('KG / MIN'), H('POWT. / KM'), H('PLAN')]];
+  // dodatkowe pola serii (tempo, RIR, …) dostają kolumny tylko, gdy gdzieś mają wartość
+  const extra = FIELDS.filter(F => S.workouts.some(w => w.ex.some(e => e.sets.some(s => hasVal(s[F.id])))));
+  const tr = [[H('DATA'), H('TRENING'), H('ĆWICZENIE'), H('ID ĆWICZENIA'), H('SERIA'), H('KG / MIN'), H('POWT. / KM'), H('PLAN'), ...extra.map(F => H(F.x))]];
   S.workouts.forEach(w => w.ex.forEach(e => e.sets.length
-    ? e.sets.forEach((s, i) => tr.push([{ d: w.date }, w.id, exName(EXMAP[e.id]), e.id, i + 1, s.a, s.b, w.planName || '']))
+    ? e.sets.forEach((s, i) => tr.push([{ d: w.date }, w.id, exName(EXMAP[e.id]), e.id, i + 1, s.a, s.b, w.planName || '', ...extra.map(F => hasVal(s[F.id]) ? s[F.id] : null)]))
     : tr.push([{ d: w.date }, w.id, exName(EXMAP[e.id]), e.id, null, null, null, w.planName || ''])));
+  const flds = [[H('ID ĆWICZENIA'), H('ĆWICZENIE'), H('POLA')], ...Object.entries(S.exFields || {}).map(([id, f]) => [id, exName(EXMAP[id]), f.join(', ')])];
   const plans = [[H('PLAN'), H('ID PLANU'), H('KOLEJNOŚĆ'), H('ĆWICZENIE'), H('ID ĆWICZENIA'), H('SERIE')]];
   S.plans.forEach(p => p.ex.forEach((e, i) => plans.push([p.name, p.id, i + 1, exName(EXMAP[e.id]), e.id, e.sets])));
   const fav = [[H('ID ĆWICZENIA'), H('NAZWA')], ...S.fav.map(id => [id, exName(EXMAP[id])])];
@@ -676,11 +690,12 @@ function backupXlsx() {
   const meas = [[H('DATA'), ...MEAS.map(m => H(`${m.l} (${measUnit(m)})`))], ...S.measures.map(x => [{ d: x.d }, ...MEAS.map(m => x.v[m.k] != null ? N1(x.v[m.k]) : null)])];
   return buildXlsx([
     { name: 'DIETA', rows: diet, widths: [8, 12, 9, 9, 13, 20, 9, 10, 20, 8, 24] },
-    { name: 'TRENINGI', rows: tr, widths: [12, 14, 38, 34, 7, 10, 11, 18] },
+    { name: 'TRENINGI', rows: tr, widths: [12, 14, 38, 34, 7, 10, 11, 18, ...extra.map(() => 14)] },
     { name: 'PLANY', rows: plans, widths: [18, 16, 11, 38, 34, 8] },
     { name: 'POMIARY', rows: meas, widths: [12, ...MEAS.map(() => 16)] },
     { name: 'ULUBIONE', rows: fav, widths: [34, 38] },
     { name: 'WŁASNE ĆWICZENIA', rows: own, widths: [16, 34, 14, 10] },
+    { name: 'POLA ĆWICZEŃ', rows: flds, widths: [34, 38, 30] },
   ]);
 }
 
@@ -693,8 +708,40 @@ function lastSetsFor(exId, beforeId) {
   }
   return null;
 }
-const filled = s => s.a != null || s.b != null;
-const setsSummary = (e, sets) => !(sets = sets.filter(filled)).length ? 'bez serii' : sets.map(s => isCardio(e) ? `${fmt(s.a, 0)} min${s.b ? ' / ' + fmt(s.b, 1) + ' km' : ''}` : `${fmt(s.a, s.a % 1 ? 1 : 0)}×${s.b}`).join(', ');
+/* ---- pola serii: co wpisujemy przy ćwiczeniu (konfigurowalne per ćwiczenie w S.exFields) ---- */
+const fmtN = v => typeof v !== 'number' ? String(v) : fmt(v, Math.round(v) === v ? 0 : Math.round(v * 10) === v * 10 ? 1 : 2);
+const FIELDS = [
+  { id: 'kg', h: 'kg', l: 'Ciężar (kg)', x: 'CIĘŻAR (KG)', step: '0.5', im: 'decimal', f: v => fmtN(v) + ' kg' },
+  { id: 'reps', h: 'powt.', l: 'Powtórzenia', x: 'POWTÓRZENIA', step: '1', im: 'numeric', f: v => fmtN(v) + ' powt.' },
+  { id: 'min', h: 'min', l: 'Czas (minuty)', x: 'CZAS (MIN)', step: '0.5', im: 'decimal', f: v => fmtN(v) + ' min' },
+  { id: 'sec', h: 'sek.', l: 'Czas (sekundy)', x: 'CZAS (S)', step: '1', im: 'numeric', f: v => fmtN(v) + ' s' },
+  { id: 'km', h: 'km', l: 'Dystans (km)', x: 'DYSTANS (KM)', step: '0.1', im: 'decimal', f: v => fmtN(v) + ' km' },
+  { id: 'm', h: 'metry', l: 'Dystans (metry)', x: 'DYSTANS (M)', step: '1', im: 'numeric', f: v => fmtN(v) + ' m' },
+  { id: 'speed', h: 'km/h', l: 'Prędkość (km/h)', x: 'PRĘDKOŚĆ (KM/H)', step: '0.1', im: 'decimal', f: v => fmtN(v) + ' km/h' },
+  { id: 'incline', h: 'nachyl. %', l: 'Nachylenie (%)', x: 'NACHYLENIE (%)', step: '0.5', im: 'decimal', f: v => 'nachyl. ' + fmtN(v) + '%' },
+  { id: 'level', h: 'poziom', l: 'Poziom / opór maszyny', x: 'POZIOM', step: '1', im: 'numeric', f: v => 'poziom ' + fmtN(v) },
+  { id: 'tempo', h: 'tempo', l: 'Tempo (np. 3-1-1-0)', x: 'TEMPO', text: true, f: v => 'tempo ' + v },
+  { id: 'rir', h: 'RIR', l: 'RIR (powtórzenia w zapasie)', x: 'RIR', step: '1', im: 'numeric', f: v => 'RIR ' + fmtN(v) },
+  { id: 'rpe', h: 'RPE', l: 'RPE (wysiłek 1–10)', x: 'RPE', step: '0.5', im: 'decimal', f: v => 'RPE ' + fmtN(v) },
+  { id: 'hr', h: 'tętno', l: 'Tętno (bpm)', x: 'TĘTNO (BPM)', step: '1', im: 'numeric', f: v => fmtN(v) + ' bpm' },
+];
+const FIELD = Object.fromEntries(FIELDS.map(f => [f.id, f]));
+const FIELDS_MAX = 5;
+const defaultFields = ex => isCardio(ex) ? ['min', 'km'] : ['kg', 'reps'];
+const exFields = id => { const c = S.exFields && S.exFields[id]; return Array.isArray(c) && c.length ? c.filter(f => FIELD[f]) : defaultFields(EXMAP[id]); };
+// gdzie w serii leży wartość pola: dwa podstawowe pola ćwiczenia w a/b (zgodność ze starszymi danymi), reszta pod własną nazwą
+const fieldKey = (ex, f) => (isCardio(ex) ? { min: 'a', km: 'b' } : { kg: 'a', reps: 'b' })[f] || f;
+const hasVal = v => v != null && v !== '';
+const filled = s => Object.keys(s).some(k => k !== 'done' && hasVal(s[k]));
+const setVals = s => { const o = { a: null, b: null }; for (const k in s) if (k !== 'done' && hasVal(s[k])) o[k] = s[k]; return o; };
+function setText(ex, s) {
+  const cardio = isCardio(ex), parts = [];
+  if (!cardio && hasVal(s.a) && hasVal(s.b)) parts.push(`${fmtN(s.a)}×${fmtN(s.b)}`);
+  else { if (hasVal(s.a)) parts.push(FIELD[cardio ? 'min' : 'kg'].f(s.a)); if (hasVal(s.b)) parts.push(FIELD[cardio ? 'km' : 'reps'].f(s.b)); }
+  FIELDS.forEach(F => { const k = fieldKey(ex, F.id); if (k !== 'a' && k !== 'b' && hasVal(s[k])) parts.push(F.f(s[k])); });
+  return parts.join(' ');
+}
+const setsSummary = (e, sets) => !(sets = sets.filter(filled)).length ? 'bez serii' : sets.map(s => setText(e, s)).join(', ');
 const volume = w => w.ex.reduce((sum, e) => isCardio(EXMAP[e.id]) ? sum : sum + e.sets.reduce((s, x) => s + (x.a || 0) * (x.b || 0), 0), 0);
 const durMin = w => w.end ? Math.max(1, Math.round((w.end - w.start) / 60000)) : null;
 
@@ -816,20 +863,25 @@ function renderTrening() {
       </section>`
     : A.planName ? `<div class="row"><span class="pill good">Plan: ${esc(A.planName)}</span><span class="muted small">${dayLabel(A.date, { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>` : ''}
     ${A.ex.map((e, ei) => {
-      const ex = EXMAP[e.id], c = isCardio(ex), prev = lastSetsFor(e.id, A.id);
+      const ex = EXMAP[e.id], prev = lastSetsFor(e.id, A.id), fs = exFields(e.id).map(f => FIELD[f]);
       return `<section class="ex-card drag-item" data-ei="${ei}">
         <div class="head">${A.ex.length > 1 ? GRIP : ''}${thumbHTML(ex)}
           <div class="grow"><div class="t" style="font-weight:650">${esc(exName(ex))}</div>
           <div class="small muted">${prev ? `Ostatnio (${dayLabel(prev.date)}): ${setsSummary(ex, prev.sets)}` : 'Pierwszy raz'}</div></div>
+          <button class="icon-btn" type="button" data-act="fields" aria-label="Co wpisujesz przy tym ćwiczeniu">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
           <button class="icon-btn" type="button" data-act="rm" aria-label="Usuń ćwiczenie">✕</button>
         </div>
-        <div class="sets">
-          <span class="hd">#</span><span class="hd">${c ? 'min' : 'kg'}</span><span class="hd">${c ? 'km' : 'powt.'}</span><span class="hd">✓</span>
+        <div class="sets${fs.length > 3 ? ' many' : ''}" style="grid-template-columns:24px ${fs.map(F => F.text ? 'minmax(0, 1.6fr)' : 'minmax(0, 1fr)').join(' ')} 44px">
+          <span class="hd">#</span>${fs.map(F => `<span class="hd">${F.h}</span>`).join('')}<span class="hd">✓</span>
           ${e.sets.map((s, si) => {
             const ph = prev && prev.sets[Math.min(si, prev.sets.length - 1)];
             return `<span class="n">${si + 1}</span>
-            <input type="number" inputmode="decimal" step="0.5" data-si="${si}" data-f="a" value="${s.a ?? ''}" placeholder="${ph && ph.a != null ? ph.a : ''}" aria-label="${c ? 'Minuty' : 'Ciężar'} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">
-            <input type="number" inputmode="${c ? 'decimal' : 'numeric'}" step="${c ? '0.1' : '1'}" data-si="${si}" data-f="b" value="${s.b ?? ''}" placeholder="${ph && ph.b != null ? ph.b : ''}" aria-label="${c ? 'Kilometry' : 'Powtórzenia'} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">
+            ${fs.map(F => { const k = fieldKey(ex, F.id), v = s[k], p = ph && hasVal(ph[k]) ? ph[k] : '';
+              return F.text
+                ? `<input type="text" inputmode="text" autocomplete="off" maxlength="12" data-si="${si}" data-f="${k}" data-text="1" value="${esc(v ?? '')}" placeholder="${esc(p)}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`
+                : `<input type="number" inputmode="${F.im}" step="${F.step}" data-si="${si}" data-f="${k}" value="${v ?? ''}" placeholder="${p}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`;
+            }).join('')}
             <button class="check" type="button" data-act="done" data-si="${si}" aria-pressed="${!!s.done}" aria-label="Seria ${si + 1} zrobiona">✓</button>`;
           }).join('')}
         </div>
@@ -845,20 +897,21 @@ function renderTrening() {
   body.oninput = e => {
     const inp = e.target.closest('input[data-f]'); if (!inp) return;
     const ei = +inp.closest('[data-ei]').dataset.ei;
-    A.ex[ei].sets[+inp.dataset.si][inp.dataset.f] = num(inp.value);
+    A.ex[ei].sets[+inp.dataset.si][inp.dataset.f] = inp.dataset.text ? (inp.value.trim() || null) : num(inp.value);
     save();
   };
   body.onclick = e => {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const ei = +b.closest('[data-ei]').dataset.ei, ex = A.ex[ei];
     const act = b.dataset.act;
+    if (act === 'fields') { pickFields(ex.id); return; }
     if (act === 'rm') A.ex.splice(ei, 1);
-    if (act === 'add') { const l = [...ex.sets].reverse().find(s => s.a != null || s.b != null); ex.sets.push({ a: l ? l.a : null, b: l ? l.b : null, done: false }); }
+    if (act === 'add') { const l = [...ex.sets].reverse().find(filled); ex.sets.push(Object.assign(l ? setVals(l) : { a: null, b: null }, { done: false })); }
     if (act === 'pop') ex.sets.pop();
     if (act === 'done') {
       const s = ex.sets[+b.dataset.si];
       if (!s.done) { // uzupełnij puste pola podpowiedzią z poprzedniego treningu
-        $$(`input[data-si="${b.dataset.si}"]`, b.closest('[data-ei]')).forEach(i => { if (i.value === '' && i.placeholder !== '') s[i.dataset.f] = num(i.placeholder); });
+        $$(`input[data-si="${b.dataset.si}"]`, b.closest('[data-ei]')).forEach(i => { if (i.value === '' && i.placeholder !== '') s[i.dataset.f] = i.dataset.text ? i.placeholder : num(i.placeholder); });
       }
       s.done = !s.done;
       if (s.done && navigator.vibrate) navigator.vibrate(10);
@@ -875,6 +928,39 @@ function renderTrening() {
   };
   $('#t-finish').onclick = finishWorkout;
 }
+// Wybór pól serii dla ćwiczenia (zapamiętywany dla tego ćwiczenia na kolejne treningi)
+function pickFields(exId) {
+  const ex = EXMAP[exId], def = defaultFields(ex);
+  let sel = exFields(exId).slice();
+  const draw = b => {
+    $('#fl-list', b).innerHTML = FIELDS.map(F => {
+      const on = sel.includes(F.id), full = !on && sel.length >= FIELDS_MAX;
+      return `<label class="share-opt${full ? ' off' : ''}"><input type="checkbox" data-fl="${F.id}" ${on ? 'checked' : ''} ${full ? 'disabled' : ''}>
+        <span>${esc(F.l)}${def.includes(F.id) ? ' <span class="muted small">· domyślne</span>' : ''}</span></label>`;
+    }).join('');
+    $('#fl-count', b).textContent = `Wybrane: ${sel.length} z maks. ${FIELDS_MAX}. Kolejność kolumn jak na liście.`;
+  };
+  openSheet('Co wpisujesz', `
+    <p class="muted small" style="margin:0"><b>${esc(exName(ex))}</b>: zaznacz, co chcesz zapisywać w każdej serii. Wybór zostaje dla tego ćwiczenia w kolejnych treningach. Wcześniej wpisane wartości nie znikają.</p>
+    <div class="share-opts" id="fl-list"></div>
+    <p class="muted small" id="fl-count" style="margin:0"></p>
+    <div class="btns"><button class="btn" type="button" id="fl-def">Domyślne</button><button class="btn primary" type="button" id="fl-save">Zapisz</button></div>`, b => {
+    draw(b);
+    b.addEventListener('change', e => {
+      const c = e.target.closest('[data-fl]'); if (!c) return;
+      sel = c.checked ? [...sel, c.dataset.fl] : sel.filter(x => x !== c.dataset.fl);
+      sel = FIELDS.map(F => F.id).filter(id => sel.includes(id)); // kolejność jak w katalogu
+      draw(b);
+    });
+    $('#fl-def', b).onclick = () => { sel = def.slice(); draw(b); };
+    $('#fl-save', b).onclick = () => {
+      if (!sel.length) { toast('Zaznacz przynajmniej jedno pole'); return; }
+      S.exFields = S.exFields || {};
+      if (sel.join() === def.join()) delete S.exFields[exId]; else S.exFields[exId] = sel;
+      save(); closeSheet(); renderTrening(); toast('Zapisano pola dla: ' + exName(ex));
+    };
+  });
+}
 function addExToActive(id) {
   const prev = lastSetsFor(id);
   const n = prev ? prev.sets.length : 3;
@@ -888,7 +974,7 @@ function emptySets(id) {
 async function finishWorkout() {
   const A = S.active;
   // ćwiczenia zostają w treningu nawet bez wpisanych serii (zachowany układ) i z pełną liczbą serii, także pustych
-  const ex = A.ex.map(e => ({ id: e.id, sets: e.sets.map(s => ({ a: s.a, b: s.b })) }));
+  const ex = A.ex.map(e => ({ id: e.id, sets: e.sets.map(setVals) }));
   if (!ex.length) {
     if (A.editId) { toast('Trening musi mieć co najmniej jedno ćwiczenie. Żeby go skasować, użyj „Usuń trening”.'); return; }
     if (await confirmBox('Pusty trening', 'Nie dodałeś żadnego ćwiczenia. Odrzucić ten trening?', 'Odrzuć', true)) { S.active = null; save(); renderTrening(); }
@@ -918,7 +1004,7 @@ function editWorkout(id) {
   const w = S.workouts.find(x => x.id === id); if (!w) return;
   if (S.active) { toast(S.active.editId ? 'Najpierw zapisz albo odrzuć zmiany w edytowanym treningu.' : 'Najpierw zapisz albo odrzuć trening, który trwa.'); return; }
   // kopia treningu jako „trening w toku” z oznaczeniem edycji; serie oznaczone jako zrobione
-  S.active = { id: w.id, editId: w.id, date: w.date, start: w.start, ex: w.ex.map(e => ({ id: e.id, sets: e.sets.length ? e.sets.map(s => ({ a: s.a, b: s.b, done: filled(s) })) : emptySets(e.id) })) };
+  S.active = { id: w.id, editId: w.id, date: w.date, start: w.start, ex: w.ex.map(e => ({ id: e.id, sets: e.sets.length ? e.sets.map(s => Object.assign(setVals(s), { done: filled(s) })) : emptySets(e.id) })) };
   if (w.planName) { S.active.planId = w.planId; S.active.planName = w.planName; }
   save(); closeSheet(); setTab('trening');
 }

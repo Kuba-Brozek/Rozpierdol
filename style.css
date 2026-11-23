@@ -420,6 +420,12 @@ input.has-clear { padding-right: 38px !important; }
 .share-opts { display: flex; flex-direction: column; gap: 2px; }
 .share-opt { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 16px; cursor: pointer; }
 .share-opt input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+.share-opt.off { opacity: .45; cursor: default; }
+/* Dużo pól w serii: węższe kolumny */
+.sets.many { gap: 6px 5px; }
+.sets.many input { padding: 9px 2px; font-size: 16px; }
+.sets.many input.has-clear { padding-left: 4px; }
+.sets .hd { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 hr.sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; width: 100%; }
 
 /* Pomiary ciała */
