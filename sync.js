@@ -52,7 +52,9 @@ async function call(url, opts) {
 
 /* ---- sesja ---- */
 function setSession(j) {
+  const old = SY.session, uidNew = j.localId || j.user_id || (old && old.uid);
   SY.session = {
+    createdAt: old && old.uid === uidNew ? old.createdAt : undefined, // data założenia konta (ms), z accounts:lookup
     idToken: j.idToken || j.id_token, refresh: j.refreshToken || j.refresh_token,
     expiresAt: Date.now() + (+(j.expiresIn || j.expires_in) || 3600) * 1000,
     uid: j.localId || j.user_id || (SY.session && SY.session.uid), email: j.email || (SY.session && SY.session.email),
@@ -85,11 +87,13 @@ async function cloudLogin(email, password) {
   const r = await authPost('signInWithPassword', { email, password, returnSecureToken: true });
   setSession(await r.json());
   checkSpecialTheme(SY.session.email);
+  fetchAccountCreated();
   await firstSyncAfterLogin();
 }
 async function cloudSignup(email, password) {
   const r = await authPost('signUp', { email, password, returnSecureToken: true });
   setSession(await r.json());
+  SY.session.createdAt = Date.now(); sySave();
   checkSpecialTheme(SY.session.email);
   await firstSyncAfterLogin();
   return 'in';
@@ -184,6 +188,16 @@ async function listSharedWithMe() {
   }).filter(x => x.uid !== SY.session.uid);
 }
 // Weryfikacja e-maila (potrzebna osobie, która ogląda cudze dane)
+// Data założenia konta — do faktu „dbasz o siebie od …”; pobierana raz i zapamiętywana w sesji
+async function fetchAccountCreated() {
+  if (!cloudReady() || !SY.session || SY.session.createdAt || !navigator.onLine) return;
+  try {
+    const t = await idToken(); if (!t) return;
+    const j = await (await authPost('lookup', { idToken: t })).json();
+    const c = +(j.users && j.users[0] && j.users[0].createdAt);
+    if (c && SY.session) { SY.session.createdAt = c; sySave(); if (UI.tab === 'dieta' && $('#sheet').hidden) renderDieta(); }
+  } catch (e) { /* bez daty fakt po prostu się nie pokaże */ }
+}
 async function emailVerified() {
   const t = await idToken(); if (!t) throw Object.assign(new Error('Brak połączenia z serwerem.'), { code: 'net' });
   const r = await authPost('lookup', { idToken: t });
@@ -504,6 +518,7 @@ function showShared(x) {
 /* ---- start ---- */
 if (cloudReady() && SY.session) syncNow();
 checkSpecialTheme(SY.session && SY.session.email);
+fetchAccountCreated();
 if (cloudReady() && !SY.session && !authSkipped()) showAuthScreen();
 window.addEventListener('online', () => { if (SY.session) syncNow(); });
 let lastVisiblePull = Date.now();

@@ -266,7 +266,26 @@ function positiveFacts() {
     let best = 1, run = 1; for (let i = 1; i < w.length; i++) { run = daysBetween(w[i - 1].d, w[i].d) === 1 ? run + 1 : 1; best = Math.max(best, run); }
     if (best >= 5) out.push(`Rekord regularności: <b>${best} dni</b> ważenia pod rząd.`);
   }
-  const mon = today().slice(0, 7), wm = S.workouts.filter(x => x.date.slice(0, 7) === mon).length;
+  // Ile już dbasz o siebie: od założenia konta (bez konta: od pierwszego pomiaru),
+  // tylko gdy ważenie jest regularne: co najmniej raz w każdym z ostatnich (do 4) tygodni
+  {
+    const created = typeof SY !== 'undefined' && SY.session && SY.session.createdAt;
+    const since = created ? dstr(new Date(created)) : (w[0] && w[0].d);
+    const days = since ? daysBetween(since, today()) : 0;
+    if (days >= 7) {
+      const weeks = Math.min(4, Math.floor(days / 7));
+      let regular = true;
+      for (let k = 0; k < weeks && regular; k++) {
+        const to = addDays(today(), -7 * k), from = addDays(to, -6);
+        regular = w.some(x => x.d >= from && x.d <= to);
+      }
+      if (regular) {
+        const wk = Math.floor(days / 7), extra = days % 7;
+        out.push(`${created ? 'Od założenia konta' : 'Od pierwszego pomiaru'} dbasz o siebie już <b>${plural(days, 'dzień', 'dni', 'dni')}</b>${wk >= 2 ? ` (${extra ? 'ponad ' : ''}${plural(wk, 'tydzień', 'tygodnie', 'tygodni')})` : ''} i regularnie się ważysz. Tak trzymaj! 💪`);
+      }
+    }
+  }
+  const mon = today().slice(0, 7), wm =S.workouts.filter(x => x.date.slice(0, 7) === mon).length;
   if (wm >= 1) out.push(`W tym miesiącu ${wm === 1 ? 'zrobiony jest już' : 'masz już'} <b>${plural(wm, 'trening', 'treningi', 'treningów')}</b>.`);
   if (S.workouts.length >= 3) out.push(`Łącznie <b>${plural(S.workouts.length, 'trening', 'treningi', 'treningów')}</b> w historii. Każdy się liczy.`);
   const tons = S.workouts.reduce((s, x) => s + volume(x), 0) / 1000;
