@@ -2118,7 +2118,7 @@ function renderWiecej() {
       <p>Teraz liczy treningi, rekordy, kalorie i ma motyw tak różowy, że aż boli.</p>
       <p>Robię ją sam, za darmo i bez reklam. Pomysły i błędy wrzucaj do „Sugestii”.</p>
       <p><i>Gdy wiatry nie sprzyjają, to buduje się charakter.</i> 💪</p>
-      <p>Na co dzień jestem Senior SAP ABAP Developerem z 5-letnim stażem komercyjnym. Ten projekt robię czysto dla zabawy.</p>
+      <p>Na co dzień jestem senior programistą SAP ABAP z 5-letnim stażem komercyjnym. Ten projekt robię czysto dla zabawy.</p>
     </section>
     <section class="card" data-sec="priv"><p class="big-note">Używaj jak chcesz, tylko nie wkurwiaj kodera.</p></section>
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
