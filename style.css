@@ -239,8 +239,16 @@ ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column;
 .stepper { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .stepper .icon-btn { width: 30px; height: 30px; font-size: 17px; color: var(--fg); }
 .stepper span { font-size: 14px; min-width: 62px; text-align: center; }
-.plan-move { display: flex; flex-direction: column; gap: 4px; flex: none; }
-.plan-move .icon-btn { width: 30px; height: 30px; }
+/* Przytrzymaj i przeciągnij */
+.drag-item { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; position: relative; }
+.drag-item input { -webkit-user-select: text; user-select: text; }
+.drag-item img { -webkit-user-drag: none; pointer-events: none; }
+.grip { flex: none; display: grid; place-items: center; width: 18px; margin-right: -4px; color: var(--muted); opacity: .7; }
+.grip svg { fill: currentColor; }
+.drag-active { overflow: visible !important; }
+.dragging { z-index: 5; background: var(--surface) !important; border-radius: 18px; box-shadow: 0 12px 32px rgba(0, 0, 0, .28); transition: box-shadow .15s ease; }
+.plan-ex.dragging { border: 1px solid var(--line); }
+.drag-hint { margin: -4px 0 0; text-align: center; }
 .icon-btn:disabled { opacity: .35; cursor: default; }
 
 /* Aktualna waga + schudnięte kg obok siebie */

@@ -697,6 +697,90 @@ const setsSummary = (e, sets) => !sets.length ? 'bez serii' : sets.map(s => isCa
 const volume = w => w.ex.reduce((sum, e) => isCardio(EXMAP[e.id]) ? sum : sum + e.sets.reduce((s, x) => s + (x.a || 0) * (x.b || 0), 0), 0);
 const durMin = w => w.end ? Math.max(1, Math.round((w.end - w.start) / 60000)) : null;
 
+/* ---- przytrzymaj i przeciągnij: zmiana kolejności na liście ---- */
+const DRAG = { on: false, until: 0 };
+const GRIP = '<span class="grip" aria-hidden="true"><svg viewBox="0 0 12 20" width="12" height="20"><circle cx="3" cy="4" r="1.6"/><circle cx="9" cy="4" r="1.6"/><circle cx="3" cy="10" r="1.6"/><circle cx="9" cy="10" r="1.6"/><circle cx="3" cy="16" r="1.6"/><circle cx="9" cy="16" r="1.6"/></svg></span>';
+document.addEventListener('touchmove', e => { if (DRAG.on) e.preventDefault(); }, { passive: false });
+document.addEventListener('click', e => { if (Date.now() < DRAG.until) { e.preventDefault(); e.stopPropagation(); } }, true);
+document.addEventListener('contextmenu', e => { if (DRAG.on || (e.target.closest && e.target.closest('.drag-item'))) e.preventDefault(); });
+function dragSort(box, sel, onMove) {
+  box._ds = { sel, onMove };
+  if (box._dsBound) return; // nasłuch tylko raz na kontener (render podmienia tylko ustawienia)
+  box._dsBound = true;
+  box.addEventListener('pointerdown', ev => {
+    if (ev.button > 0 || DRAG.on) return;
+    const { sel, onMove } = box._ds;
+    const el = ev.target.closest(sel);
+    if (!el || !box.contains(el) || ev.target.closest('input, textarea, select')) return;
+    const x0 = ev.clientX, y0 = ev.clientY, pid = ev.pointerId;
+    const scroller = box.closest('.sheet-body') || document.scrollingElement;
+    let st = null, timer = setTimeout(start, ev.pointerType === 'mouse' ? 250 : 380);
+    function start() {
+      timer = null;
+      const items = [...box.querySelectorAll(sel)].filter(n => n.parentElement === el.parentElement);
+      const from = items.indexOf(el);
+      if (items.length < 2 || from < 0) { cleanup(); return; }
+      const s0 = scroller.scrollTop;
+      const R = items.map(n => { const r = n.getBoundingClientRect(); return { top: r.top + s0, h: r.height }; });
+      const gap = from < items.length - 1 ? R[from + 1].top - R[from].top - R[from].h : R[from].top - R[from - 1].top - R[from - 1].h;
+      st = { items, from, to: from, s0, R, shift: R[from].h + gap, y: y0, raf: 0 };
+      DRAG.on = true;
+      el.classList.add('dragging'); el.parentElement.classList.add('drag-active');
+      items.forEach(n => { if (n !== el) n.style.transition = 'transform .18s ease'; });
+      if (navigator.vibrate) navigator.vibrate(15);
+      try { el.setPointerCapture(pid); } catch (e) {}
+      update(); st.raf = requestAnimationFrame(autoScroll);
+    }
+    function update() {
+      const dy = st.y - y0 + scroller.scrollTop - st.s0, R = st.R;
+      el.style.transform = `translateY(${dy}px) scale(1.02)`;
+      const c = R[st.from].top + R[st.from].h / 2 + dy;
+      let to = st.from;
+      st.items.forEach((n, i) => {
+        if (i === st.from) return;
+        const ci = R[i].top + R[i].h / 2;
+        let t = 0;
+        if (i > st.from && c > ci) { t = -st.shift; to++; }
+        if (i < st.from && c < ci) { t = st.shift; to--; }
+        n.style.transform = t ? `translateY(${t}px)` : '';
+      });
+      st.to = to;
+    }
+    function autoScroll() {
+      if (!st) return;
+      const vr = scroller === document.scrollingElement ? { top: 0, bottom: innerHeight } : scroller.getBoundingClientRect();
+      const edge = 90; let v = 0;
+      if (st.y < vr.top + edge) v = -Math.ceil((vr.top + edge - st.y) / 5);
+      else if (st.y > vr.bottom - edge) v = Math.ceil((st.y - vr.bottom + edge) / 5);
+      if (v) { const before = scroller.scrollTop; scroller.scrollTop += v; if (scroller.scrollTop !== before) update(); }
+      st.raf = requestAnimationFrame(autoScroll);
+    }
+    function move(e) {
+      if (e.pointerId !== pid) return;
+      if (!st) { if (Math.hypot(e.clientX - x0, e.clientY - y0) > 8) cleanup(); return; } // to przewijanie, nie przeciąganie
+      e.preventDefault(); st.y = e.clientY; update();
+    }
+    function up(e) {
+      if (e.pointerId !== pid) return;
+      const s = st; cleanup();
+      if (s) { DRAG.until = Date.now() + 350; if (s.to !== s.from) onMove(s.from, s.to); }
+    }
+    function cleanup() {
+      if (timer) clearTimeout(timer); timer = null;
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+      if (st) {
+        cancelAnimationFrame(st.raf);
+        st.items.forEach(n => { n.style.transform = ''; n.style.transition = ''; });
+        el.classList.remove('dragging'); el.parentElement && el.parentElement.classList.remove('drag-active');
+      }
+      st = null; DRAG.on = false;
+    }
+    window.addEventListener('pointermove', move, { passive: false });
+    window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  });
+}
+const moveItem = (arr, from, to) => { arr.splice(to, 0, arr.splice(from, 1)[0]); };
+
 function renderTrening() {
   const body = $('#trening-body');
   const A = S.active;
@@ -732,8 +816,8 @@ function renderTrening() {
     : A.planName ? `<div class="row"><span class="pill good">Plan: ${esc(A.planName)}</span><span class="muted small">${dayLabel(A.date, { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>` : ''}
     ${A.ex.map((e, ei) => {
       const ex = EXMAP[e.id], c = isCardio(ex), prev = lastSetsFor(e.id, A.id);
-      return `<section class="ex-card" data-ei="${ei}">
-        <div class="head">${thumbHTML(ex)}
+      return `<section class="ex-card drag-item" data-ei="${ei}">
+        <div class="head">${A.ex.length > 1 ? GRIP : ''}${thumbHTML(ex)}
           <div class="grow"><div class="t" style="font-weight:650">${esc(exName(ex))}</div>
           <div class="small muted">${prev ? `Ostatnio (${dayLabel(prev.date)}): ${setsSummary(ex, prev.sets)}` : 'Pierwszy raz'}</div></div>
           <button class="icon-btn" type="button" data-act="rm" aria-label="Usuń ćwiczenie">✕</button>
@@ -780,6 +864,7 @@ function renderTrening() {
     }
     save(); renderTrening();
   };
+  dragSort(body, '.ex-card', (from, to) => { moveItem(A.ex, from, to); save(); renderTrening(); });
   $('#t-add').onclick = () => pickExercise(id => { addExToActive(id); closeSheet(); renderTrening(); toast('Dodano: ' + exName(EXMAP[id])); });
   $('#t-cancel').onclick = async () => {
     const ok = editing
@@ -1198,8 +1283,8 @@ function editPlan(id, draft) {
     <div class="field"><label for="pl-name">Nazwa planu</label><input type="text" id="pl-name" maxlength="40" placeholder="np. Push, Nogi, FBW A" value="${esc(D.name)}"></div>
     ${D.ex.length ? `<div class="list">${D.ex.map((e, i) => {
       const ex = EXMAP[e.id];
-      return `<div class="li plan-ex" data-i="${i}">
-        ${thumbHTML(ex)}
+      return `<div class="li plan-ex drag-item" data-i="${i}">
+        ${D.ex.length > 1 ? GRIP : ''}${thumbHTML(ex)}
         <div class="grow"><div class="t">${esc(exName(ex))}</div>
           <div class="stepper">
             <button class="icon-btn" type="button" data-pa="minus" aria-label="Mniej serii">−</button>
@@ -1207,13 +1292,9 @@ function editPlan(id, draft) {
             <button class="icon-btn" type="button" data-pa="plus" aria-label="Więcej serii">+</button>
           </div>
         </div>
-        <div class="plan-move">
-          <button class="icon-btn" type="button" data-pa="up" aria-label="Wyżej" ${i === 0 ? 'disabled' : ''}>↑</button>
-          <button class="icon-btn" type="button" data-pa="down" aria-label="Niżej" ${i === D.ex.length - 1 ? 'disabled' : ''}>↓</button>
-        </div>
         <button class="icon-btn" type="button" data-pa="rm" aria-label="Usuń z planu">✕</button>
       </div>`;
-    }).join('')}</div>` : '<div class="card empty" style="padding:20px 16px"><span>Plan jest pusty. Dodaj ćwiczenia i ustaw, ile serii każdego robisz.</span></div>'}
+    }).join('')}</div>${D.ex.length > 1 ? '<p class="muted small drag-hint">Przytrzymaj ćwiczenie i przeciągnij, żeby zmienić kolejność.</p>' : ''}` :'<div class="card empty" style="padding:20px 16px"><span>Plan jest pusty. Dodaj ćwiczenia i ustaw, ile serii każdego robisz.</span></div>'}
     <button class="btn block" type="button" id="pl-add">+ Dodaj ćwiczenie</button>
     <div class="btns">
       ${isNew ? '' : '<button class="btn danger" type="button" id="pl-del">Usuń plan</button>'}
@@ -1227,9 +1308,12 @@ function editPlan(id, draft) {
       const i = +btn.closest('[data-i]').dataset.i, act = btn.dataset.pa;
       if (act === 'minus') D.ex[i].sets = Math.max(1, D.ex[i].sets - 1);
       if (act === 'plus') D.ex[i].sets = Math.min(20, D.ex[i].sets + 1);
-      if (act === 'up' && i > 0) [D.ex[i - 1], D.ex[i]] = [D.ex[i], D.ex[i - 1]];
-      if (act === 'down' && i < D.ex.length - 1) [D.ex[i + 1], D.ex[i]] = [D.ex[i], D.ex[i + 1]];
       if (act === 'rm') D.ex.splice(i, 1);
+      const st = $('#sheet-body').scrollTop;
+      editPlan(null, D); $('#sheet-body').scrollTop = st;
+    });
+    dragSort(b, '.plan-ex', (from, to) => {
+      keepName(); moveItem(D.ex, from, to);
       const st = $('#sheet-body').scrollTop;
       editPlan(null, D); $('#sheet-body').scrollTop = st;
     });
