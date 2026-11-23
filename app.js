@@ -1183,91 +1183,86 @@ function dragSort(box, sel, onMove) {
 const moveItem = (arr, from, to) => { arr.splice(to, 0, arr.splice(from, 1)[0]); };
 
 /* ============ Mapa partii mięśni: serie z ostatnich 7 dni ============
-   Sylwetka przód/tył; każda partia to kształt (lewa połowa, prawa to jej lustro).
+   Sylwetki (przód i tył) to obrazki z Pixabay (licencja Pixabay: wolno używać i przerabiać).
+   Obrazek zamieniamy na maskę: ciemne = mięsień, jasne tło i linie między mięśniami = przezroczyste (widać tło motywu).
+   Każdy mięsień to osobny „kawałek” maski; BODY_IMG.seeds to punkty leżące w kawałkach danej partii.
    Kolor = ile serii (ćwiczenie główne = 1 seria, pomocnicze = ½). Szczegóły po stuknięciu w partię. */
-const BODY_FRONT = [
-  ['traps', 'M44 31 L37 36 L45 36 Z'],
-  ['shoulders', 'M36 37 C28 37 24 43 24 51 L30 53 C31 47 34 43 40 41 Z'],
-  ['chest', 'M49 40 L41 41 C35 43 32 48 32 54 C36 59 44 60 49 58 Z'],
-  ['biceps', 'M24 53 C22 61 22 68 24 74 L30 74 C31 67 31 60 30 55 Z'],
-  ['forearms', 'M23 77 C20 87 19 96 19 103 L24 103 C26 95 29 86 30 77 Z'],
-  ['abdominals', 'M49 60 C44 61 39 61 36 59 L37 89 C40 96 45 99 49 100 Z'],
-  ['abductors', 'M36 92 C33 97 32 103 32 109 L36 105 C36 100 36 96 37 93 Z'],
-  ['quadriceps', 'M37 105 C33 120 33 138 36 150 L46 150 C47 138 47 121 46 109 C43 107 40 105 37 105 Z'],
-  ['adductors', 'M47 107 L49 104 L49 128 L47.5 134 Z'],
-  ['calves', 'M36 156 C34 170 35 184 37 196 L43 196 C45 184 46 170 45 156 Z'],
-];
-const BODY_BACK = [
-  ['traps', 'M49 27 L43 31 L36 36 L43 40 L49 49 Z'],
-  ['shoulders', BODY_FRONT[1][1]],
-  ['middle back', 'M49 50 L43 41 L39 45 L44 56 L49 59 Z'],
-  ['lats', 'M38 46 L32 54 C33 66 38 76 45 82 L49 80 L49 60 L43 57 Z'],
-  ['lower back', 'M49 81 L45 83 L40 88 L41 94 L49 94 Z'],
-  ['triceps', BODY_FRONT[3][1]],
-  ['forearms', BODY_FRONT[4][1]],
-  ['abductors', 'M36 95 C33 99 32 105 32 111 L35 113 C34 107 35 101 37 96 Z'],
-  ['glutes', 'M49 95 L40 95 C35 99 34 108 36 116 C40 120 46 119 49 116 Z'],
-  ['hamstrings', 'M36 120 C33 132 34 144 36 152 L46 152 C47 142 47 131 47 121 C44 122 39 122 36 120 Z'],
-  ['calves', 'M36 157 C33 167 34 178 37 189 L44 189 C46 178 46 167 45 157 Z'],
-];
-// nieklikalne „tło”: głowa, szyja, dłonie, stopy
-const BODY_BASE = '<ellipse cx="50" cy="15" rx="8.5" ry="10.5"/><path d="M45 25 L55 25 L56 31 L44 31 Z"/>'
-  + '<ellipse cx="21" cy="109" rx="3.5" ry="5.5"/><ellipse cx="79" cy="109" rx="3.5" ry="5.5"/>'
-  + '<path d="M37 199 L43 199 L44 206 L34 206 Z"/><path d="M63 199 L57 199 L56 206 L66 206 Z"/>';
-// Realistyczna sylwetka (profil „Mężczyzna” albo brak logowania): szare, cieniowane mięśnie z włóknami,
-// ćwiczone partie świecą na czerwono. Każdy wpis: [partia, kształt lewej połowy, kąt włókien w stopniach].
-const BODY_SIL = 'M50 2 C44 2 41 7 41 13 C41 19 44 23 45 25 L45 28 C40 31 34 32 28 34 C21 36 18 42 17 50 C16 60 16 70 15 80 C14 90 13 100 13 108 C13 113 18 114 19 109 C20 100 22 90 24 82 C26 74 27 66 28 60 C29 68 31 76 32 84 C31 95 30 104 31 114 C31 130 32 146 34 158 C33 172 34 186 35 198 L34 206 L44 206 L44 198 C45 184 46 170 46 158 C47 140 48 124 49 112 L50 112 Z';
-const BODY_FRONT_M = [
-  ['neck', 'M45 22 C45.5 26 45 29 43 31.5 C45 32 47 32 48.5 31 C48.5 28 48.5 25 48 22 Z', -10],
-  ['traps', 'M44 27 C40 31 35 33 31 34.5 C35 35.5 40 36 44 36 Z', 65],
-  ['shoulders', 'M33 36 C27 35 21 38 19 44 C18 49 19 54 21 57 C23 52 26 47 31 43 C32 41 33 38 33 36 Z', 15],
-  ['chest', 'M49.5 37 C44 36 37 37 33 41 C30 44 29 49 30 53 C33 57 38 59 43 59 C46 59 48.5 58 49.5 57 Z', 75],
-  ['lats', 'M30.5 55 C32 56 33.5 57 34 58.5 C32.5 59 31 58.5 30.5 57 Z', -40],
-  ['lats', 'M31 60 C32.5 61 34 62 34.5 63.5 C33 64 31.5 63.5 31 62 Z', -40],
-  ['biceps', 'M21 58 C19 64 19 72 21 78 C23 80 26 80 27 78 C29 72 29 64 27 58 C25 56 22 56 21 58 Z', 4],
-  ['forearms', 'M20 81 C17 88 16 96 17 104 C18 105 20 105 21 104 C24 96 27 88 27 81 C25 79 22 79 20 81 Z', 12],
-  ['abdominals', 'M42.5 61 Q42 60.5 43 60.5 L48.8 60.5 L48.8 67.5 L43 67.5 Q42 67.5 42.3 66.5 Z', 0],
-  ['abdominals', 'M42.2 69 L48.8 69 L48.8 76.5 L42.5 76.5 Q41.8 76 42 75 Z', 0],
-  ['abdominals', 'M42.3 78 L48.8 78 L48.8 85.5 L43 85.5 Q42.2 85 42.3 84 Z', 0],
-  ['abdominals', 'M43 87 L48.8 87 L48.8 100 C46 98.5 44 95 43 87 Z', 0],
-  ['abdominals', 'M41 61 C37 61 33 61 31 60 C31 70 33 82 37 91 C39 93 41 94 41.5 93 Z', 35],
-  ['abductors', 'M36.5 92 C33 96 31 102 31 108 C33 107 34.5 105.5 35 104 C35 99.5 36 96 38.5 94 Z', 20],
-  ['quadriceps', 'M36 100 C32 110 31 125 33 140 C34 146 36 149 39 150 C38 135 38 115 40 104 Z', 6],
-  ['quadriceps', 'M41 102 C39 112 39 128 41 142 C42 144 44 144 45 142 C46 128 46 112 44 104 Z', 0],
-  ['quadriceps', 'M45.5 128 C44 134 43.5 142 45 149 C47 150 49 148 48.5 143 C48 137 47 132 45.5 128 Z', -20],
-  ['adductors', 'M45 103 C46 110 47 118 47 126 C48 120 49 112 49.5 104 Z', -12],
-  ['calves', 'M35 157 C32 165 33 175 36 182 C38 178 39 170 39 162 C38 159 37 157 35 157 Z', 0],
-  ['calves', 'M40 157 C39.5 168 40 180 41 193 L43 193 C44 180 44 168 43 157 Z', 0],
-  ['calves', 'M44 158 C46 164 46.5 172 45 180 C44.5 172 44 164 44 158 Z', 0],
-];
-const BODY_BACK_M = [
-  ['traps', 'M49.5 22 C47 24 45 27 44 29 C40 32 35 34 31 35.5 C36 37 41 39 44 42 C46 48 48 55 49.5 61 Z', 55],
-  ['shoulders', BODY_FRONT_M[2][1], 15],
-  ['middle back', 'M41 39 C37 38 33 39 31 41.5 C30 45 31 48 33 50.5 C36 49 40 47 43 45 C42.5 43 42 41 41 39 Z', 70],
-  ['middle back', 'M33.5 51.5 C36.5 50 40 48.5 43 46.5 C43.5 49 43.5 51 43 53 C40 54 37 55 35 55.5 Z', 65],
-  ['lats', 'M35 56.5 C38 55.5 41 54.5 43.5 54 C45 58 46 64 45.5 72 C45 76 44.5 79 44 81 C41 82.5 39 83.5 37.5 84 C35 76 32.5 66 31 57.5 Z', -35],
-  ['lower back', 'M49.5 62 C48 63 47 64 46.5 66 C46 72 45.5 78 45 82 C44 87 43 91 42.5 95 L49.5 95 Z', 0],
-  ['triceps', 'M21 58 C19 64 19 71 21 78 C22.5 79 24 79 25 78 C25.5 71 26 64 26.5 58 C25 56.5 22.5 56.5 21 58 Z', 4],
-  ['triceps', 'M27 58 C27 65 26.5 72 26 78.5 C27 79 28 78.5 28.5 77.5 C29.5 71 29.5 64 28.5 58.5 Z', 4],
-  ['forearms', BODY_FRONT_M[7][1], 12],
-  ['abductors', 'M38 91.5 C35 93 32.5 97 32 102 C34 102 36 101 37.5 100 C38.5 97 39.5 95 41 94 Z', 40],
-  ['glutes', 'M49.5 96 C46 95 43 95 41 95.5 C36 99 34 107 35.5 115 C38 119 43 121 49.5 119 Z', 50],
-  ['hamstrings', 'M35.5 121 C33 133 34 145 37 153 C38.5 153.5 40 153 41 152 C40.5 142 40.5 132 41 122 C39 121.5 37 121 35.5 121 Z', 3],
-  ['hamstrings', 'M41.5 122 C41 133 41 143 42 152 C43.5 153 45 152.5 46 151 C47 142 47.5 132 47 122 C45 122.5 43 122.5 41.5 122 Z', -3],
-  ['calves', 'M35 157 C33 164 33.5 173 36.5 181 C38.5 180 40 178 40.5 176 C40.5 169 40 162 39.5 157 C38 156 36.5 156 35 157 Z', 0],
-  ['calves', 'M41 157 C42 163 43.5 170 43 178 C44.5 177 45.5 175 46 172 C46.5 166 46 161 44.5 157 C43.5 156 42 156 41 157 Z', 0],
-  ['calves', 'M37.5 183 C38.5 188 39.5 192 40.5 196 L43.5 196 C43.5 190 43.5 185 43.5 181 C41.5 182 39.5 183 37.5 183 Z', 0],
-];
-// gradienty (szary + 3 stopnie „rozgrzania”) i wzory włókien pod każdy kąt
-const MUS_GRAD = [['#eceef0', '#a3a8b0', '#6f747c'], ['#ffc9a8', '#f08a5d', '#b9502c'], ['#ffad8a', '#f2603a', '#b52d17'], ['#ff8f6e', '#e8361f', '#99140c']];
-function bodyDefs() {
-  const angles = [...new Set([...BODY_FRONT_M, ...BODY_BACK_M].map(x => x[2]))];
-  return `<defs>${MUS_GRAD.map((c, i) => `<radialGradient id="mg${i}" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="${c[0]}"/><stop offset=".55" stop-color="${c[1]}"/><stop offset="1" stop-color="${c[2]}"/></radialGradient>`).join('')}
-    <linearGradient id="msil" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4a4e55"/><stop offset=".5" stop-color="#5f646c"/><stop offset="1" stop-color="#4a4e55"/></linearGradient>
-    <radialGradient id="mhead" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#d9dce0"/><stop offset="1" stop-color="#7d828a"/></radialGradient>
-    ${angles.map(a => `<pattern id="mf${String(a).replace('-', 'm')}" width="1.1" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(${a})"><path d="M.3 0 V4" stroke="#fff" stroke-opacity=".28" stroke-width=".22"/><path d="M.85 0 V4" stroke="#000" stroke-opacity=".12" stroke-width=".18"/></pattern>`).join('')}</defs>`;
+const BODY_IMG = {
+  m: { src: 'icons/body-m.png', seeds: {"neck":[[292,212],[351,212],[301,217],[291,246],[352,246],[941,193],[969,193]],"traps":[[284,247],[357,247],[900,263],[994,263]],"shoulders":[[214,268],[417,268],[845,274],[1067,274]],"chest":[[273,280],[359,280]],"biceps":[[215,340],[428,340],[185,359],[454,359]],"abdominals":[[307,379],[331,379],[311,427],[328,427],[301,474],[326,474],[276,516],[337,516],[239,495],[402,495],[240,464],[403,464],[239,439],[404,439],[243,423],[398,423],[264,397],[378,398],[227,403],[416,403],[227,382],[416,382],[229,369],[412,369],[880,502],[1033,502]],"forearms":[[158,440],[485,440],[172,466],[465,466],[183,477],[459,477],[789,458],[1125,458],[776,472],[1138,472],[767,483],[1147,483],[815,489],[1096,489]],"quadriceps":[[235,590],[407,590],[243,583],[400,583],[214,701],[428,701],[275,741],[367,741],[851,655],[1063,655]],"adductors":[[247,572],[395,572],[309,679],[333,679],[930,693],[970,693],[930,757],[985,757]],"calves":[[359,852],[283,853],[233,860],[410,860],[227,891],[415,891],[278,907],[364,907],[887,859],[1021,859],[1027,859],[893,860],[871,1027],[1036,1027],[895,1029],[1012,1029]],"middle back":[[886,285],[1025,285],[847,318],[1065,318]],"lats":[[911,355],[1002,355]],"lower back":[[944,430],[971,430]],"triceps":[[839,337],[1076,337],[846,377],[1068,377],[803,388],[1112,388]],"abductors":[[890,547],[1012,547]],"glutes":[[929,562],[978,562]],"hamstrings":[[880,672],[1034,672],[910,700],[1004,700]]} },
+  f: { src: 'icons/body-f.png', seeds: {"neck":[[305,285],[348,285],[320,291]],"traps":[[296,302],[354,302],[882,307],[1013,307]],"shoulders":[[241,311],[410,311],[260,317],[391,317],[860,314],[1036,314]],"chest":[[297,337],[354,337],[303,316],[350,316]],"biceps":[[230,386],[417,386]],"abdominals":[[253,410],[400,410],[311,429],[335,430],[312,454],[340,454],[297,488],[343,488],[289,520],[358,520],[268,473],[385,473],[895,509],[1009,509],[268,418],[385,418],[268,431],[383,431],[267,442],[385,442],[265,451],[388,451]],"forearms":[[239,425],[413,425],[203,462],[450,462],[217,480],[437,480],[209,512],[444,512],[200,517],[452,517],[833,465],[1064,465],[807,483],[812,483],[1092,483],[1098,483],[844,490],[1060,490]],"quadriceps":[[253,558],[400,559],[245,568],[408,568],[235,643],[418,644],[294,717],[359,717],[856,673],[1049,673]],"adductors":[[393,562],[261,563],[314,623],[339,623],[937,664],[967,664],[923,762],[982,762]],"calves":[[302,840],[352,840],[266,845],[387,845],[301,897],[352,897],[265,898],[388,898],[260,926],[394,926],[899,846],[1005,846],[911,855],[993,855],[931,1009],[973,1010],[894,1012],[1010,1012]],"middle back":[[890,334],[1013,334]],"lats":[[907,383],[996,383]],"lower back":[[945,481],[960,481]],"triceps":[[859,365],[1045,365],[840,384],[1065,384],[839,412],[1066,412]],"abductors":[[886,551],[1013,551]],"glutes":[[943,576],[960,576]],"hamstrings":[[908,685],[997,685],[896,693],[1006,693]]} },
+};
+const BODY_CACHE = {};
+const bodySex = () => S.profile.sex === 'f' ? 'f' : 'm';
+// Raz na uruchomienie: wczytaj obrazek, zrób maskę, podziel ją na kawałki i przypisz kawałki do partii
+function loadBody(sex) {
+  if (BODY_CACHE[sex]) return BODY_CACHE[sex];
+  return BODY_CACHE[sex] = new Promise((res, rej) => {
+    const img = new Image();
+    img.onerror = () => { delete BODY_CACHE[sex]; rej(new Error('img')); };
+    img.onload = () => {
+      const W = img.naturalWidth, H = img.naturalHeight, c = document.createElement('canvas');
+      c.width = W; c.height = H; const cx = c.getContext('2d'); cx.drawImage(img, 0, 0);
+      const d = cx.getImageData(0, 0, W, H).data, N = W * H, A = new Uint8Array(N);
+      for (let i = 0; i < N; i++) { const L = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) / 3; A[i] = Math.max(0, Math.min(255, Math.round((200 - L) / 104 * 255))); }
+      // kawałki: spójne obszary pikseli z kryciem >= 50%
+      const lab = new Int32Array(N).fill(-1), st = new Int32Array(N); let nl = 0;
+      for (let s = 0; s < N; s++) {
+        if (A[s] < 128 || lab[s] >= 0) continue;
+        let sp = 0; st[sp++] = s; lab[s] = nl;
+        while (sp) {
+          const p = st[--sp], px = p % W;
+          if (px > 0 && A[p - 1] >= 128 && lab[p - 1] < 0) { lab[p - 1] = nl; st[sp++] = p - 1; }
+          if (px < W - 1 && A[p + 1] >= 128 && lab[p + 1] < 0) { lab[p + 1] = nl; st[sp++] = p + 1; }
+          if (p >= W && A[p - W] >= 128 && lab[p - W] < 0) { lab[p - W] = nl; st[sp++] = p - W; }
+          if (p < N - W && A[p + W] >= 128 && lab[p + W] < 0) { lab[p + W] = nl; st[sp++] = p + W; }
+        }
+        nl++;
+      }
+      const keys = Object.keys(BODY_IMG[sex].seeds), labM = new Int8Array(nl).fill(-1);
+      keys.forEach((k, ki) => BODY_IMG[sex].seeds[k].forEach(([x, y]) => { const l = lab[y * W + x]; if (l >= 0) labM[l] = ki; }));
+      // piksel -> partia (-1 = głowa, dłonie, kolana itp.); półprzezroczyste krawędzie biorą partię sąsiada
+      const mus = new Int8Array(N).fill(-1);
+      for (let i = 0; i < N; i++) if (lab[i] >= 0) mus[i] = labM[lab[i]];
+      for (let pass = 0; pass < 2; pass++) for (let i = W; i < N - W; i++) if (A[i] && lab[i] < 0 && mus[i] < 0) {
+        const n = [i - 1, i + 1, i - W, i + W].find(q => mus[q] >= 0); if (n !== undefined) mus[i] = mus[n];
+      }
+      // przycięcie do sylwetek
+      let x0 = W, y0 = H, x1 = 0, y1 = 0;
+      for (let i = 0; i < N; i++) if (A[i] > 20) { const x = i % W, y = (i / W) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      x0 = Math.max(0, x0 - 4); y0 = Math.max(0, y0 - 4); x1 = Math.min(W - 1, x1 + 4); y1 = Math.min(H - 1, y1 + 4);
+      const w = x1 - x0 + 1, h = y1 - y0 + 1, cA = new Uint8Array(w * h), cM = new Int8Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const s = (y + y0) * W + x + x0; cA[y * w + x] = A[s]; cM[y * w + x] = mus[s]; }
+      res({ w, h, A: cA, mus: cM, keys });
+    };
+    img.src = BODY_IMG[sex].src;
+  });
 }
-const detailedBody = () => S.profile.sex === 'm' || !(typeof SY !== 'undefined' && SY.session);
+const hexRGB = h => { h = (h || '').trim().replace('#', ''); if (h.length === 3) h = h.split('').map(x => x + x).join(''); const n = parseInt(h, 16); return isNaN(n) ? [128, 128, 128] : [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+// poziom 0 = kolor „wyciszony” motywu, 1–3 = coraz mocniejsza czerwień
+const BODY_HOT = [[240, 153, 123], [232, 97, 60], [217, 48, 28]];
+function drawBody(cv, B, data) {
+  const base = hexRGB(getComputedStyle(document.documentElement).getPropertyValue('--muted'));
+  const col = B.keys.map(k => { const lv = muscleLevel(muscleScore(data[k])); return lv ? BODY_HOT[lv - 1] : base; });
+  cv.width = B.w; cv.height = B.h;
+  const x = cv.getContext('2d'), im = x.createImageData(B.w, B.h), o = im.data;
+  for (let i = 0; i < B.A.length; i++) {
+    const a = B.A[i]; if (!a) continue;
+    const c = B.mus[i] >= 0 ? col[B.mus[i]] : base, j = i * 4;
+    o[j] = c[0]; o[j + 1] = c[1]; o[j + 2] = c[2]; o[j + 3] = B.mus[i] >= 0 ? a : a * .55;
+  }
+  x.putImageData(im, 0, 0);
+}
+// partia pod palcem (albo najbliższa w promieniu ~2% szerokości — palec jest grubszy niż linie)
+function bodyHit(B, px, py) {
+  const at = (x, y) => x >= 0 && y >= 0 && x < B.w && y < B.h ? B.mus[y * B.w + x] : -1;
+  const r = Math.round(B.w * .02);
+  for (let d = 0; d <= r; d += 2) for (let a = 0; a < 16; a++) {
+    const m = at(Math.round(px + Math.cos(a * Math.PI / 8) * d), Math.round(py + Math.sin(a * Math.PI / 8) * d));
+    if (m >= 0) return B.keys[m];
+    if (!d) break;
+  }
+  return null;
+}
 function muscleSets(days = 7) {
   const from = addDays(today(), -(days - 1)), out = {};
   S.workouts.filter(w => w.date >= from && w.date <= today()).forEach(w => w.ex.forEach(e => {
@@ -1282,24 +1277,12 @@ function muscleSets(days = 7) {
 const muscleScore = o => o ? o.main + o.help / 2 : 0;
 const muscleLevel = v => v <= 0 ? 0 : v < 4 ? 1 : v < 10 ? 2 : 3;
 function bodyMapHTML() {
-  const data = muscleSets(), det = detailedBody();
-  const fig = (list, dx, label) => {
-    const shapes = list.map(([m, d]) => `<path d="${d}" data-m="${m}" class="mz l${muscleLevel(muscleScore(data[m]))}"/>`).join('');
-    return `<g transform="translate(${dx} 0)"><g class="mbase">${BODY_BASE}</g>${shapes}
-      <g transform="matrix(-1 0 0 1 100 0)">${shapes}</g><text x="50" y="218" class="mlab">${label}</text></g>`;
-  };
-  // realistyczna: ciemna sylwetka pod spodem (szczeliny między mięśniami), mięśnie z gradientem i włóknami
-  const figR = (list, dx, label) => {
-    const half = `<path d="${BODY_SIL}" fill="url(#msil)"/>` + list.map(([m, d, a]) => {
-      const lv = muscleLevel(muscleScore(data[m]));
-      return `<g data-m="${m}" class="mzr"><path d="${d}" fill="url(#mg${lv})" stroke="#3d4147" stroke-width=".35"/><path d="${d}" fill="url(#mf${String(a).replace('-', 'm')})"/></g>`;
-    }).join('');
-    return `<g transform="translate(${dx} 0)">${half}<g transform="matrix(-1 0 0 1 100 0)">${half}</g>
-      <ellipse cx="50" cy="13.5" rx="7.6" ry="9.6" fill="url(#mhead)"/><text x="50" y="218" class="mlab">${label}</text></g>`;
-  };
   return `<section class="card bodymap">
     <p class="muted small" style="margin:0;text-align:center">Serie z ostatnich 7 dni</p>
-    <svg viewBox="0 0 210 222" role="group" aria-label="Sylwetka: stuknij partię, żeby zobaczyć serie">${det ? bodyDefs() + figR(BODY_FRONT_M, 0, 'Przód') + figR(BODY_BACK_M, 110, 'Tył') : fig(BODY_FRONT, 0, 'Przód') + fig(BODY_BACK, 110, 'Tył')}</svg>
+    <div class="body-wrap"><canvas class="body-cv" role="img" aria-label="Sylwetka z przodu i z tyłu: stuknij partię, żeby zobaczyć serie"></canvas>
+      <p class="muted small body-load">Wczytuję sylwetkę…</p></div>
+    <div class="body-lab muted small"><span>Przód</span><span>Tył</span></div>
+    <div class="body-leg small muted"><i class="l1"></i>1–3<i class="l2"></i>4–9<i class="l3"></i>10+ serii</div>
     <p class="muted small" style="margin:0;text-align:center">Stuknij partię, żeby zobaczyć serie</p></section>`;
 }
 function musclesNavCard() {
@@ -1310,7 +1293,15 @@ function musclesNavCard() {
 function renderMiesnie() {
   const body = $('#miesnie-body');
   body.innerHTML = bodyMapHTML();
-  $('.bodymap svg', body).addEventListener('click', e => { const p = e.target.closest('[data-m]'); if (p) showMuscle(p.dataset.m); });
+  const cv = $('.body-cv', body), load = $('.body-load', body);
+  loadBody(bodySex()).then(B => {
+    if (!cv.isConnected) return;
+    drawBody(cv, B, muscleSets()); load.remove();
+    cv.addEventListener('click', e => {
+      const r = cv.getBoundingClientRect(), m = bodyHit(B, (e.clientX - r.left) * B.w / r.width, (e.clientY - r.top) * B.h / r.height);
+      if (m) showMuscle(m);
+    });
+  }).catch(() => { load.textContent = 'Nie udało się wczytać sylwetki.'; });
 }
 function showMuscle(m) {
   const o = muscleSets()[m] || { main: 0, help: 0, items: [] }, name = MUSCLE[m] || m;
@@ -2278,7 +2269,7 @@ function renderWiecej() {
     </section>
     <section class="card" data-sec="priv"><p class="big-note">Używaj jak chcesz, tylko nie wkurwiaj kodera.</p></section>
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
-    <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
+    <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Sylwetki mięśni: <a href="https://pixabay.com/vectors/anatomical-anatomy-anatomy-chart-6826992/" target="_blank" rel="noopener" style="color:inherit">Pixabay</a>. Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
     <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: …</p>
     <p class="muted small settings-foot" style="margin:4px 0 0">© 2026${new Date().getFullYear() > 2026 ? '–' + new Date().getFullYear() : ''} Rozpierdol. Wszelkie prawa zastrzeżone.<br>Zrobione z miłością i odrobiną bólu mięśni 💪</p>`;
   // numer wersji = nazwa schowka plików apki (ustawiana przy budowaniu)

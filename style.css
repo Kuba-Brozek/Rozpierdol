@@ -543,15 +543,6 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 
 /* Mapa partii mięśni (Trening) */
 .bodymap { gap: 8px; }
-.bodymap svg { width: 100%; max-width: 360px; margin: 0 auto; display: block; -webkit-tap-highlight-color: transparent; }
-.bodymap .mbase { fill: var(--surface-2); }
-.bodymap .mz { stroke: var(--surface); stroke-width: .8; cursor: pointer; transition: fill .2s, opacity .2s; }
-.bodymap .mz.l0 { fill: var(--line); }
-.bodymap .mz.l1 { fill: color-mix(in srgb, var(--accent) 35%, var(--line)); }
-.bodymap .mz.l2 { fill: color-mix(in srgb, var(--accent) 70%, var(--line)); }
-.bodymap .mz.l3 { fill: var(--accent); }
-.bodymap .mz:active { opacity: .6; }
-.bodymap .mlab { font-size: 9px; fill: var(--muted); text-anchor: middle; }
 .mus-head { display: flex; align-items: baseline; gap: 8px; }
 .mus-head b { font-size: 40px; line-height: 1; }
 .mus-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; height: 120px; align-items: end; }
@@ -561,5 +552,10 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .mus-bars .v { font-size: 12px; font-weight: 600; min-height: 15px; }
 .mus-bars .d { font-size: 11px; color: var(--muted); }
 .mus-bars .today .d { color: var(--fg); font-weight: 600; }
-.bodymap .mzr { cursor: pointer; transition: opacity .15s; }
-.bodymap .mzr:active { opacity: .7; }
+.body-wrap { position: relative; }
+.body-cv { width: 100%; max-width: 420px; height: auto; display: block; margin: 0 auto; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.body-load { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; margin: 0; min-height: 200px; }
+.body-lab { display: flex; justify-content: space-around; max-width: 420px; margin: -4px auto 0; width: 100%; }
+.body-leg { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.body-leg i { width: 12px; height: 12px; border-radius: 4px; display: inline-block; margin-left: 6px; }
+.body-leg .l1 { background: rgb(240,153,123); } .body-leg .l2 { background: rgb(232,97,60); } .body-leg .l3 { background: rgb(217,48,28); }
