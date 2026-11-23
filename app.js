@@ -248,18 +248,65 @@ function avgBetween(from, to) {
   const a = S.weights.filter(x => x.d >= from && x.d <= to);
   return a.length ? a.reduce((s, x) => s + x.w, 0) / a.length : null;
 }
+/* ---- profil: cel (redukcja / utrzymanie / masa), kalorie, tłuszcz z obwodów ---- */
+const GOALS = { cut: { l: 'Redukcja', dir: -1 }, keep: { l: 'Utrzymanie', dir: 0 }, bulk: { l: 'Masa', dir: 1 } };
+const goalType = () => GOALS[S.profile.goalType] ? S.profile.goalType : 'cut';
+const goalDir = () => GOALS[goalType()].dir;
+// klasa koloru dla zmiany wagi: zielona, gdy zmiana idzie w stronę celu
+const wcls = delta => { const d = goalDir(); if (!delta || !d) return ''; return Math.sign(delta) === d ? 'down' : 'up'; };
+const ACTIVITY = [
+  { k: 1.2, l: 'Siedzący tryb, mało ruchu' },
+  { k: 1.375, l: 'Lekka aktywność (1–3 treningi/tydz.)' },
+  { k: 1.55, l: 'Średnia aktywność (3–5 treningów/tydz.)' },
+  { k: 1.725, l: 'Duża aktywność (6–7 treningów/tydz.)' },
+  { k: 1.9, l: 'Bardzo duża (praca fizyczna + treningi)' },
+];
+const ageNow = () => S.profile.born ? new Date().getFullYear() - S.profile.born : null;
+// Zapotrzebowanie kaloryczne: BMR wzorem Mifflina-St Jeora × aktywność, ± deficyt/nadwyżka z tempa (7700 kcal ≈ 1 kg)
+function calories(weight) {
+  const p = S.profile, age = ageNow();
+  if (!weight || !p.height || !p.sex || !age || !p.activity) return null;
+  const bmr = 10 * weight + 6.25 * p.height * 100 - 5 * age + (p.sex === 'm' ? 5 : -161);
+  const tdee = bmr * p.activity, dir = goalDir(), rate = p.rate || (dir > 0 ? 0.25 : 0.5);
+  const floor = p.sex === 'm' ? 1500 : 1200;
+  const raw = tdee + dir * rate * 7700 / 7, target = dir ? Math.max(floor, raw) : tdee;
+  return { bmr, tdee, target, rate, dir, clamped: dir < 0 && raw < floor };
+}
+// % tkanki tłuszczowej z obwodów (wzór US Navy, cm). Mężczyźni: szyja + brzuch na wysokości pępka; kobiety: szyja + talia + biodra.
+function navyFat(v) {
+  const p = S.profile; if (!v || !p.height || !p.sex) return null;
+  const h = p.height * 100, neck = v.neck;
+  if (p.sex === 'm') {
+    const waist = v.belly ?? v.waist; if (!neck || !waist || waist <= neck) return null;
+    return 495 / (1.0324 - 0.19077 * Math.log10(waist - neck) + 0.15456 * Math.log10(h)) - 450;
+  }
+  const waist = v.waist ?? v.belly, hips = v.hips; if (!neck || !waist || !hips || waist + hips <= neck) return null;
+  return 495 / (1.29579 - 0.35004 * Math.log10(waist + hips - neck) + 0.22100 * Math.log10(h)) - 450;
+}
+const navySeries = () => S.measures.map(x => ({ d: x.d, w: navyFat(x.v) })).filter(x => x.w != null && x.w > 2 && x.w < 70).map(x => ({ d: x.d, w: Math.round(x.w * 10) / 10 }));
+// tygodnie od poniedziałku: ile treningów w danym tygodniu
+const weekStart = d => addDays(d, -((parseD(d).getDay() + 6) % 7));
+const workoutsInWeek = ws => S.workouts.filter(w => w.date >= ws && w.date <= addDays(ws, 6)).length;
+function weeklyStreak() {
+  const t = S.profile.weekly; if (!t) return 0;
+  let ws = weekStart(today()), n = workoutsInWeek(ws) >= t ? 1 : 0; // bieżący tydzień liczy się, gdy już wykonany
+  for (ws = addDays(ws, -7); workoutsInWeek(ws) >= t; ws = addDays(ws, -7)) n++;
+  return n;
+}
+
 function stats() {
   const w = S.weights; if (!w.length) return null;
-  const h = S.profile.height, goal = S.profile.goalLoss;
+  const h = S.profile.height, goal = S.profile.goalLoss, dir = goalDir();
   const first = w[0], lastE = w[w.length - 1];
   const start = first.w, cur = lastE.w, last = lastE.d;
   const bmi = h ? cur / (h * h) : null;
   const lost = start - cur;
+  const prog = dir ? (cur - start) * dir : null; // postęp w stronę celu (kg)
   const ref30 = [...w].reverse().find(x => x.d <= addDays(last, -30));
   const prev = w.length > 1 ? w[w.length - 2] : null;
   return {
-    start, cur, last, day: daysBetween(first.d, last) + 1, bmi, cat: bmiCat(bmi), lost, goal,
-    pct: goal ? lost / goal * 100 : null, target: goal ? start - goal : null,
+    start, cur, last, day: daysBetween(first.d, last) + 1, bmi, cat: bmiCat(bmi), lost, goal, prog, dir,
+    pct: goal && dir ? prog / goal * 100 : null, target: goal && dir ? start + dir * goal : null,
     wk: avgBetween(addDays(last, -6), last), pwk: avgBetween(addDays(last, -13), addDays(last, -7)),
     m30: ref30 ? ref30.w - cur : null, prevDiff: prev ? cur - prev.w : null,
   };
@@ -317,17 +364,37 @@ function positiveFacts() {
   const out = [], st = stats(), w = S.weights;
   const kg = v => fmt(v, v >= 10 ? 1 : v >= 1 ? 1 : 2) + ' kg';
   if (st) {
-    if (st.lost >= 0.1) {
-      out.push(`Od startu masz już <b>${kg(st.lost)}</b> mniej. Tyle waży mniej więcej ${plural(Math.max(1, Math.round(st.lost / 0.2)), 'kostka', 'kostki', 'kostek')} masła.`);
-      if (st.day > 6) out.push(`Średnio ubywa ci <b>${kg(st.lost / st.day * 7)}</b> na tydzień od startu. Stałe tempo to najlepsze tempo.`);
+    const g = goalType();
+    if (g === 'cut') {
+      if (st.lost >= 0.1) {
+        out.push(`Od startu masz już <b>${kg(st.lost)}</b> mniej. Tyle waży mniej więcej ${plural(Math.max(1, Math.round(st.lost / 0.2)), 'kostka', 'kostki', 'kostek')} masła.`);
+        if (st.day > 6) out.push(`Średnio ubywa ci <b>${kg(st.lost / st.day * 7)}</b> na tydzień od startu. Stałe tempo to najlepsze tempo.`);
+      }
+      if (st.m30 != null && st.m30 >= 0.1) out.push(`W ostatnich 30 dniach waga spadła o <b>${kg(st.m30)}</b>.`);
+      if (st.wk != null && st.pwk != null && st.pwk - st.wk >= 0.05) out.push(`Średnia waga z ostatnich 7 dni jest o <b>${kg(st.pwk - st.wk)}</b> niższa niż średnia z tygodnia wcześniej.`);
+      const min = Math.min(...w.map(x => x.w));
+      if (w.length > 2 && st.cur <= min && st.cur < st.start) out.push(`Ostatni pomiar to <b>najniższa waga</b> od początku pomiarów: ${fmt(st.cur, 1)} kg.`);
+      const h = S.profile.height;
+      if (h && st.lost > 0) { const d = (st.start - st.cur) / (h * h); if (d >= 0.1) out.push(`Twoje BMI spadło od startu o <b>${fmt(d, 1)}</b>.`); }
+    } else if (g === 'bulk') {
+      const gain = -st.lost;
+      if (gain >= 0.1) {
+        out.push(`Od startu masz już <b>+${kg(gain)}</b>. Budowanie masy idzie do przodu.`);
+        if (st.day > 13) { const r = gain / st.day * 7; out.push(`Przybierasz średnio <b>${kg(r)}</b> na tydzień${r <= 0.5 ? '. Spokojne tempo to więcej mięśni, mniej tłuszczu.' : '.'}`); }
+      }
+      if (st.m30 != null && -st.m30 >= 0.1) out.push(`W ostatnich 30 dniach waga wzrosła o <b>${kg(-st.m30)}</b>.`);
+      const max = Math.max(...w.map(x => x.w));
+      if (w.length > 2 && st.cur >= max && st.cur > st.start) out.push(`Ostatni pomiar to <b>najwyższa waga</b> od początku pomiarów: ${fmt(st.cur, 1)} kg.`);
+    } else {
+      // utrzymanie: pozytywne jest to, że waga stoi w miejscu
+      const recent = w.filter(x => x.d >= addDays(st.last, -29));
+      if (recent.length >= 4) {
+        const span = Math.max(...recent.map(x => x.w)) - Math.min(...recent.map(x => x.w));
+        if (span <= 2) out.push(`Przez ostatnie 30 dni waga trzyma się w przedziale <b>${kg(span)}</b>. Utrzymanie wychodzi ci świetnie.`);
+      }
+      if (Math.abs(st.lost) <= 1 && st.day >= 14) out.push(`Od startu waga zmieniła się tylko o <b>${kg(Math.abs(st.lost))}</b>. Stabilnie!`);
     }
-    if (st.m30 != null && st.m30 >= 0.1) out.push(`W ostatnich 30 dniach waga spadła o <b>${kg(st.m30)}</b>.`);
-    if (st.wk != null && st.pwk != null && st.pwk - st.wk >= 0.05) out.push(`Średnia waga z ostatnich 7 dni jest o <b>${kg(st.pwk - st.wk)}</b> niższa niż średnia z tygodnia wcześniej.`);
     if (st.pct != null && st.pct >= 1) out.push(st.pct >= 100 ? `Cel osiągnięty! Masz za sobą <b>${fmt(st.pct, 0)}%</b> zaplanowanej drogi. 🎉` : `Masz za sobą <b>${fmt(st.pct, 0)}%</b> drogi do celu.${st.pct >= 50 ? ' Z górki!' : ''}`);
-    const min = Math.min(...w.map(x => x.w));
-    if (w.length > 2 && st.cur <= min && st.cur < st.start) out.push(`Ostatni pomiar to <b>najniższa waga</b> od początku pomiarów: ${fmt(st.cur, 1)} kg.`);
-    const h = S.profile.height;
-    if (h && st.lost > 0) { const d = (st.start - st.cur) / (h * h); if (d >= 0.1) out.push(`Twoje BMI spadło od startu o <b>${fmt(d, 1)}</b>.`); }
     if (w.length >= 5) out.push(`Zapisanych pomiarów wagi: <b>${w.length}</b>. Regularność to połowa sukcesu.`);
     if (st.day >= 7) out.push(`To już <b>${st.day}.</b> dzień twojej drogi. Dobrze, że jesteś dalej w grze.`);
     // najdłuższa seria dni z ważeniem pod rząd
@@ -369,7 +436,11 @@ function positiveFacts() {
     const prs = Object.values(prTimeline().byW).reduce((s, a) => s + a.length, 0);
     if (prs >= 1) out.push(`Pobitych rekordów osobistych: <b>${prs}</b> 🏆`);
   }
-  [['waist', 'Talia'], ['belly', 'Brzuch'], ['hips', 'Biodra']].forEach(([k, l]) => {
+  const streak = weeklyStreak();
+  if (streak >= 2) out.push(`<b>${plural(streak, 'tydzień', 'tygodnie', 'tygodni')} z rzędu</b> z wykonanym planem treningów (${S.profile.weekly}/tydz.). 🔥`);
+  const nf = navySeries();
+  if (nf.length >= 2 && nf[0].w - nf[nf.length - 1].w >= 0.3) out.push(`Tkanka tłuszczowa (z obwodów) spadła o <b>${fmt(nf[0].w - nf[nf.length - 1].w, 1)} pkt proc.</b> od pierwszego pomiaru.`);
+  if (goalType() !== 'bulk') [['waist', 'Talia'], ['belly', 'Brzuch'], ['hips', 'Biodra']].forEach(([k, l]) => {
     const xs = S.measures.filter(x => x.v && x.v[k] != null);
     if (xs.length >= 2) { const d = xs[0].v[k] - xs[xs.length - 1].v[k]; if (d >= 0.5) out.push(`${l}: <b>−${fmt(d, 1)} cm</b> od pierwszego pomiaru.`); }
   });
@@ -384,6 +455,32 @@ function factCardHTML() {
 function wireFact(root) {
   const c = $('#fact-card', root); if (!c) return;
   c.onclick = () => { UI.fact = (UI.fact || 0) + 1; c.outerHTML = factCardHTML(); wireFact(root); };
+}
+
+// Kafelek „Kalorie”: zapotrzebowanie z profilu albo zachęta do uzupełnienia profilu
+function kcalCardHTML(st) {
+  const ref = st.wk != null ? st.wk : st.cur, k = calories(ref);
+  if (!k) return navCard('wiecej', '🔥', 'Dzienne kalorie', 'Uzupełnij w Ustawieniach płeć, rok urodzenia i aktywność, a policzę zapotrzebowanie');
+  const r = n => fmt(Math.round(n / 10) * 10, 0);
+  const what = k.dir < 0 ? `na redukcję −${fmtN(k.rate)} kg/tydz.` : k.dir > 0 ? `na masę +${fmtN(k.rate)} kg/tydz.` : 'na utrzymanie wagi';
+  return `<button class="card nav-card kcal" type="button" id="kcal-card"><span class="nav-ic" aria-hidden="true">🔥</span>
+    <span class="grow"><span class="small muted">Dzienne kalorie ${what}</span><b class="kcal-v num">~${r(k.target)} kcal</b>
+    <span class="small muted">utrzymanie ~${r(k.tdee)} kcal${k.clamped ? ' · ograniczone do bezpiecznego minimum' : ''}</span></span><span class="chev" aria-hidden="true">›</span></button>`;
+}
+function showKcal() {
+  const st = stats(); if (!st) return;
+  const ref = st.wk != null ? st.wk : st.cur, k = calories(ref); if (!k) { setTab('wiecej'); return; }
+  const r = n => fmt(Math.round(n / 10) * 10, 0), act = ACTIVITY.find(a => a.k === S.profile.activity);
+  openSheet('Dzienne kalorie', `
+    <div class="card">
+      <div class="row"><span>Podstawowa przemiana materii (BMR)</span><b class="num">${r(k.bmr)} kcal</b></div>
+      <div class="row"><span>× aktywność ${fmtN(S.profile.activity)}</span><b class="num">${r(k.tdee)} kcal</b></div>
+      ${k.dir ? `<div class="row"><span>${k.dir < 0 ? 'Deficyt' : 'Nadwyżka'} na ${fmtN(k.rate)} kg/tydz.</span><b class="num">${k.dir < 0 ? '−' : '+'}${r(k.rate * 1100)} kcal</b></div>` : ''}
+      <hr class="sep"><div class="row"><b>Cel na dzień</b><b class="num">~${r(k.target)} kcal</b></div>
+    </div>
+    <p class="muted small" style="margin:0">Liczone wzorem Mifflina-St Jeora z wagi ${fmt(ref, 1)} kg (średnia z 7 dni), wzrostu, wieku (${ageNow()} lat) i płci. Aktywność: ${esc(act ? act.l : '')}. 1 kg tkanki ≈ 7700 kcal.${k.clamped ? ' Wynik podniosłem do bezpiecznego minimum, więc tempo będzie wolniejsze.' : ''}</p>
+    <p class="muted small" style="margin:0">To szacunek. Jeśli przez 2–3 tygodnie waga zmienia się wolniej albo szybciej, niż zakładasz, skoryguj kalorie o 100–200 kcal.</p>
+    <button class="btn block" type="button" data-close>OK</button>`);
 }
 
 // Duże liczby w kafelku wagi: jeśli nie mieszczą się w swojej kolumnie (np. szersza czcionka iPhone'a), zmniejsz je
@@ -431,21 +528,23 @@ function renderDieta() {
       <section class="card hero">
         <div class="hero-nums">
           <div><h3>Aktualna waga</h3><div class="big">${fmt(st.cur, 2)}<small>kg</small></div></div>
-          <div class="lost"><h3>Od startu</h3><div class="big ${st.lost > 0 ? 'down' : st.lost < 0 ? 'up' : ''}">${st.lost > 0 ? '−' : st.lost < 0 ? '+' : ''}${fmt(Math.abs(st.lost), 2)}<small>kg</small></div></div>
+          <div class="lost"><h3>Od startu</h3><div class="big ${wcls(-st.lost)}">${st.lost > 0 ? '−' : st.lost < 0 ? '+' : ''}${fmt(Math.abs(st.lost), 2)}<small>kg</small></div></div>
         </div>
-        <div class="muted small">dzień ${st.day} · ostatni pomiar ${dayLabel(st.last)}</div>
-        ${st.prevDiff != null ? `<div class="small ${st.prevDiff > 0 ? 'up' : st.prevDiff < 0 ? 'down' : 'muted'}">${fmtSigned(st.prevDiff, 2)} kg od poprzedniego pomiaru</div>` : ''}
+        <div class="muted small">${GOALS[goalType()].l} · dzień ${st.day} · ostatni pomiar ${dayLabel(st.last)}</div>
+        ${st.prevDiff != null ? `<div class="small ${wcls(st.prevDiff) || 'muted'}">${fmtSigned(st.prevDiff, 2)} kg od poprzedniego pomiaru</div>` : ''}
         ${pct != null ? `
           <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct}%"></i></div>
-          <div class="row small"><span>Zrzucone <b class="num">${fmt(st.lost, 2)}</b> z ${fmt(st.goal, 1)} kg</span><b class="num">${fmt(st.pct, 0)}%</b></div>
-          <div class="muted small">Start ${fmt(st.start, 1)} kg → cel ${fmt(st.target, 1)} kg · zostało ${fmt(Math.max(0, st.cur - st.target), 1)} kg</div>`
-        : `<div class="muted small">Zrzucone ${fmt(st.lost, 2)} kg od startu (${fmt(st.start, 1)} kg). Ustaw cel w Ustawieniach.</div>`}
+          <div class="row small"><span>${st.dir > 0 ? 'Przybrane' : 'Zrzucone'} <b class="num">${fmt(st.prog, 2)}</b> z ${fmt(st.goal, 1)} kg</span><b class="num">${fmt(st.pct, 0)}%</b></div>
+          <div class="muted small">Start ${fmt(st.start, 1)} kg → cel ${fmt(st.target, 1)} kg · zostało ${fmt(Math.max(0, (st.target - st.cur) * st.dir), 1)} kg</div>`
+        : goalType() === 'keep' ? `<div class="muted small">Utrzymanie wagi startowej ${fmt(st.start, 1)} kg · teraz ${fmtSigned(st.cur - st.start, 1)} kg</div>`
+        : `<div class="muted small">${st.dir > 0 ? 'Przybrane' : 'Zrzucone'} ${fmt(st.prog, 2)} kg od startu (${fmt(st.start, 1)} kg). Ustaw cel w Ustawieniach.</div>`}
       </section>
       <div class="tiles">
         <div class="tile">${bmiTileHTML(st.bmi)}</div>
-        <div class="tile"><span class="k">Średnia 7 dni</span><span class="v">${fmt(st.wk, 1)}</span><span class="d ${wkDiff > 0 ? 'up' : wkDiff < 0 ? 'down' : ''}">${wkDiff != null ? fmtSigned(wkDiff, 2) + ' kg / tydz.' : 'za mało danych'}</span></div>
-        <div class="tile"><span class="k">Ostatnie 30 dni</span><span class="v ${st.m30 > 0 ? 'down' : st.m30 < 0 ? 'up' : ''}">${st.m30 != null ? fmtSigned(-st.m30, 1) : '–'}</span><span class="d">kg</span></div>
+        <div class="tile"><span class="k">Średnia 7 dni</span><span class="v">${fmt(st.wk, 1)}</span><span class="d ${wcls(wkDiff)}">${wkDiff != null ? fmtSigned(wkDiff, 2) + ' kg / tydz.' : 'za mało danych'}</span></div>
+        <div class="tile"><span class="k">Ostatnie 30 dni</span><span class="v ${st.m30 != null ? wcls(-st.m30) : ''}">${st.m30 != null ? fmtSigned(-st.m30, 1) : '–'}</span><span class="d">kg</span></div>
       </div>
+      ${kcalCardHTML(st)}
       ${cialoNavCard()}
       ${factCardHTML()}
       <section class="card chart">
@@ -465,7 +564,7 @@ function renderDieta() {
             const prev = list[list.indexOf(x) + 1];
             const df = prev ? x.w - prev.w : null;
             return `<button class="li" type="button" data-wd="${x.d}"><div class="grow"><div class="t">${dayLabel(x.d, { weekday: 'short', day: 'numeric', month: 'long' })}</div></div>
-              <div class="r"><div class="num"><b>${fmt(x.w, 2)}</b> kg</div>${df != null ? `<div class="small ${df > 0 ? 'up' : df < 0 ? 'down' : 'muted'}">${fmtSigned(df, 2)}</div>` : ''}</div></button>`;
+              <div class="r"><div class="num"><b>${fmt(x.w, 2)}</b> kg</div>${df != null ? `<div class="small ${wcls(df) || 'muted'}">${fmtSigned(df, 2)}</div>` : ''}</div></button>`;
           }).join('')}
         </div>
         ${list.length > 10 ? `<button class="link" type="button" id="w-more">${UI.showAll ? 'Pokaż mniej' : 'Pokaż wszystkie (' + list.length + ')'}</button>` : ''}
@@ -473,6 +572,7 @@ function renderDieta() {
     $$('[data-range]', body).forEach(b => b.addEventListener('click', () => { UI.range = +b.dataset.range; renderDieta(); }));
     wireFact(body);
     fitHero(body);
+    const kc = $('#kcal-card', body); if (kc) kc.onclick = showKcal;
     $$('[data-wd]', body).forEach(b => b.addEventListener('click', () => editWeight(b.dataset.wd)));
     const more = $('#w-more'); more && more.addEventListener('click', () => { UI.showAll = !UI.showAll; renderDieta(); });
   }
@@ -1071,7 +1171,11 @@ function renderTrening() {
       ${hist.length ? `
         <div class="tiles">
           <div class="tile"><span class="k">Treningi</span><span class="v">${hist.length}</span><span class="d">łącznie</span></div>
-          <div class="tile"><span class="k">Ten tydzień</span><span class="v">${hist.filter(w => w.date >= addDays(today(), -((new Date().getDay() + 6) % 7))).length}</span><span class="d">od poniedziałku</span></div>
+          ${(() => { const n = workoutsInWeek(weekStart(today())), t = S.profile.weekly, st = weeklyStreak();
+            return t ? `<div class="tile"><span class="k">Ten tydzień</span><span class="v">${n}<small class="muted">/${t}</small></span>
+              <div class="bar" style="margin:2px 0" aria-hidden="true"><i style="width:${Math.min(100, n / t * 100)}%"></i></div>
+              <span class="d ${n >= t ? 'down' : ''}">${n >= t ? 'plan wykonany ✓' : 'zostało ' + (t - n)}${st >= 2 ? ` · 🔥 ${st} tyg.` : ''}</span></div>`
+            : `<div class="tile"><span class="k">Ten tydzień</span><span class="v">${n}</span><span class="d">od poniedziałku</span></div>`; })()}
           <div class="tile"><span class="k">Ostatni</span><span class="v" style="font-size:17px">${dayLabel(hist[0].date)}</span><span class="d">${(n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : n + ' dni temu')(daysBetween(hist[0].date, today()))}</span></div>
         </div>
         <button class="btn block" type="button" id="t-prs">🏆 Rekordy osobiste</button>
@@ -1559,6 +1663,24 @@ function saveMeasure(entry, replaceDate) {
   if (i >= 0) S.measures[i] = entry; else S.measures.push(entry);
   sortMeasures(); save();
 }
+// Karta: % tkanki tłuszczowej policzony z obwodów (US Navy)
+function navyCardHTML() {
+  const p = S.profile, ser = navySeries();
+  const need = p.sex === 'f' ? 'szyję, talię i biodra' : 'szyję i brzuch (na wysokości pępka)';
+  if (!p.height || !p.sex) return `<section class="card"><h2>Tkanka tłuszczowa z obwodów</h2>
+    <p class="muted small" style="margin:0">Podaj w Ustawieniach wzrost i płeć, a policzę % tkanki tłuszczowej z obwodów (wzór US Navy).</p>
+    <button class="btn" type="button" data-go="wiecej">Uzupełnij profil</button></section>`;
+  if (!ser.length) return `<section class="card"><h2>Tkanka tłuszczowa z obwodów</h2>
+    <p class="muted small" style="margin:0">Zmierz ${need}, a policzę % tkanki tłuszczowej (wzór US Navy). Zaznacz te pomiary przez „Wybierz pomiary”.</p></section>`;
+  const cur = ser[ser.length - 1], diff = ser.length > 1 ? cur.w - ser[0].w : null;
+  return `<section class="card chart">
+    <div class="row"><h2>Tkanka tłuszczowa z obwodów</h2><span class="muted small">${dayLabel(cur.d)}</span></div>
+    <div class="row" style="align-items:flex-end"><span class="navy-v">${fmt(cur.w, 1)}<small class="muted" style="font-size:16px"> %</small></span>
+      ${diff != null ? `<span class="small ${diff < 0 ? 'down' : diff > 0 ? 'up' : 'muted'}">${fmtSigned(diff, 1)} pkt proc. od ${dayLabel(ser[0].d)}</span>` : ''}</div>
+    ${ser.length > 1 ? chartSVG(ser, 0) : ''}
+    <p class="muted small" style="margin:0">Szacunek z ${need}, wzrostu i płci. Błąd to zwykle ±3–4 pkt proc., ale trend w czasie jest wiarygodny, gdy mierzysz zawsze tak samo.</p>
+  </section>`;
+}
 function renderCialo() {
   const body = $('#cialo-body');
   const list = [...S.measures].reverse();
@@ -1584,7 +1706,8 @@ function renderCialo() {
         <div class="row"><h2>${curM.l}</h2><span class="muted small">${measUnit(curM)}</span></div>
         ${chartSVG(measSeries(curM.k), 0)}
         <p class="muted small" style="margin:0">Stuknij kafelek wyżej, żeby zobaczyć wykres innego pomiaru.</p>
-      </section>` : `
+      </section>
+      ${navyCardHTML()}` : `
       <div class="card empty"><strong>${last ? 'Brak danych dla wybranych pomiarów' : 'Zacznij mierzyć obwody'}</strong><span>Mierz się co 1–2 tygodnie, rano, w tym samym miejscu ciała. Talia i biodra często pokazują postęp, gdy waga stoi w miejscu.</span></div>`}
     <form class="card" id="meas-form" autocomplete="off">
       <div class="row"><h2>Nowy pomiar</h2><button class="link" type="button" id="meas-pick">Wybierz pomiary</button></div>
@@ -1877,11 +2000,26 @@ function renderWiecej() {
     </section>
     <section class="card">
       <h2>Profil</h2>
+      <p class="muted small" style="margin:0">Wszystkie pola są opcjonalne. Płeć, rok urodzenia i aktywność są potrzebne do kalorii i % tkanki tłuszczowej z obwodów. Te dane nie trafiają do udostępniania.</p>
       <div class="add-weight" style="grid-template-columns:1fr 1fr">
         <div class="field"><label for="p-h">Wzrost (m)</label><input type="number" id="p-h" inputmode="decimal" step="0.01" min="1" max="2.5" value="${p.height ?? ''}" placeholder="1.76"></div>
-        <div class="field"><label for="p-g">Cel: ile kg zrzucić</label><input type="number" id="p-g" inputmode="decimal" step="0.1" min="0" value="${p.goalLoss ?? ''}" placeholder="20"></div>
+        <div class="field"><label for="p-born">Rok urodzenia</label><input type="number" id="p-born" inputmode="numeric" step="1" min="1920" max="${new Date().getFullYear() - 10}" value="${p.born ?? ''}" placeholder="1998"></div>
       </div>
+      <div class="field"><span class="lbl">Płeć</span>
+        <div class="seg seg-full" role="group" aria-label="Płeć">${[['m', 'Mężczyzna'], ['f', 'Kobieta']].map(([v, l]) => `<button type="button" data-sex="${v}" aria-pressed="${p.sex === v}">${l}</button>`).join('')}</div></div>
+      <div class="field"><label for="p-act">Aktywność na co dzień</label>
+        <select id="p-act"><option value="">— wybierz —</option>${ACTIVITY.map(a => `<option value="${a.k}" ${p.activity === a.k ? 'selected' : ''}>${a.l}</option>`).join('')}</select></div>
+      <hr class="sep">
+      <div class="field"><span class="lbl">Cel</span>
+        <div class="seg seg-full" role="group" aria-label="Cel">${Object.entries(GOALS).map(([v, g]) => `<button type="button" data-goal="${v}" aria-pressed="${goalType() === v}">${g.l}</button>`).join('')}</div></div>
+      ${goalType() !== 'keep' ? `<div class="add-weight" style="grid-template-columns:1fr 1fr">
+        <div class="field"><label for="p-g">${goalType() === 'bulk' ? 'Ile kg przybrać' : 'Ile kg zrzucić'}</label><input type="number" id="p-g" inputmode="decimal" step="0.1" min="0" value="${p.goalLoss ?? ''}" placeholder="${goalType() === 'bulk' ? '5' : '10'}"></div>
+        <div class="field"><label for="p-rate">Tempo (kg/tydz.)</label><select id="p-rate">${(goalType() === 'bulk' ? [0.1, 0.25, 0.5] : [0.25, 0.5, 0.75, 1]).map(v => `<option value="${v}" ${(p.rate || (goalType() === 'bulk' ? 0.25 : 0.5)) === v ? 'selected' : ''}>${fmtN(v)}</option>`).join('')}</select></div>
+      </div>` : ''}
       <div class="muted small" id="p-info"></div>
+      <hr class="sep">
+      <div class="row"><span>Treningi w tygodniu (plan)</span>
+        <div class="stepper"><button class="icon-btn" type="button" data-wk="-1" aria-label="Mniej">−</button><b class="num" id="p-wk">${p.weekly || '–'}</b><button class="icon-btn" type="button" data-wk="1" aria-label="Więcej">+</button></div></div>
     </section>
     <section class="card">
       <h2>Kopia zapasowa w Excelu</h2>
@@ -1913,13 +2051,20 @@ function renderWiecej() {
   if (typeof renderShareCard === 'function') renderShareCard($('#share-card', body)); else $('#share-card', body).remove();
   const info = () => {
     const st = stats(), el = $('#p-info');
-    el.textContent = st && p.goalLoss ? `Waga docelowa: ${fmt(st.start - p.goalLoss, 1)} kg (start ${fmt(st.start, 1)} kg)` : '';
+    el.textContent = st && p.goalLoss && goalDir() ? `Waga docelowa: ${fmt(st.start + goalDir() * p.goalLoss, 1)} kg (start ${fmt(st.start, 1)} kg)` : '';
   };
+  const rerenderKeep = () => { const y = window.scrollY; renderWiecej(); window.scrollTo(0, y); };
+  $$('[data-sex]', body).forEach(b => b.onclick = () => { p.sex = b.dataset.sex; save(); rerenderKeep(); toast('Zapisano płeć'); });
+  $$('[data-goal]', body).forEach(b => b.onclick = () => { p.goalType = b.dataset.goal; save(); rerenderKeep(); toast('Cel: ' + GOALS[b.dataset.goal].l); });
+  $$('[data-wk]', body).forEach(b => b.onclick = () => { p.weekly = Math.max(0, Math.min(14, (p.weekly || 0) + +b.dataset.wk)) || null; save(); $('#p-wk').textContent = p.weekly || '–'; });
+  $('#p-born').addEventListener('change', e => { const v = Math.round(num(e.target.value)); p.born = v >= 1920 && v <= new Date().getFullYear() - 10 ? v : null; save(); toast(p.born ? 'Zapisano rok urodzenia' : 'Wpisz rok, np. 1998'); });
+  $('#p-act').addEventListener('change', e => { p.activity = num(e.target.value); save(); toast('Zapisano aktywność'); });
+  const pr = $('#p-rate'); if (pr) pr.addEventListener('change', e => { p.rate = num(e.target.value); save(); toast('Zapisano tempo'); });
   info();
   body.querySelectorAll('[data-accent]').forEach(b => b.onclick = () => { setTheme({ accent: b.dataset.accent }); body.querySelectorAll('[data-accent]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   body.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { setTheme({ mode: b.dataset.mode }); body.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   $('#p-h').addEventListener('change', e => { let v = num(e.target.value); if (v > 3) v = v / 100; p.height = v; save(); info(); toast('Zapisano wzrost'); });
-  $('#p-g').addEventListener('change', e => { p.goalLoss = num(e.target.value); save(); info(); toast('Zapisano cel'); });
+  const pg = $('#p-g'); if (pg) pg.addEventListener('change', e => { p.goalLoss = num(e.target.value); save(); info(); toast('Zapisano cel'); });
   $('#imp-xlsx').addEventListener('change', onXlsxPicked);
   $('#exp-xlsx').onclick = () => {
     if (!S.weights.length && !S.workouts.length && !S.fav.length && !S.plans.length && !(S.custom || []).length) { toast('Nie ma jeszcze danych do zapisania'); return; }

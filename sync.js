@@ -1,7 +1,7 @@
 'use strict';
 /* ============ SYNCHRONIZACJA W CHMURZE (Firebase: Authentication + Firestore, przez REST, bez bibliotek) ============
    - logowanie e-mailem i hasłem; każde konto widzi tylko swój dokument (reguły bezpieczeństwa Firestore)
-   - każda zmiana: po 2 s cała baza apki + aktualny plik Excel lecą do dokumentu backups/{uid}
+   - każda zmiana: po 2 s dane lecą do backups/{uid} (bez treningów) i backups/{uid}/years/{rok} (treningi z roku)
    - bez internetu: zmiany czekają i wysyłają się, gdy sieć wróci
    - przy otwarciu apki: jeśli w chmurze jest coś nowszego (np. z drugiego telefonu), apka to pobiera */
 
@@ -20,7 +20,7 @@ try { Object.assign(SY, JSON.parse(localStorage.getItem(SYNC_KEY) || '{}')); } c
 if (SY.session && !SY.session.idToken) SY.session = null; // sesja ze starej wersji (Supabase)
 SY.status = 'idle'; SY.error = '';
 function sySave() {
-  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ session: SY.session, lastSyncAt: SY.lastSyncAt, lastRemoteAt: SY.lastRemoteAt, dirty: SY.dirty, sharedPublished: SY.sharedPublished })); } catch (e) {}
+  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ session: SY.session, lastSyncAt: SY.lastSyncAt, lastRemoteAt: SY.lastRemoteAt, dirty: SY.dirty, sharedPublished: SY.sharedPublished, yearSeen: SY.yearSeen, splitBlocked: SY.splitBlocked })); } catch (e) {}
 }
 
 /* ---- błędy po polsku ---- */
@@ -102,7 +102,7 @@ async function cloudResetPassword(email) {
   await authPost('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 async function cloudLogout() {
-  SY.session = null; SY.lastRemoteAt = 0; SY.lastSyncAt = 0; SY.dirty = false; SY.sharedPublished = undefined; SY.status = 'idle'; sySave();
+  SY.session = null; SY.lastRemoteAt = 0; SY.lastSyncAt = 0; SY.dirty = false; SY.sharedPublished = undefined; SY.yearSeen = {}; SY.splitBlocked = false; SY.status = 'idle'; sySave();
   checkSpecialTheme(null);
 }
 
@@ -112,6 +112,24 @@ async function blobToB64(blob) {
   const u8 = new Uint8Array(await blob.arrayBuffer()); let s = '';
   for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
   return btoa(s);
+}
+/* Format 2 (rozdzielony):
+   - backups/{uid}: json = cała baza apki BEZ historii treningów, w niej wy = {rok: skrót treningów z roku}; fmt = 2; updatedAt
+   - backups/{uid}/years/{rok}: json = treningi z danego roku
+   Żaden dokument nie rośnie bez końca (limit Firestore: 1 MB na dokument), a wysyłane są tylko zmienione lata.
+   Format 1 (stary): wszystko w jednym json. Nadal go czytamy; przy zapisie przechodzi na format 2.
+   Gdy reguły Firestore nie pozwalają jeszcze na dokumenty roczne (403), apka zapisuje dalej format 1. */
+const yearUrl = (uid, y) => docUrl(uid) + '/years/' + encodeURIComponent(y);
+const wYear = w => /^\d{4}/.test(w.date || '') ? w.date.slice(0, 4) : '0000';
+function hashStr(s) { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(36) + s.length.toString(36); }
+function workoutsByYear(list) { const m = {}; list.forEach(w => (m[wYear(w)] = m[wYear(w)] || []).push(w)); return m; }
+const yearHash = list => hashStr(JSON.stringify([...(list || [])].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
+function setYear(y, list) { S.workouts = S.workouts.filter(w => wYear(w) !== y).concat(list); S.workouts.sort((a, b) => a.start - b.start); }
+async function pullYear(y) {
+  const r = await authed(yearUrl(SY.session.uid, y));
+  if (r.status === 404) return [];
+  const f = (await r.json()).fields || {};
+  try { const a = JSON.parse(f.json && f.json.stringValue || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
 }
 async function pullRemote() {
   const r = await authed(docUrl(SY.session.uid));
@@ -124,14 +142,45 @@ async function pullRemote() {
   let data = null;
   try { data = JSON.parse(f.json && f.json.stringValue || 'null'); } catch (e) {}
   if (!data) return null;
-  return { data, updatedAt: +(f.updatedAt && f.updatedAt.integerValue || 0), xlsx: f.xlsx && f.xlsx.bytesValue };
+  const fmt2 = +(f.fmt && f.fmt.integerValue || 0) === 2, years = fmt2 ? (data.wy || {}) : null;
+  if (fmt2) { data = Object.assign({}, data); delete data.wy; }
+  return { data, updatedAt: +(f.updatedAt && f.updatedAt.integerValue || 0), fmt2, years };
 }
-async function pushRemote() {
-  const now = Date.now();
-  const fields = { json: { stringValue: JSON.stringify(S) }, updatedAt: { integerValue: String(now) } };
-  try { fields.xlsx = { bytesValue: await blobToB64(backupXlsx()) }; } catch (e) {}
-  await authed(docUrl(SY.session.uid), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
+// Pełne dane z chmury, z treningami ze wszystkich lat (pierwsze logowanie)
+async function pullFull() {
+  const remote = await pullRemote(); if (!remote) return null;
+  if (remote.fmt2) {
+    const ws = []; for (const y of Object.keys(remote.years)) ws.push(...await pullYear(y));
+    remote.data.workouts = ws.sort((a, b) => a.start - b.start);
+    SY.yearSeen = Object.assign({}, remote.years);
+  }
+  return remote;
+}
+async function pushRemote(remoteYears) {
+  const now = Date.now(), uid = SY.session.uid, by = workoutsByYear(S.workouts), years = {};
+  Object.keys(by).forEach(y => years[y] = yearHash(by[y]));
+  // rok, z którego usunięto wszystkie treningi, zapisujemy jako pusty
+  Object.keys(remoteYears || {}).forEach(y => { if (!years[y]) { by[y] = []; years[y] = yearHash([]); } });
+  let split = true;
+  try {
+    for (const y of Object.keys(years)) {
+      if (remoteYears && remoteYears[y] === years[y]) continue; // ten rok się nie zmienił
+      await authed(yearUrl(uid, y), { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { json: { stringValue: JSON.stringify(by[y]) }, updatedAt: { integerValue: String(now) } } }) });
+    }
+    SY.splitBlocked = false;
+  } catch (e) {
+    if (e.status !== 403) throw e;
+    split = false; SY.splitBlocked = true; // stare reguły Firestore — zostań przy formacie 1
+  }
+  let fields;
+  if (split) {
+    const main = Object.assign({}, S); delete main.workouts; main.wy = years;
+    fields = { json: { stringValue: JSON.stringify(main) }, fmt: { integerValue: '2' }, updatedAt: { integerValue: String(now) } };
+  } else fields = { json: { stringValue: JSON.stringify(S) }, updatedAt: { integerValue: String(now) } };
+  await authed(docUrl(uid), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
   SY.lastRemoteAt = now;
+  if (split) SY.yearSeen = years;
   // Udostępniany wycinek (osobny dokument) — błąd tutaj nie psuje kopii zapasowej
   try { await pushShared(); SY.shareErr = ''; } catch (e) { SY.shareErr = e.message; }
 }
@@ -235,16 +284,44 @@ async function syncNow() {
   syncing = true; SY.status = 'sync'; updateSyncUI();
   try {
     const remote = await pullRemote();
-    const remoteNewer = remote && remote.updatedAt > SY.lastRemoteAt + 1000;
-    if (remoteNewer && !SY.dirty) {
-      adoptRemote(remote.data);            // ktoś zmienił dane na innym urządzeniu — pobierz
-      SY.lastRemoteAt = remote.updatedAt;
-    } else {
-      if (remoteNewer && SY.dirty) {        // zmiany i tu, i tam — połącz, potem wyślij
-        applyData(stateAsData(remote.data), false); save(true); rebuildExMap();
+    if (!remote) await pushRemote(null);
+    else {
+      const remoteNewer = remote.updatedAt > SY.lastRemoteAt + 1000;
+      let main = remote.data;
+      if (!remote.fmt2 && remoteNewer && SY.yearSeen && Object.keys(SY.yearSeen).length) {
+        // stary format zapisany przez starszą wersję apki już po przejściu na nowy:
+        // dołącz treningi z dokumentów rocznych, żeby żaden nie zginął
+        const extra = []; for (const y of Object.keys(SY.yearSeen)) extra.push(...await pullYear(y));
+        const ids = new Set((main.workouts || []).map(w => w.id));
+        main = Object.assign({}, main, { workouts: [...(main.workouts || []), ...extra.filter(w => !ids.has(w.id))] });
+      }
+      // 1) dane poza treningami (w starym formacie: wszystko)
+      if (remoteNewer && !SY.dirty) {         // ktoś zmienił dane na innym urządzeniu — pobierz
+        adoptRemote(remote.fmt2 ? Object.assign({}, main, { workouts: S.workouts }) : main);
+        SY.lastRemoteAt = remote.updatedAt;
+      } else if (remoteNewer && SY.dirty) {   // zmiany i tu, i tam — połącz, potem wyślij
+        applyData(stateAsData(main), false); save(true); rebuildExMap();
         if ($('#sheet').hidden) rerender();
       }
-      if (SY.dirty || !remote) await pushRemote();
+      // 2) treningi: pobierz tylko lata zmienione gdzie indziej
+      let differs = false;
+      if (remote.fmt2) {
+        SY.yearSeen = SY.yearSeen || {};
+        let changed = false;
+        for (const y of Object.keys(remote.years)) {
+          const rh = remote.years[y];
+          if (rh === SY.yearSeen[y]) continue;                                            // bez zmian od ostatniej synchronizacji
+          if (rh === yearHash(workoutsByYear(S.workouts)[y])) { SY.yearSeen[y] = rh; continue; } // to samo co w telefonie
+          const list = await pullYear(y);
+          if (SY.dirty) applyData({ workouts: list }, false); else setYear(y, list);
+          SY.yearSeen[y] = rh; changed = true;
+        }
+        if (changed) { save(true); rebuildExMap(); if ($('#sheet').hidden) rerender(); }
+        const local = workoutsByYear(S.workouts);
+        differs = [...new Set([...Object.keys(local), ...Object.keys(remote.years)])].some(y => yearHash(local[y]) !== remote.years[y]);
+      }
+      // 3) wysyłka (także jednorazowe przejście ze starego formatu na nowy)
+      if (SY.dirty || differs || (!remote.fmt2 && !SY.splitBlocked)) await pushRemote(remote.fmt2 ? remote.years : null);
     }
     SY.dirty = false; dirtySince = 0; SY.lastSyncAt = Date.now(); SY.status = 'ok'; SY.error = '';
   } catch (e) {
@@ -255,7 +332,8 @@ async function syncNow() {
   }
 }
 async function firstSyncAfterLogin() {
-  const remote = await pullRemote();
+  SY.yearSeen = {};
+  const remote = await pullFull();
   if (!remote) { SY.dirty = true; sySave(); await syncNow(); return; }
   if (!hasLocalData()) { adoptRemote(remote.data); SY.lastRemoteAt = remote.updatedAt; SY.lastSyncAt = Date.now(); SY.dirty = false; sySave(); return; }
   // Dane i w telefonie, i w chmurze — zapytaj
@@ -276,13 +354,11 @@ async function firstSyncAfterLogin() {
   rerender();
 }
 async function downloadCloudFile() {
-  try {
-    const remote = await pullRemote();
-    if (!remote || !remote.xlsx) { toast('W chmurze nie ma jeszcze pliku. Stuknij „Synchronizuj teraz”.'); return; }
-    const bin = atob(remote.xlsx), u8 = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-    shareOrDownload(`Rozpierdol-kopia-z-chmury-${today()}.xlsx`, new Blob([u8], { type: XLSX_MIME }));
-  } catch (e) { toast(e.message); }
+  // plik nie leży już w chmurze (zajmował miejsce w dokumencie) — po synchronizacji budujemy go z aktualnych danych
+  toast('Synchronizuję…');
+  await syncNow();
+  if (SY.status === 'error' || SY.status === 'offline') { toast('Nie udało się zsynchronizować: ' + (SY.error || 'brak internetu') + '. Plik będzie z danych w telefonie.'); }
+  shareOrDownload(`Rozpierdol-kopia-${today()}.xlsx`, backupXlsx());
 }
 
 /* ---- interfejs: sekcja „Konto i chmura” w Ustawieniach ---- */
@@ -307,7 +383,7 @@ function renderSyncCard(card) {
   }
   if (!SY.session) {
     card.innerHTML = `<h2>Konto i chmura</h2>
-      <p class="muted small" style="margin:0">Nie jesteś zalogowany, więc dane są tylko na tym telefonie. Po zalogowaniu każda zmiana sama zapisze się w chmurze, razem z plikiem Excel.</p>
+      <p class="muted small" style="margin:0">Nie jesteś zalogowany, więc dane są tylko na tym telefonie. Po zalogowaniu każda zmiana sama zapisze się w chmurze.</p>
       <button class="btn primary" type="button" id="sy-open">Zaloguj się lub załóż konto</button>`;
     card.querySelector('#sy-open').onclick = () => showAuthScreen();
     return;
@@ -315,9 +391,10 @@ function renderSyncCard(card) {
   card.innerHTML = `<h2>Konto i chmura</h2>
     <div class="row small"><span>Zalogowano jako</span><b style="overflow-wrap:anywhere;text-align:right">${esc(SY.session.email || '')}</b></div>
     <div class="small" id="sync-status" aria-live="polite">${syncStatusText()}</div>
+    ${SY.splitBlocked ? '<p class="small" style="margin:0;color:var(--bad)">Treningi zapisują się jeszcze w starym formacie (jeden dokument). Wklej w Firebase nowe reguły z instrukcji FIREBASE.md, a apka sama przejdzie na podział po latach.</p>' : ''}
     <div class="btns">
       <button class="btn" type="button" id="sy-now">Synchronizuj teraz</button>
-      <button class="btn" type="button" id="sy-file">Pobierz plik z chmury</button>
+      <button class="btn" type="button" id="sy-file">Pobierz kopię Excel</button>
     </div>
     <button class="link" type="button" id="sy-out" style="align-self:flex-start;color:var(--muted)">Wyloguj</button>`;
   card.querySelector('#sy-now').onclick = () => { SY.dirty = true; sySave(); syncNow(); };
