@@ -176,7 +176,7 @@ ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column;
 /* Pasek zakładek */
 .tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
@@ -834,4 +834,18 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .rest-choices .btn[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-fg);
+}
+
+/* 5 zakładek: dłuższa nazwa „Podsumowanie” nie może się łamać */
+.tabs button span {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabs button {
+  padding: 0 1px;
+  font-size: 10px;
+  letter-spacing: -.02em;
 }

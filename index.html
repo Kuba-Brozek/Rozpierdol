@@ -65,21 +65,31 @@
 </script>
 
 <main id="app">
-  <!-- DIETA -->
-  <section class="view" id="view-dieta" aria-labelledby="h-dieta">
-    <header class="vhead"><h1 id="h-dieta">Forma</h1><span class="vdate" id="dieta-date"></span></header>
+  <!-- PODSUMOWANIE -->
+  <section class="view" id="view-start" aria-labelledby="h-start">
+    <header class="vhead">
+      <h1 id="h-start">Podsumowanie</h1>
+      <span class="vdate" id="start-date"></span>
+    </header>
+    <div id="start-body"></div>
+  </section>
+
+  <!-- WAGA (identyfikator „dieta” zostaje dla zgodności) -->
+  <section class="view" id="view-dieta" hidden aria-labelledby="h-dieta">
+    <header class="vhead">
+      <h1 id="h-dieta">Waga</h1>
+    </header>
     <div id="dieta-body"></div>
   </section>
 
-  <!-- TRENING -->
   <section class="view" id="view-cialo" hidden aria-labelledby="h-cialo">
-    <button class="link back" type="button" data-go="dieta">‹ Forma</button>
+    <button class="link back" type="button" data-go="dieta">‹ Waga</button>
     <header class="vhead"><h1 id="h-cialo">Pomiary ciała</h1></header>
     <div id="cialo-body"></div>
   </section>
 
   <section class="view" id="view-miesnie" hidden aria-labelledby="h-miesnie">
-    <button class="link back" type="button" data-go="dieta">‹ Forma</button>
+    <button class="link back" type="button" data-go="start">‹ Podsumowanie</button>
     <header class="vhead"><h1 id="h-miesnie">Graf trenowanych partii mięśniowych</h1></header>
     <div id="miesnie-body"></div>
   </section>
@@ -111,9 +121,21 @@
 </main>
 
 <nav class="tabs" aria-label="Sekcje">
-  <button type="button" data-tab="dieta" aria-current="page">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg>
-    <span>Forma</span>
+  <button type="button" data-tab="start" aria-current="page">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8"/>
+      <circle cx="12" cy="12" r="4.5"/>
+      <circle cx="12" cy="12" r="1"/>
+    </svg>
+    <span>Podsumowanie</span>
+  </button>
+  <button type="button" data-tab="dieta">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="4"/>
+      <path d="M8.5 10a4.5 4.5 0 0 1 7 0"/>
+      <path d="M12 10.5l1.3-1.8"/>
+    </svg>
+    <span>Waga</span>
   </button>
   <button type="button" data-tab="trening">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8v8M3.5 10v4M18 8v8M20.5 10v4M6 12h12"/></svg>

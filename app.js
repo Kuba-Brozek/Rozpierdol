@@ -105,7 +105,7 @@ function thumbHTML(e, cls = 'thumb') {
 
 /* ============ Nawigacja ============ */
 // Ekrany bez własnej zakładki: otwierane przyciskiem z innej zakładki, która zostaje podświetlona
-const TAB_PARENT = { cialo: 'dieta', miesnie: 'dieta', cwiczenia: 'plany' };
+const TAB_PARENT = { cialo: 'dieta', miesnie: 'start', cwiczenia: 'plany' };
 function setTab(t, fromHistory) {
   UI.tab = t;
   if (!fromHistory) UI.sec = null; // zakładka z dolnego paska zawsze otwiera listę ustawień
@@ -187,7 +187,7 @@ if (navigator.standalone === true) {
   document.addEventListener('touchcancel', () => { if (sx != null && tracking) reset(); sx = null; });
 }
 function rerender() {
-  ({ dieta: renderDieta, cialo: renderCialo, miesnie: renderMiesnie, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
+  ({ start: renderStart, dieta: renderDieta, cialo: renderCialo, miesnie: renderMiesnie, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
 }
 $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 // przyciski „‹ Forma”, „Pomiary ciała ›” itp.
@@ -472,7 +472,7 @@ function wireFact(root) {
 }
 
 // Przełączniki kafelków na ekranie Forma (S.prefs, zapisywane w chmurze); domyślnie włączone
-const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu', '🔥'], ['fact', 'Losowy pozytywny fakt', 'kafelek nad wykresem wagi', '✨']];
+const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu', '🔥'], ['fact', 'Losowy pozytywny fakt', 'kafelek w Podsumowaniu', '✨']];
 const pref = k => !(S.prefs && S.prefs[k] === false);
 // Kafelek „Kalorie”: zapotrzebowanie z profilu albo zachęta do uzupełnienia profilu
 function kcalCardHTML(st) {
@@ -513,99 +513,262 @@ function fitHero(root = document) {
     while (tooWide() && size > 22) { size -= 1; bigs.forEach(b => b.style.fontSize = size + 'px'); }
   });
 }
-window.addEventListener('resize', () => { if (UI.tab === 'dieta') fitHero($('#dieta-body')); });
+window.addEventListener('resize', () => {
+  if (UI.tab === 'start') {
+    fitHero($('#start-body'));
+  }
+});
 
+/* ============ WAGA: wpis, wykres, lista pomiarów, pomiary ciała ============
+   (identyfikator zakładki to wciąż „dieta” — tak zapisują go starsze wersje i historia przeglądarki) */
 function renderDieta() {
-  $('#dieta-date').textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' });
   const st = stats();
   const body = $('#dieta-body');
+
   const form = `
     <form class="card" id="f-weight" autocomplete="off">
       <h2>Dzisiejszy pomiar</h2>
       <div class="add-weight">
-        <div class="field"><label for="w-date">Data</label><input type="date" id="w-date" value="${today()}" max="${today()}" required></div>
-        <div class="field"><label for="w-val">Waga (kg)</label><input type="number" id="w-val" inputmode="decimal" step="0.01" min="20" max="400" placeholder="${st ? fmt(st.cur, 1).replace(',', '.') : '80.0'}" required></div>
+        <div class="field">
+          <label for="w-date">Data</label>
+          <input type="date" id="w-date" value="${today()}" max="${today()}" required>
+        </div>
+        <div class="field">
+          <label for="w-val">Waga (kg)</label>
+          <input type="number" id="w-val" inputmode="decimal" step="0.01" min="20" max="400"
+            placeholder="${st ? fmt(st.cur, 1).replace(',', '.') : '80.0'}" required>
+        </div>
         <button class="btn primary" type="submit">Zapisz</button>
       </div>
     </form>`;
+
   if (!st) {
     body.innerHTML = `
       <div class="card empty">
         <strong>Zacznij śledzić wagę</strong>
         <span>Wpisz dzisiejszy pomiar poniżej albo zaimportuj swój arkusz z Excela (kolumny DATA i WAGA).</span>
-        <label class="btn primary file-btn">Importuj plik Excel<input type="file" id="imp-xlsx-empty" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+        <label class="btn primary file-btn">
+          Importuj plik Excel
+          <input type="file" id="imp-xlsx-empty" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        </label>
       </div>
       ${form}
-      ${cialoNavCard()}
-      ${musclesNavCard()}
-      ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w zakładce Ustawienia, żeby zobaczyć BMI i postęp do celu.</p>'}`;
+      ${cialoNavCard()}`;
     $('#imp-xlsx-empty').addEventListener('change', onXlsxPicked);
   } else {
-    const wkDiff = st.wk != null && st.pwk != null ? st.wk - st.pwk : null;
-    const pct = st.pct != null ? Math.max(0, Math.min(100, st.pct)) : null;
     const list = [...S.weights].reverse();
     const shown = UI.showAll ? list : list.slice(0, 10);
+
+    const ranges = [[30, '30 dni'], [90, '90 dni'], [0, 'Całość']]
+      .map(([v, l]) => `<button type="button" data-range="${v}" aria-pressed="${UI.range === v}">${l}</button>`)
+      .join('');
+
+    const rows = shown
+      .map(x => {
+        const prev = list[list.indexOf(x) + 1];
+        const df = prev ? x.w - prev.w : null;
+        const diff = df != null
+          ? `<div class="small ${wcls(df) || 'muted'}">${fmtSigned(df, 2)}</div>`
+          : '';
+        return `
+          <button class="li" type="button" data-wd="${x.d}">
+            <div class="grow">
+              <div class="t">${dayLabel(x.d, { weekday: 'short', day: 'numeric', month: 'long' })}</div>
+            </div>
+            <div class="r">
+              <div class="num"><b>${fmt(x.w, 2)}</b> kg</div>
+              ${diff}
+            </div>
+          </button>`;
+      })
+      .join('');
+
+    const moreBtn = list.length > 10
+      ? `<button class="link" type="button" id="w-more">${UI.showAll ? 'Pokaż mniej' : 'Pokaż wszystkie (' + list.length + ')'}</button>`
+      : '';
+
     body.innerHTML = `
-      <section class="card hero">
-        <div class="hero-nums">
-          <div><h3>Aktualna waga</h3><div class="big">${fmt(st.cur, 2)}<small>kg</small></div></div>
-          <div class="lost"><h3>Od startu</h3><div class="big ${wcls(-st.lost)}">${st.lost > 0 ? '−' : st.lost < 0 ? '+' : ''}${fmt(Math.abs(st.lost), 2)}<small>kg</small></div></div>
-        </div>
-        <div class="muted small">${GOALS[goalType()].l} · dzień ${st.day} · ostatni pomiar ${dayLabel(st.last)}</div>
-        ${typeof weighStreakHTML === 'function' ? weighStreakHTML() : ''}
-        ${st.prevDiff != null ? `<div class="small ${wcls(st.prevDiff) || 'muted'}">${fmtSigned(st.prevDiff, 2)} kg od poprzedniego pomiaru</div>` : ''}
-        ${pct != null ? `
-          <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct}%"></i></div>
-          <div class="row small"><span>${st.dir > 0 ? 'Przybrane' : 'Zrzucone'} <b class="num">${fmt(st.prog, 2)}</b> z ${fmt(st.goal, 1)} kg</span><b class="num">${fmt(st.pct, 0)}%</b></div>
-          <div class="muted small">Start ${fmt(st.start, 1)} kg → cel ${fmt(st.target, 1)} kg · zostało ${fmt(Math.max(0, (st.target - st.cur) * st.dir), 1)} kg</div>`
-        : goalType() === 'keep' ? `<div class="muted small">Utrzymanie wagi startowej ${fmt(st.start, 1)} kg · teraz ${fmtSigned(st.cur - st.start, 1)} kg</div>`
-        : `<div class="muted small">${st.dir > 0 ? 'Przybrane' : 'Zrzucone'} ${fmt(st.prog, 2)} kg od startu (${fmt(st.start, 1)} kg). Ustaw cel w Ustawieniach.</div>`}
-      </section>
-      <div class="tiles">
-        <div class="tile">${bmiTileHTML(st.bmi)}</div>
-        <div class="tile"><span class="k">Średnia 7 dni</span><span class="v">${fmt(st.wk, 1)}</span><span class="d ${wcls(wkDiff)}">${wkDiff != null ? fmtSigned(wkDiff, 2) + ' kg / tydz.' : 'za mało danych'}</span></div>
-        <div class="tile"><span class="k">Ostatnie 30 dni</span><span class="v ${st.m30 != null ? wcls(-st.m30) : ''}">${st.m30 != null ? fmtSigned(-st.m30, 1) : '–'}</span><span class="d">kg</span></div>
-      </div>
-      ${pref('kcal') ? kcalCardHTML(st) : ''}
-      ${cialoNavCard()}
-      ${musclesNavCard()}
-      ${pref('fact') ? factCardHTML() : ''}
+      ${form}
       <section class="card chart">
-        <div class="row"><h2>Waga</h2>
-          <div class="seg" role="group" aria-label="Zakres wykresu">
-            ${[[30, '30 dni'], [90, '90 dni'], [0, 'Całość']].map(([v, l]) => `<button type="button" data-range="${v}" aria-pressed="${UI.range === v}">${l}</button>`).join('')}
-          </div>
+        <div class="row">
+          <h2>Wykres</h2>
+          <div class="seg" role="group" aria-label="Zakres wykresu">${ranges}</div>
         </div>
         ${chartSVG()}
         <div class="legend"><span><i></i>waga z pomiarów (kg)</span></div>
       </section>
-      ${form}
       <section class="view" style="gap:10px">
-        <div class="row"><h3>Pomiary</h3><span class="muted small">${S.weights.length} wpisów</span></div>
-        <div class="list">
-          ${shown.map((x, i) => {
-            const prev = list[list.indexOf(x) + 1];
-            const df = prev ? x.w - prev.w : null;
-            return `<button class="li" type="button" data-wd="${x.d}"><div class="grow"><div class="t">${dayLabel(x.d, { weekday: 'short', day: 'numeric', month: 'long' })}</div></div>
-              <div class="r"><div class="num"><b>${fmt(x.w, 2)}</b> kg</div>${df != null ? `<div class="small ${wcls(df) || 'muted'}">${fmtSigned(df, 2)}</div>` : ''}</div></button>`;
-          }).join('')}
+        <div class="row">
+          <h3>Pomiary</h3>
+          <span class="muted small">${S.weights.length} wpisów</span>
         </div>
-        ${list.length > 10 ? `<button class="link" type="button" id="w-more">${UI.showAll ? 'Pokaż mniej' : 'Pokaż wszystkie (' + list.length + ')'}</button>` : ''}
-      </section>`;
-    $$('[data-range]', body).forEach(b => b.addEventListener('click', () => { UI.range = +b.dataset.range; renderDieta(); }));
-    wireFact(body);
-    fitHero(body);
-    const kc = $('#kcal-card', body); if (kc) kc.onclick = showKcal;
-    $$('[data-wd]', body).forEach(b => b.addEventListener('click', () => editWeight(b.dataset.wd)));
-    const more = $('#w-more'); more && more.addEventListener('click', () => { UI.showAll = !UI.showAll; renderDieta(); });
+        <div class="list">${rows}</div>
+        ${moreBtn}
+      </section>
+      ${cialoNavCard()}`;
+
+    $$('[data-range]', body).forEach(b => {
+      b.addEventListener('click', () => {
+        UI.range = +b.dataset.range;
+        renderDieta();
+      });
+    });
+    $$('[data-wd]', body).forEach(b => {
+      b.addEventListener('click', () => editWeight(b.dataset.wd));
+    });
+    const more = $('#w-more');
+    if (more) {
+      more.addEventListener('click', () => {
+        UI.showAll = !UI.showAll;
+        renderDieta();
+      });
+    }
   }
+
   $('#f-weight').addEventListener('submit', e => {
     e.preventDefault();
-    const d = $('#w-date').value || today(), w = num($('#w-val').value);
-    if (!w || w < 20 || w > 400) { toast('Wpisz wagę w kilogramach, np. 108.4'); return; }
-    setWeight(d, Math.round(w * 100) / 100); toast('Zapisano ' + fmt(w, 2) + ' kg'); renderDieta();
+    const d = $('#w-date').value || today();
+    const w = num($('#w-val').value);
+    if (!w || w < 20 || w > 400) {
+      toast('Wpisz wagę w kilogramach, np. 108.4');
+      return;
+    }
+    setWeight(d, Math.round(w * 100) / 100);
+    toast('Zapisano ' + fmt(w, 2) + ' kg');
+    renderDieta();
   });
 }
+/* ============ PODSUMOWANIE: ogólne liczby w jednym miejscu ============
+   Kafelek z wagą i celem, BMI / średnia / 30 dni, seria ważenia, kalorie, fakt dnia,
+   podsumowanie miesiąca i skróty (graf partii, odznaki). Wpisy wagi są w zakładce Waga. */
+function heroHTML(st) {
+  const pct = st.pct != null
+    ? Math.max(0, Math.min(100, st.pct))
+    : null;
+  const lostSign = st.lost > 0 ? '−' : st.lost < 0 ? '+' : '';
+
+  let goalPart;
+  if (pct != null) {
+    goalPart = `
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}">
+        <i style="width:${pct}%"></i>
+      </div>
+      <div class="row small">
+        <span>${st.dir > 0 ? 'Przybrane' : 'Zrzucone'} <b class="num">${fmt(st.prog, 2)}</b> z ${fmt(st.goal, 1)} kg</span>
+        <b class="num">${fmt(st.pct, 0)}%</b>
+      </div>
+      <div class="muted small">
+        Start ${fmt(st.start, 1)} kg → cel ${fmt(st.target, 1)} kg · zostało ${fmt(Math.max(0, (st.target - st.cur) * st.dir), 1)} kg
+      </div>`;
+  } else if (goalType() === 'keep') {
+    goalPart = `<div class="muted small">Utrzymanie wagi startowej ${fmt(st.start, 1)} kg · teraz ${fmtSigned(st.cur - st.start, 1)} kg</div>`;
+  } else {
+    goalPart = `<div class="muted small">${st.dir > 0 ? 'Przybrane' : 'Zrzucone'} ${fmt(st.prog, 2)} kg od startu (${fmt(st.start, 1)} kg). Ustaw cel w Ustawieniach.</div>`;
+  }
+
+  return `
+    <section class="card hero">
+      <div class="hero-nums">
+        <div>
+          <h3>Aktualna waga</h3>
+          <div class="big">${fmt(st.cur, 2)}<small>kg</small></div>
+        </div>
+        <div class="lost">
+          <h3>Od startu</h3>
+          <div class="big ${wcls(-st.lost)}">${lostSign}${fmt(Math.abs(st.lost), 2)}<small>kg</small></div>
+        </div>
+      </div>
+      <div class="muted small">${GOALS[goalType()].l} · dzień ${st.day} · ostatni pomiar ${dayLabel(st.last)}</div>
+      ${typeof weighStreakHTML === 'function' ? weighStreakHTML() : ''}
+      ${st.prevDiff != null
+        ? `<div class="small ${wcls(st.prevDiff) || 'muted'}">${fmtSigned(st.prevDiff, 2)} kg od poprzedniego pomiaru</div>`
+        : ''}
+      ${goalPart}
+    </section>`;
+}
+
+function statTilesHTML(st) {
+  const wkDiff = st.wk != null && st.pwk != null
+    ? st.wk - st.pwk
+    : null;
+
+  return `
+    <div class="tiles">
+      <div class="tile">${bmiTileHTML(st.bmi)}</div>
+      <div class="tile">
+        <span class="k">Średnia 7 dni</span>
+        <span class="v">${fmt(st.wk, 1)}</span>
+        <span class="d ${wcls(wkDiff)}">${wkDiff != null ? fmtSigned(wkDiff, 2) + ' kg / tydz.' : 'za mało danych'}</span>
+      </div>
+      <div class="tile">
+        <span class="k">Ostatnie 30 dni</span>
+        <span class="v ${st.m30 != null ? wcls(-st.m30) : ''}">${st.m30 != null ? fmtSigned(-st.m30, 1) : '–'}</span>
+        <span class="d">kg</span>
+      </div>
+    </div>`;
+}
+
+function renderStart() {
+  $('#start-date').textContent = new Date().toLocaleDateString('pl-PL', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+
+  const st = stats();
+  const body = $('#start-body');
+
+  const badgesCard = typeof badgeCount === 'function'
+    ? `<button class="card nav-card" type="button" id="st-badges">
+        <span class="nav-ic" aria-hidden="true">🎖️</span>
+        <span class="grow">
+          <b>Odznaki</b>
+          <span class="small muted">zdobyte ${badgeCount()}</span>
+        </span>
+        <span class="chev" aria-hidden="true">›</span>
+      </button>`
+    : '';
+
+  const weightPart = st
+    ? `
+      ${heroHTML(st)}
+      ${statTilesHTML(st)}
+      ${pref('kcal') ? kcalCardHTML(st) : ''}
+      ${pref('fact') ? factCardHTML() : ''}`
+    : `
+      <div class="card empty">
+        <strong>Zacznij od wagi</strong>
+        <span>Wpisz pierwszy pomiar w zakładce Waga, a tu pojawi się podsumowanie: postęp do celu, BMI, średnie i ciekawostki.</span>
+        <button class="btn primary" type="button" data-go="dieta">Przejdź do Wagi</button>
+      </div>`;
+
+  body.innerHTML = `
+    ${weightPart}
+    ${typeof monthSummaryHTML === 'function' ? monthSummaryHTML() : ''}
+    ${musclesNavCard()}
+    ${badgesCard}
+    ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w zakładce Ustawienia, żeby zobaczyć BMI i postęp do celu.</p>'}`;
+
+  if (st) {
+    wireFact(body);
+    fitHero(body);
+    const kc = $('#kcal-card', body);
+    if (kc) {
+      kc.onclick = showKcal;
+    }
+  }
+
+  const ms = $('#month-sum', body);
+  if (ms && typeof wireMonthSummary === 'function') {
+    wireMonthSummary(ms);
+  }
+
+  const bd = $('#st-badges', body);
+  if (bd) {
+    bd.onclick = () => showBadges();
+  }
+}
+
 function editWeight(d) {
   const e = S.weights.find(x => x.d === d); if (!e) return;
   openSheet(dayLabel(d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), `
@@ -1300,7 +1463,7 @@ function musclesNavCard() {
   const n = Object.values(muscleSets(7)).reduce((s, o) => s + o.main, 0);
   return navCard('miesnie', '💪', 'Graf trenowanych partii mięśniowych', n ? `ostatnie 7 dni: ${plural(n, 'seria', 'serie', 'serii')}` : 'serie na każdą partię z ostatnich 7 dni');
 }
-// Osobny ekran w zakładce Forma
+// Osobny ekran pod Podsumowaniem
 function renderMiesnie() {
   const body = $('#miesnie-body');
   body.innerHTML = bodyMapHTML();
@@ -1364,7 +1527,6 @@ function renderTrening() {
               <span class="d ${n >= t ? 'down' : ''}">${n >= t ? 'plan wykonany ✓' : 'zostało ' + (t - n)}</span></div>`; })()}
           <div class="tile"><span class="k">Ostatni</span><span class="v" style="font-size:17px">${dayLabel(hist[0].date)}</span><span class="d">${(n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : n + ' dni temu')(daysBetween(hist[0].date, today()))}</span></div>
         </div>
-        ${typeof monthSummaryHTML === 'function' ? monthSummaryHTML() : ''}
         <div class="btns"><button class="btn" type="button" id="t-prs">🏆 Rekordy</button><button class="btn" type="button" id="t-badges">🎖️ Odznaki${typeof badgeCount === 'function' ? ` <span class="muted">${badgeCount()}</span>` : ''}</button></div>
         <h3>Historia</h3>
         <div class="list">${hist.map(w => `
@@ -1385,7 +1547,9 @@ function renderTrening() {
     $('#t-start').onclick = startWorkoutSheet;
     const prb = $('#t-prs', body); if (prb) prb.onclick = showRecords;
     const bdg = $('#t-badges', body); if (bdg) bdg.onclick = () => typeof showBadges === 'function' && showBadges();
-    const ms = $('#month-sum', body); if (ms && typeof wireMonthSummary === 'function') wireMonthSummary(ms);    $$('[data-w]', body).forEach(b => b.onclick = () => showWorkout(b.dataset.w));
+    $$('[data-w]', body).forEach(b => {
+      b.onclick = () => showWorkout(b.dataset.w);
+    });
     return;
   }
   const editing = !!A.editId;
@@ -2218,7 +2382,7 @@ function renderWiecej() {
       </div>
     </section>
     <section class="card" data-sec="dieta">
-      <h2>Ekran Forma</h2>
+      <h2>Ekran Podsumowanie</h2>
       <div class="pref-list">${PREFS.map(([k, l, s, ic]) => `<label class="pref-row"><span class="pref-ic" aria-hidden="true">${ic}</span>
         <span class="grow"><span class="pref-l">${l}</span><span class="small muted">${s}</span></span>
         <input type="checkbox" class="switch" role="switch" data-pref="${k}" ${pref(k) ? 'checked' : ''}></label>`).join('')}</div>
@@ -2308,7 +2472,7 @@ function renderWiecej() {
     <section class="card about" data-sec="about">
       <p class="big-note" style="text-align:left">Cześć! 👋</p>
       <p>Wszystko zaczęło się od zwykłego pliku Excel. Codziennie rano nowy wiersz: data i waga. Obok formuły liczyły BMI, zrzucone kilogramy, procent celu i średnią tygodniową, a w osobnej kolumnie świeciła brutalnie szczera „rodzaj otyłości”. Wzrost i cel miały swoje stałe komórki, żeby żadna formuła się nie zgubiła.</p>
-      <p>Działało, ale wpisywanie wagi w Excelu na telefonie o 7 rano to sport ekstremalny. W końcu padło pytanie: „a może by tak zrobić to porządnie?”. Tak powstał Rozpierdol. Zakładka Forma wciąż liczy to samo co tamten arkusz, a kopia zapasowa zapisuje się w jego układzie.</p>
+      <p>Działało, ale wpisywanie wagi w Excelu na telefonie o 7 rano to sport ekstremalny. W końcu padło pytanie: „a może by tak zrobić to porządnie?”. Tak powstał Rozpierdol. Zakładki Podsumowanie i Waga wciąż liczą to samo co tamten arkusz, a kopia zapasowa zapisuje się w jego układzie.</p>
       <p>Teraz liczy treningi, rekordy, kalorie i ma motyw tak różowy, że aż boli.</p>
       <p>Robię ją sam, za darmo i bez reklam. Pomysły i błędy wrzucaj do „Sugestii”.</p>
       <p><i>Kurwy niech giną pod ciepłą pierzyną, a zwycięzcy mają czuć chłód zwycięstwa.</i> 💪</p>
@@ -2372,7 +2536,7 @@ function renderWiecej() {
 /* ---- Ustawienia jak w iPhonie: lista pozycji, każda otwiera osobny ekran ---- */
 const SECS = [
   ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], ['lock', '🔒', 'Blokada apki'], null,
-  ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Forma'], ['wyglad', '🎨', 'Wygląd'], null,
+  ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Podsumowanie'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
   ['log', '🆕', 'Co nowego'], ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
 ];
@@ -2474,6 +2638,15 @@ $('#wiecej-back').addEventListener('click', () => goBack());
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
   {
+    id: 8,
+    t: 'Podsumowanie i Waga',
+    items: [
+      'Nowa pierwsza zakładka <b>Podsumowanie</b>: aktualna waga, wynik od startu, postęp do celu, BMI, średnia 7 dni, ostatnie 30 dni, kalorie, fakt dnia i seria ważenia.',
+      'Jest tam też <b>podsumowanie miesiąca</b> oraz skróty do grafu partii mięśniowych i odznak.',
+      'Wpisy wagi, wykres i lista pomiarów są w osobnej zakładce <b>Waga</b>, razem z Pomiarami ciała.',
+    ],
+  },
+  {
     id: 7,
     t: 'Statystyki, odznaki i timer',
     items: [
@@ -2483,7 +2656,7 @@ const CHANGELOG = [
       '<b>Podsumowanie miesiąca</b> w zakładce Trening: treningi, serie, objętość, czas, rekordy i zmiana wagi.',
       'Graf partii mięśniowych pokazuje teraz okres <b>7, 14 albo 30 dni</b>.',
       '<b>Odznaki</b> za treningi, rekordy, ciężary, ważenie i cele (Trening → 🎖️ Odznaki).',
-      '<b>Seria dni ważenia</b> 🔥 w zakładce Forma.',
+      '<b>Seria dni ważenia</b> 🔥 w Podsumowaniu.',
     ],
   },
   { id: 6, t: 'Blokada apki', items: [
@@ -2556,7 +2729,7 @@ function hideSplash() {
 setTimeout(hideSplash, 6000); // zabezpieczenie: ekran startowy znika zawsze, nawet po błędzie niżej
 try { applyTheme(getTheme()); } catch (e) { console.error(e); }
 rebuildExMap();
-try { setTab(S.active ? 'trening' : 'dieta'); } catch (e) { console.error(e); }
+try { setTab(S.active ? 'trening' : 'start'); } catch (e) { console.error(e); }
 loadExercises().finally(hideSplash);
 setTimeout(() => { try { whatsNew(); } catch (e) { console.error(e); } }, 2600);
 
@@ -2566,7 +2739,17 @@ setTimeout(() => {
     checkBadges();
   }
 }, 4000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && UI.tab === 'dieta') renderDieta(); });
+// po powrocie do apki odśwież ekrany z „dzisiejszymi” liczbami
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    return;
+  }
+  if (UI.tab === 'start') {
+    renderStart();
+  } else if (UI.tab === 'dieta') {
+    renderDieta();
+  }
+});
 // Apka działa z pamięci telefonu. Nowa wersja pobiera się w tle (raz), a potem proponujemy odświeżenie.
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;

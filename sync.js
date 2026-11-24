@@ -291,7 +291,7 @@ async function fetchAccountCreated() {
     sySave();
     if (await checkBlocked()) return;
     if (!hadDate) touchUser(true);
-    if (!hadDate && UI.tab === 'dieta' && $('#sheet').hidden) renderDieta();
+    if (!hadDate && UI.tab === 'start' && $('#sheet').hidden) renderStart();
     if (UI.tab === 'wiecej' && $('#sheet').hidden) renderWiecej();
   } catch (e) { /* bez tych danych apka działa normalnie */ }
 }
