@@ -746,15 +746,6 @@ function wireWeightTrend(el) {
     ? '<p class="muted small" style="margin:0">Za mało pomiarów w tym okresie.</p>'
     : trendSVG(pts, st && st.target);
 
-  // zmiana średniej z 7 dni od początku okresu do dziś
-  const avg = movingAvg(pts);
-  const change = avg.length > 1
-    ? avg[avg.length - 1].w - avg[0].w
-    : null;
-  const changeTxt = change == null
-    ? ''
-    : `<span class="${wcls(change)}">${fmtSigned(change, 1)} kg</span> w tym okresie (średnia z 7 dni)`;
-
   el.innerHTML = `
     <div class="row">
       <h2>Waga</h2>
@@ -766,7 +757,6 @@ function wireWeightTrend(el) {
       <span><i class="dots"></i>pomiary</span>
       ${st && st.target ? '<span><i class="goal"></i>cel</span>' : ''}
     </div>
-    ${changeTxt ? `<p class="small" style="margin:0">${changeTxt}</p>` : ''}
     <button class="link" type="button" data-go="dieta">Wszystkie wpisy ›</button>`;
 
   $$('[data-tr]', el).forEach(b => {
