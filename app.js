@@ -718,22 +718,31 @@ function renderStart() {
   const st = stats();
   const body = $('#start-body');
 
-  const badgesCard = typeof badgeCount === 'function'
+  const has = name => typeof window[name] === 'function';
+
+  const achCard = has('badgeCount')
     ? `<button class="card nav-card" type="button" id="st-badges">
-        <span class="nav-ic" aria-hidden="true">🎖️</span>
+        <span class="nav-ic" aria-hidden="true">🏅</span>
         <span class="grow">
-          <b>Odznaki</b>
+          <b>Osiągnięcia</b>
           <span class="small muted">zdobyte ${badgeCount()}</span>
         </span>
         <span class="chev" aria-hidden="true">›</span>
       </button>`
     : '';
 
-  const weightPart = st
+  // kolejność: waga i cel → poziom → liczby → partie (paski + sylwetka) → trend wagi → reszta
+  const muscles = `
+    ${has('muscleBarsHTML') ? muscleBarsHTML() : ''}
+    ${musclesNavCard()}`;
+
+  const top = st
     ? `
       ${heroHTML(st)}
+      ${has('levelCardHTML') ? levelCardHTML() : ''}
       ${statTilesHTML(st)}
-      ${typeof weightTrendHTML === 'function' ? weightTrendHTML() : ''}
+      ${muscles}
+      ${has('weightTrendHTML') ? weightTrendHTML() : ''}
       ${pref('kcal') ? kcalCardHTML(st) : ''}
       ${pref('fact') ? factCardHTML() : ''}`
     : `
@@ -741,15 +750,20 @@ function renderStart() {
         <strong>Zacznij od wagi</strong>
         <span>Wpisz pierwszy pomiar w zakładce Waga, a tu pojawi się podsumowanie: postęp do celu, BMI, średnie i ciekawostki.</span>
         <button class="btn primary" type="button" data-go="dieta">Przejdź do Wagi</button>
-      </div>`;
+      </div>
+      ${has('levelCardHTML') ? levelCardHTML() : ''}
+      ${muscles}`;
 
   body.innerHTML = `
-    ${weightPart}
-    ${typeof monthSummaryHTML === 'function' ? monthSummaryHTML() : ''}
-    ${typeof muscleBarsHTML === 'function' ? muscleBarsHTML() : ''}
-    ${musclesNavCard()}
-    ${badgesCard}
+    ${top}
+    ${has('monthSummaryHTML') ? monthSummaryHTML() : ''}
+    ${achCard}
     ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w zakładce Ustawienia, żeby zobaczyć BMI i postęp do celu.</p>'}`;
+
+  const lv = $('#level-card', body);
+  if (lv) {
+    lv.onclick = () => showLevels();
+  }
 
   if (st) {
     wireFact(body);
@@ -1539,7 +1553,10 @@ function renderTrening() {
               <span class="d ${n >= t ? 'down' : ''}">${n >= t ? 'plan wykonany ✓' : 'zostało ' + (t - n)}</span></div>`; })()}
           <div class="tile"><span class="k">Ostatni</span><span class="v" style="font-size:17px">${dayLabel(hist[0].date)}</span><span class="d">${(n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : n + ' dni temu')(daysBetween(hist[0].date, today()))}</span></div>
         </div>
-        <div class="btns"><button class="btn" type="button" id="t-prs">🏆 Rekordy</button><button class="btn" type="button" id="t-badges">🎖️ Odznaki${typeof badgeCount === 'function' ? ` <span class="muted">${badgeCount()}</span>` : ''}</button></div>
+        <div class="btns">
+          <button class="btn" type="button" id="t-prs">🏆 Rekordy</button>
+          <button class="btn" type="button" id="t-badges">🏅 Osiągnięcia</button>
+        </div>
         <h3>Historia</h3>
         <div class="list">${hist.map(w => `
           <button class="li" type="button" data-w="${w.id}">
@@ -2650,6 +2667,16 @@ $('#wiecej-back').addEventListener('click', () => goBack());
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
   {
+    id: 9,
+    t: 'Poziomy i osiągnięcia',
+    items: [
+      '<b>Poziomy</b>: zbierasz XP za treningi, serie, rekordy, ważenie, pomiary ciała i osiągnięcia. Jest 20 poziomów, od Świeżaka do Rozpierdola. Stuknij kartę poziomu w zakładce Postęp, żeby zobaczyć, ile XP masz z czego.',
+      'Odznaki to teraz <b>Osiągnięcia</b>. Jest ich 44 w pięciu grupach: treningi, siła, rekordy, regularność oraz waga i ciało.',
+      'Przy awansie na wyższy poziom i przy nowym osiągnięciu wyskakują gratulacje.',
+      'W zakładce Postęp paski partii i graf sylwetki są teraz nad wykresem wagi.',
+    ],
+  },
+  {
     id: 8,
     t: 'Postęp i Waga',
     items: [
@@ -2668,7 +2695,7 @@ const CHANGELOG = [
       '<b>Wykres postępu</b> w szczegółach ćwiczenia: szacowany 1RM i objętość z każdego treningu.',
       '<b>Podsumowanie miesiąca</b> w zakładce Trening: treningi, serie, objętość, rekordy i zmiana wagi.',
       'Graf partii mięśniowych pokazuje teraz okres <b>7, 14 albo 30 dni</b>.',
-      '<b>Odznaki</b> za treningi, rekordy, ciężary, ważenie i cele (Trening → 🎖️ Odznaki).',
+      '<b>Osiągnięcia</b> za treningi, rekordy, ciężary, ważenie i cele (Trening → 🏅 Osiągnięcia).',
       '<b>Seria dni ważenia</b> 🔥 w zakładce Postęp.',
     ],
   },

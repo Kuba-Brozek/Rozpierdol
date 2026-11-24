@@ -948,3 +948,110 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   font-weight: 700;
   text-align: right;
 }
+
+/* poziom użytkownika */
+.level-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.level-card .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.level-card .bprog {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.lvl-t {
+  font-size: 15px;
+}
+
+.lvl-badge {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--accent-fg);
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.lvl-badge.sm {
+  width: 30px;
+  height: 30px;
+  font-size: 13px;
+  box-shadow: none;
+}
+
+.lvl-badge.big {
+  width: 84px;
+  height: 84px;
+  font-size: 36px;
+  box-shadow: 0 0 0 8px var(--accent-soft);
+}
+
+.lvl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lvl-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  opacity: .5;
+}
+
+.lvl-row .lvl-badge {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.lvl-row.done {
+  opacity: .85;
+}
+
+.lvl-row.done .lvl-badge,
+.lvl-row.cur .lvl-badge {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.lvl-row.cur {
+  opacity: 1;
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.lvl-up {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  text-align: center;
+}
+
+.lvl-up b {
+  font-size: 22px;
+}

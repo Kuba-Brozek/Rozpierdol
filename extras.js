@@ -331,38 +331,106 @@ function weighStreakHTML() {
 }
 
 
-/* ---------- odznaki ---------- */
+/* ---------- osiągnięcia ---------- */
 
-// k = który licznik z badgeVals(), g = ile trzeba, u = jednostka do paska postępu
-const BADGES = [
-  { id: 'w1', ic: '🎉', t: 'Pierwszy trening', d: 'Zapisz pierwszy trening', k: 'w', g: 1 },
-  { id: 'w10', ic: '💪', t: '10 treningów', d: 'Zapisz 10 treningów', k: 'w', g: 10 },
-  { id: 'w50', ic: '🦾', t: '50 treningów', d: 'Zapisz 50 treningów', k: 'w', g: 50 },
-  { id: 'w100', ic: '🏛️', t: '100 treningów', d: 'Zapisz 100 treningów', k: 'w', g: 100 },
-  { id: 'kg100', ic: '🏋️', t: 'Pierwsze 100 kg', d: 'Seria z ciężarem 100 kg lub więcej', k: 'kg', g: 100, u: ' kg' },
-  { id: 'ton10', ic: '🚛', t: '10 ton', d: 'Objętość jednego treningu: 10 000 kg', k: 'vol', g: 10000, u: ' kg' },
-  { id: 'pr10', ic: '🏆', t: '10 rekordów', d: 'Pobij 10 rekordów osobistych', k: 'pr', g: 10 },
-  { id: 'pr50', ic: '👑', t: '50 rekordów', d: 'Pobij 50 rekordów osobistych', k: 'pr', g: 50 },
-  { id: 'drop', ic: '↘️', t: 'Dropset', d: 'Zrób pierwszy dropset', k: 'drop', g: 1 },
-  { id: 'wk4', ic: '📅', t: 'Plan na 4 tygodnie', d: 'Cel treningów na tydzień 4 tygodnie z rzędu', k: 'wk', g: 4 },
-  { id: 's7', ic: '🔥', t: 'Tydzień ważenia', d: 'Waż się 7 dni z rzędu', k: 'st', g: 7 },
-  { id: 's30', ic: '☄️', t: 'Miesiąc ważenia', d: 'Waż się 30 dni z rzędu', k: 'st', g: 30 },
-  { id: 'm5', ic: '📏', t: 'Pod kontrolą', d: 'Zapisz 5 pomiarów ciała', k: 'ms', g: 5 },
-  { id: 'goal', ic: '🎯', t: 'Cel osiągnięty', d: 'Osiągnij cel wagi z profilu', k: 'goal', g: 100, u: '%' },
+// k = który licznik z achVals(), g = ile trzeba, u = jednostka do paska postępu, c = kategoria
+const ACH_CATS = [
+  ['tr', '💪 Treningi'],
+  ['si', '🏋️ Siła'],
+  ['re', '🏆 Rekordy'],
+  ['rg', '🔥 Regularność'],
+  ['ci', '⚖️ Waga i ciało'],
 ];
 
-function badgeVals() {
+const BADGES = [
+  // treningi
+  { c: 'tr', id: 'w1', ic: '🎉', t: 'Pierwszy trening', d: 'Zapisz pierwszy trening', k: 'w', g: 1 },
+  { c: 'tr', id: 'w10', ic: '💪', t: '10 treningów', d: 'Zapisz 10 treningów', k: 'w', g: 10 },
+  { c: 'tr', id: 'w25', ic: '🥉', t: '25 treningów', d: 'Zapisz 25 treningów', k: 'w', g: 25 },
+  { c: 'tr', id: 'w50', ic: '🦾', t: '50 treningów', d: 'Zapisz 50 treningów', k: 'w', g: 50 },
+  { c: 'tr', id: 'w100', ic: '🏛️', t: '100 treningów', d: 'Zapisz 100 treningów', k: 'w', g: 100 },
+  { c: 'tr', id: 'w200', ic: '🗿', t: '200 treningów', d: 'Zapisz 200 treningów', k: 'w', g: 200 },
+  { c: 'tr', id: 'set500', ic: '🔁', t: '500 serii', d: 'Zrób łącznie 500 serii', k: 'sets', g: 500 },
+  { c: 'tr', id: 'set2k', ic: '♾️', t: '2000 serii', d: 'Zrób łącznie 2000 serii', k: 'sets', g: 2000 },
+  { c: 'tr', id: 'ex20', ic: '🧭', t: 'Odkrywca', d: 'Zrób 20 różnych ćwiczeń', k: 'exN', g: 20 },
+  { c: 'tr', id: 'plan3', ic: '📋', t: 'Planista', d: 'Ułóż 3 plany treningowe', k: 'plans', g: 3 },
+  { c: 'tr', id: 'early', ic: '🌅', t: 'Ranny ptaszek', d: 'Zacznij trening przed 7:00', k: 'early', g: 1 },
+  { c: 'tr', id: 'late', ic: '🦉', t: 'Nocny marek', d: 'Zacznij trening po 22:00', k: 'late', g: 1 },
+  // siła
+  { c: 'si', id: 'kg60', ic: '🥈', t: '60 kg na sztandze', d: 'Seria z ciężarem 60 kg lub więcej', k: 'kg', g: 60, u: ' kg' },
+  { c: 'si', id: 'kg100', ic: '🏋️', t: 'Pierwsze 100 kg', d: 'Seria z ciężarem 100 kg lub więcej', k: 'kg', g: 100, u: ' kg' },
+  { c: 'si', id: 'kg140', ic: '🦍', t: '140 kg', d: 'Seria z ciężarem 140 kg lub więcej', k: 'kg', g: 140, u: ' kg' },
+  { c: 'si', id: 'kg200', ic: '🐘', t: '200 kg', d: 'Seria z ciężarem 200 kg lub więcej', k: 'kg', g: 200, u: ' kg' },
+  { c: 'si', id: 'ton5', ic: '🚚', t: '5 ton', d: 'Objętość jednego treningu: 5000 kg', k: 'vol', g: 5000, u: ' kg' },
+  { c: 'si', id: 'ton10', ic: '🚛', t: '10 ton', d: 'Objętość jednego treningu: 10 000 kg', k: 'vol', g: 10000, u: ' kg' },
+  { c: 'si', id: 'ton20', ic: '🚂', t: '20 ton', d: 'Objętość jednego treningu: 20 000 kg', k: 'vol', g: 20000, u: ' kg' },
+  { c: 'si', id: 'tot100', ic: '🏗️', t: '100 ton łącznie', d: 'Podnieś łącznie 100 000 kg', k: 'volT', g: 100000, u: ' kg' },
+  { c: 'si', id: 'tot1k', ic: '🌋', t: '1000 ton łącznie', d: 'Podnieś łącznie 1 000 000 kg', k: 'volT', g: 1000000, u: ' kg' },
+  // rekordy
+  { c: 're', id: 'pr1', ic: '⭐', t: 'Pierwszy rekord', d: 'Pobij pierwszy rekord osobisty', k: 'pr', g: 1 },
+  { c: 're', id: 'pr10', ic: '🏆', t: '10 rekordów', d: 'Pobij 10 rekordów osobistych', k: 'pr', g: 10 },
+  { c: 're', id: 'pr25', ic: '🥇', t: '25 rekordów', d: 'Pobij 25 rekordów osobistych', k: 'pr', g: 25 },
+  { c: 're', id: 'pr50', ic: '👑', t: '50 rekordów', d: 'Pobij 50 rekordów osobistych', k: 'pr', g: 50 },
+  { c: 're', id: 'pr100', ic: '💎', t: '100 rekordów', d: 'Pobij 100 rekordów osobistych', k: 'pr', g: 100 },
+  { c: 're', id: 'drop', ic: '↘️', t: 'Dropset', d: 'Zrób pierwszy dropset', k: 'drop', g: 1 },
+  { c: 're', id: 'drop25', ic: '🪜', t: 'Mistrz dropsetów', d: 'Zrób 25 dropsetów', k: 'drop', g: 25 },
+  // regularność
+  { c: 'rg', id: 'wk4', ic: '📅', t: 'Plan na 4 tygodnie', d: 'Cel treningów na tydzień 4 tygodnie z rzędu', k: 'wk', g: 4 },
+  { c: 'rg', id: 'wk8', ic: '🗓️', t: 'Plan na 8 tygodni', d: 'Cel treningów na tydzień 8 tygodni z rzędu', k: 'wk', g: 8 },
+  { c: 'rg', id: 'wk12', ic: '🏁', t: 'Kwartał bez wymówek', d: 'Cel treningów na tydzień 12 tygodni z rzędu', k: 'wk', g: 12 },
+  { c: 'rg', id: 'mo6', ic: '🌗', t: 'Pół roku w grze', d: 'Treningi w 6 różnych miesiącach', k: 'mo', g: 6 },
+  { c: 'rg', id: 's7', ic: '🔥', t: 'Tydzień ważenia', d: 'Waż się 7 dni z rzędu', k: 'st', g: 7 },
+  { c: 'rg', id: 's14', ic: '🔥', t: '2 tygodnie ważenia', d: 'Waż się 14 dni z rzędu', k: 'st', g: 14 },
+  { c: 'rg', id: 's30', ic: '☄️', t: 'Miesiąc ważenia', d: 'Waż się 30 dni z rzędu', k: 'st', g: 30 },
+  { c: 'rg', id: 's100', ic: '🌟', t: '100 dni ważenia', d: 'Waż się 100 dni z rzędu', k: 'st', g: 100 },
+  // waga i ciało
+  { c: 'ci', id: 'wi30', ic: '⚖️', t: '30 ważeń', d: 'Zapisz 30 pomiarów wagi', k: 'wi', g: 30 },
+  { c: 'ci', id: 'wi100', ic: '📈', t: '100 ważeń', d: 'Zapisz 100 pomiarów wagi', k: 'wi', g: 100 },
+  { c: 'ci', id: 'wi365', ic: '📆', t: 'Rok na wadze', d: 'Zapisz 365 pomiarów wagi', k: 'wi', g: 365 },
+  { c: 'ci', id: 'm5', ic: '📏', t: 'Pod kontrolą', d: 'Zapisz 5 pomiarów ciała', k: 'ms', g: 5 },
+  { c: 'ci', id: 'm20', ic: '📐', t: 'Krawiec', d: 'Zapisz 20 pomiarów ciała', k: 'ms', g: 20 },
+  { c: 'ci', id: 'g25', ic: '🎯', t: 'Ćwierć drogi', d: '25% drogi do celu wagi', k: 'goal', g: 25, u: '%' },
+  { c: 'ci', id: 'g50', ic: '🎯', t: 'Półmetek', d: '50% drogi do celu wagi', k: 'goal', g: 50, u: '%' },
+  { c: 'ci', id: 'goal', ic: '🏅', t: 'Cel osiągnięty', d: 'Osiągnij cel wagi z profilu', k: 'goal', g: 100, u: '%' },
+];
+
+function achVals() {
   let kg = 0;
   let vol = 0;
+  let volT = 0;
   let drop = 0;
+  let sets = 0;
+  let early = 0;
+  let late = 0;
+  const exIds = new Set();
+  const months = new Set();
 
   S.workouts.forEach(w => {
-    vol = Math.max(vol, volume(w));
+    const v = volume(w);
+    vol = Math.max(vol, v);
+    volT += v;
+    months.add((w.date || '').slice(0, 7));
+
+    // godzina startu tylko dla treningów zapisanych „na żywo” (start ≠ koniec)
+    if (w.start && w.end && w.end - w.start > 60000) {
+      const h = new Date(w.start).getHours();
+      if (h < 7) {
+        early++;
+      }
+      if (h >= 22) {
+        late++;
+      }
+    }
 
     w.ex.forEach(e => {
-      if (isCardio(EXMAP[e.id])) {
+      const ex = EXMAP[e.id];
+      if (e.sets.some(filled)) {
+        exIds.add(e.id);
+      }
+      if (isCardio(ex)) {
         return;
       }
+      sets += countSets(e.sets);
       e.sets
         .filter(filled)
         .forEach(s => {
@@ -383,12 +451,20 @@ function badgeVals() {
 
   return {
     w: S.workouts.length,
+    sets,
     kg,
     vol,
+    volT,
     drop,
+    early,
+    late,
+    exN: exIds.size,
+    mo: months.size,
+    plans: S.plans.length,
     pr: prCount,
     wk: weeklyStreak(),
     st: bestWeighStreak(),
+    wi: S.weights.length,
     ms: (S.measures || []).length,
     goal: st && st.pct != null
       ? Math.floor(st.pct)
@@ -396,13 +472,128 @@ function badgeVals() {
   };
 }
 
+// stara nazwa (używana w innych miejscach)
+const badgeVals = achVals;
+
 const badgeEarned = (b, v) => (v[b.k] || 0) >= b.g;
 
 function badgeCount() {
-  const v = badgeVals();
+  const v = achVals();
   const got = BADGES.filter(b => badgeEarned(b, v)).length;
   return `${got}/${BADGES.length}`;
 }
+
+
+/* ---------- poziomy użytkownika (XP) ---------- */
+
+const LEVEL_NAMES = [
+  'Świeżak', 'Rozgrzewka', 'Bywalec', 'Wyjadacz', 'Koksik',
+  'Byczek', 'Twardziel', 'Kocur', 'Pakernik', 'Maszyna',
+  'Bestia', 'Tytan', 'Gladiator', 'Spartanin', 'Wiking',
+  'Herkules', 'Atlas', 'Olimpijczyk', 'Legenda siłowni', 'Rozpierdol',
+];
+
+// skąd biorą się punkty
+const XP_RULES = [
+  ['w', 50, 'za każdy trening'],
+  ['sets', 2, 'za każdą serię'],
+  ['pr', 25, 'za każdy pobity rekord'],
+  ['wi', 5, 'za każde ważenie'],
+  ['ms', 10, 'za każdy pomiar ciała'],
+  ['ach', 100, 'za każde osiągnięcie'],
+];
+
+// XP potrzebne do osiągnięcia poziomu L (poziom 1 = 0 XP), coraz większe odstępy
+const levelXP = L => Math.round(250 * Math.pow(L - 1, 1.5));
+
+function xpOf(v) {
+  const ach = BADGES.filter(b => badgeEarned(b, v)).length;
+  const counts = Object.assign({}, v, { ach });
+  return XP_RULES.reduce((sum, [k, pts]) => sum + (counts[k] || 0) * pts, 0);
+}
+
+function levelInfo(v = achVals()) {
+  const xp = xpOf(v);
+  const max = LEVEL_NAMES.length;
+
+  let lvl = 1;
+  while (lvl < max && xp >= levelXP(lvl + 1)) {
+    lvl++;
+  }
+
+  const cur = levelXP(lvl);
+  const next = lvl < max ? levelXP(lvl + 1) : null;
+  const pct = next
+    ? Math.round((xp - cur) / (next - cur) * 100)
+    : 100;
+
+  return {
+    lvl,
+    name: LEVEL_NAMES[lvl - 1],
+    xp,
+    cur,
+    next,
+    pct,
+  };
+}
+
+function levelCardHTML() {
+  const L = levelInfo();
+  const sub = L.next
+    ? `${fmtN(L.xp)} / ${fmtN(L.next)} XP · do poziomu ${L.lvl + 1}: ${fmtN(L.next - L.xp)} XP`
+    : `${fmtN(L.xp)} XP · najwyższy poziom!`;
+
+  return `
+    <button class="card level-card" type="button" id="level-card">
+      <span class="lvl-badge num">${L.lvl}</span>
+      <span class="grow">
+        <span class="lvl-t">Poziom ${L.lvl} · <b>${L.name}</b></span>
+        <span class="bprog"><i style="width:${L.pct}%"></i></span>
+        <span class="small muted">${sub}</span>
+      </span>
+      <span class="chev" aria-hidden="true">›</span>
+    </button>`;
+}
+
+function showLevels() {
+  const v = achVals();
+  const L = levelInfo(v);
+  const counts = Object.assign({}, v, {
+    ach: BADGES.filter(b => badgeEarned(b, v)).length,
+  });
+
+  const rules = XP_RULES
+    .map(([k, pts, label]) => `
+      <div class="row small">
+        <span>+${pts} XP ${label}</span>
+        <span class="muted num">${fmtN(counts[k] || 0)} × ${pts} = ${fmtN((counts[k] || 0) * pts)}</span>
+      </div>`)
+    .join('');
+
+  const levels = LEVEL_NAMES
+    .map((name, i) => {
+      const n = i + 1;
+      const cls = n < L.lvl ? 'done' : n === L.lvl ? 'cur' : '';
+      return `
+        <div class="lvl-row ${cls}">
+          <span class="lvl-badge sm num">${n}</span>
+          <span class="grow">${name}</span>
+          <span class="small muted num">${fmtN(levelXP(n))} XP</span>
+        </div>`;
+    })
+    .join('');
+
+  openSheet('Twój poziom', `
+    ${levelCardHTML().replace('id="level-card"', '').replace('<button', '<div').replace('</button>', '</div>')}
+    <h3 style="margin:0">Jak zdobywać XP</h3>
+    <div class="view" style="gap:6px">${rules}</div>
+    <h3 style="margin:0">Poziomy</h3>
+    <div class="lvl-list">${levels}</div>
+    <button class="btn block" type="button" data-close>OK</button>`);
+}
+
+
+/* ---------- ekran osiągnięć ---------- */
 
 function badgeCardHTML(b, v, got) {
   const ok = badgeEarned(b, v);
@@ -411,7 +602,7 @@ function badgeCardHTML(b, v, got) {
   const unit = b.u || '';
 
   const footer = ok
-    ? `<span class="small good-t">✓ ${got[b.id] ? dayLabel(got[b.id]) : 'zdobyta'}</span>`
+    ? `<span class="small good-t">✓ ${got[b.id] ? dayLabel(got[b.id]) : 'zdobyte'}</span>`
     : `<span class="bprog"><i style="width:${pct}%"></i></span>
        <span class="small muted num">${fmtN(have)}${unit} / ${fmtN(b.g)}${unit}</span>`;
 
@@ -425,19 +616,41 @@ function badgeCardHTML(b, v, got) {
 }
 
 function showBadges() {
-  const v = badgeVals();
+  const v = achVals();
   const got = S.badges || {};
 
-  openSheet('🎖️ Odznaki', `
-    <div class="badges">
-      ${BADGES
-        .map(b => badgeCardHTML(b, v, got))
-        .join('')}
-    </div>
-    <button class="btn block" type="button" data-close>OK</button>`);
+  const sections = ACH_CATS
+    .map(([cat, title]) => {
+      const list = BADGES.filter(b => b.c === cat);
+      const done = list.filter(b => badgeEarned(b, v)).length;
+      return `
+        <div class="row">
+          <h3 style="margin:0">${title}</h3>
+          <span class="small muted">${done}/${list.length}</span>
+        </div>
+        <div class="badges">
+          ${list
+            .map(b => badgeCardHTML(b, v, got))
+            .join('')}
+        </div>`;
+    })
+    .join('');
+
+  openSheet('🏅 Osiągnięcia', `
+    ${levelCardHTML()}
+    ${sections}
+    <button class="btn block" type="button" data-close>OK</button>`,
+    b => {
+      const lc = $('#level-card', b);
+      if (lc) {
+        lc.onclick = showLevels;
+      }
+    });
 }
 
-// Po zapisaniu treningu / wagi: nowe odznaki → gratulacje (gdy nie ma innego okna na ekranie)
+
+/* ---------- gratulacje: nowe osiągnięcia i awans na wyższy poziom ---------- */
+
 let badgeTries = 0;
 
 function checkBadges() {
@@ -446,21 +659,31 @@ function checkBadges() {
     return;
   }
 
-  const v = badgeVals();
+  const v = achVals();
   const earned = BADGES.filter(b => badgeEarned(b, v));
+  const L = levelInfo(v);
 
-  // pierwszy raz (konta sprzed odznak): zapisz to, co już zdobyte, bez wyskakującego okna
+  // pierwszy raz (konta sprzed osiągnięć / poziomów): zapisz stan bez wyskakującego okna
+  let firstRun = false;
   if (!S.badges) {
     S.badges = {};
     earned.forEach(b => {
       S.badges[b.id] = today();
     });
+    firstRun = true;
+  }
+  if (!S.level) {
+    S.level = L.lvl;
+    firstRun = true;
+  }
+  if (firstRun) {
     save();
     return;
   }
 
   const fresh = earned.filter(b => !S.badges[b.id]);
-  if (!fresh.length) {
+  const levelUp = L.lvl > S.level;
+  if (!fresh.length && !levelUp) {
     return;
   }
 
@@ -478,13 +701,22 @@ function checkBadges() {
   fresh.forEach(b => {
     S.badges[b.id] = today();
   });
+  S.level = Math.max(S.level, L.lvl);
   save();
 
   if (navigator.vibrate) {
     navigator.vibrate([20, 60, 20]);
   }
 
-  const title = fresh.length > 1 ? '🎖️ Nowe odznaki!' : '🎖️ Nowa odznaka!';
+  const lvlBox = levelUp
+    ? `
+      <div class="lvl-up">
+        <span class="lvl-badge big num">${L.lvl}</span>
+        <b>Awans! Poziom ${L.lvl}</b>
+        <span>${L.name}</span>
+      </div>`
+    : '';
+
   const cards = fresh
     .map(b => `
       <div class="badge on wide">
@@ -494,10 +726,20 @@ function checkBadges() {
       </div>`)
     .join('');
 
+  let title;
+  if (levelUp && !fresh.length) {
+    title = '⬆️ Nowy poziom!';
+  } else if (fresh.length > 1) {
+    title = '🏅 Nowe osiągnięcia!';
+  } else {
+    title = '🏅 Nowe osiągnięcie!';
+  }
+
   openSheet(title, `
-    <div class="badges">${cards}</div>
+    ${lvlBox}
+    ${cards ? `<div class="badges">${cards}</div>` : ''}
     <button class="btn primary block" type="button" data-close>Super</button>
-    <button class="btn block" type="button" id="bd-all">Wszystkie odznaki</button>`,
+    <button class="btn block" type="button" id="bd-all">Wszystkie osiągnięcia</button>`,
     b => {
       $('#bd-all', b).onclick = showBadges;
     });
