@@ -454,6 +454,16 @@ input.has-clear { padding-right: 38px !important; }
 .rodo p, .rodo ul { margin: 0; font-size: 15px; line-height: 1.5; }
 .rodo ul { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 .big-note { font-size: 20px; line-height: 1.4; font-weight: 600; margin: 8px 0 4px; text-align: center; }
+
+/* hasło na końcu polityki prywatności (w Ustawieniach) — większe niż zwykły tekst zasad */
+.rodo p.big-note {
+  margin-top: 10px;
+  font-size: 18px;
+}
+
+.rodo p.small {
+  font-size: 13px;
+}
 .xd { font: 800 clamp(120px, 45vw, 220px)/1 var(--num); text-align: center; color: var(--accent); padding: 20px 0 10px; letter-spacing: -.04em; }
 .sug-text { width: 100%; min-height: 140px; resize: vertical; font: inherit; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); box-sizing: border-box; }
 .sug-text:focus { outline: 2px solid var(--accent); border-color: transparent; }

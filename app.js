@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 /* ============ Pomocnicze ============ */
 const IMG = 'img/'; // zdjęcia ćwiczeń są częścią apki (pomniejszone kopie z Free Exercise DB)
@@ -2751,6 +2751,8 @@ function renderWiecej() {
     ${IS_ADMIN ? '<section class="card" data-sec="sugadmin" id="sugadmin-box"></section><section class="card" data-sec="admin"></section>' : ''}
     <section class="card rodo" data-sec="rodo">
       ${rodoBodyHTML()}
+      ${policyAcceptedLine()}
+      <p class="big-note">Używaj jak chcesz, tylko nie wkurwiaj kodera.</p>
     </section>
     <section class="card about" data-sec="about">
       <p class="big-note" style="text-align:left">Cześć! 👋</p>
@@ -2761,7 +2763,6 @@ function renderWiecej() {
       <p><i>Kurwy niech giną pod ciepłą pierzyną, a zwycięzcy mają czuć chłód zwycięstwa.</i> 💪</p>
       <p>Na co dzień jestem programistą SAP ABAP z 5-letnim stażem komercyjnym, a hobbystycznie klaunem cyrkowym 🤡. Ten projekt robię czysto dla zabawy.</p>
     </section>
-    <section class="card" data-sec="priv"><p class="big-note">Używaj jak chcesz, tylko nie wkurwiaj kodera.</p></section>
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
     <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Sylwetki mięśni: <a href="https://pixabay.com/vectors/anatomical-anatomy-anatomy-chart-6826992/" target="_blank" rel="noopener" style="color:inherit">Pixabay</a>. Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
     <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: ${APP_VERSION}</p>
@@ -2851,7 +2852,7 @@ const SECS = [
   ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], ['lock', '🔒', 'Blokada apki'], null,
   ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Postęp'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
-  ['log', '🆕', 'Co nowego'], ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
+  ['log', '🆕', 'Co nowego'], ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
 ];
 function secSub(k) {
   const p = S.profile, th = getTheme(), sy = typeof SY !== 'undefined' ? SY : null;
@@ -2867,12 +2868,12 @@ function secSub(k) {
     case 'sug': return 'Napisz, co ulepszyć w apce';
     case 'sugadmin': return 'Widoczne tylko dla admina';
     case 'admin': return 'Konta użytkowników';
-    case 'rodo': return 'Jakie dane, gdzie leżą, kto ma dostęp';
+    case 'rodo': return `Wersja ${POLICY_VERSION} · jakie dane, gdzie leżą, kto ma dostęp`;
     default: return '';
   }
 }
 // Ustawienia na jednej stronie z kartami. Sugestie / polityka / reklamacje: karta „Inne”, każda pozycja otwiera okno.
-const SHEET_SECS = ['log', 'sug', 'sugadmin', 'admin', 'about', 'rodo', 'priv', 'compl'];
+const SHEET_SECS = ['log', 'sug', 'sugadmin', 'admin', 'about', 'rodo', 'compl'];
 function applySettingsNav(body) {
   UI.sec = null;
   $('#h-wiecej').textContent = 'Ustawienia';
@@ -2951,7 +2952,7 @@ $('#wiecej-back').addEventListener('click', () => goBack());
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.17.0';
+const APP_VERSION = '1.17.1';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
@@ -3012,7 +3013,7 @@ const CHANGELOG = [
     items: [
       'Zakładając konto, akceptujesz <b>politykę prywatności</b>. W formularzu jest pole wyboru i link do pełnej treści.',
       'Po każdej zmianie zasad apka pokaże, co się zmieniło, i poprosi o ponowną akceptację.',
-      'Apka zapisuje, którą wersję zasad i kiedy zaakceptowałeś. Pełna treść jest w Ustawieniach → Przetwarzanie danych osobowych.',
+      'Apka zapisuje, którą wersję zasad i kiedy zaakceptowałeś. Pełna treść jest w Ustawieniach → Polityka prywatności.',
     ],
   },
   {

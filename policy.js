@@ -101,6 +101,20 @@ function acceptPolicy() {
   }
 }
 
+// w Ustawieniach pod treścią zasad: kiedy zaakceptowałeś aktualną wersję
+function policyAcceptedLine() {
+  const at = S.policy && S.policy.v >= POLICY_VERSION && S.policy.at;
+  if (!at) {
+    return '';
+  }
+  const when = new Date(at).toLocaleDateString('pl-PL', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  return `<p class="small muted">✅ Zaakceptowano ${when}.</p>`;
+}
+
 // pełna treść w oknie (np. z formularza zakładania konta)
 function showPolicyText() {
   openSheet('Polityka prywatności', `
