@@ -765,14 +765,16 @@ function renderStart() {
     ${has('muscleBarsHTML') ? muscleBarsHTML() : ''}
     ${musclesNavCard()}`;
 
+  // kolejność pod BMI: graf partii (sylwetka) → fakt dnia → partie w tygodniu (paski) → wykres wagi → kalorie
   const top = st
     ? `
       ${heroHTML(st)}
       ${statTilesHTML(st)}
-      ${muscles}
+      ${musclesNavCard()}
+      ${pref('fact') ? factCardHTML() : ''}
+      ${has('muscleBarsHTML') ? muscleBarsHTML() : ''}
       ${has('weightTrendHTML') ? weightTrendHTML() : ''}
-      ${pref('kcal') ? kcalCardHTML(st) : ''}
-      ${pref('fact') ? factCardHTML() : ''}`
+      ${pref('kcal') ? kcalCardHTML(st) : ''}`
     : `
       <div class="card empty">
         <strong>Zacznij od wagi</strong>
