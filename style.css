@@ -1649,3 +1649,11 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .notif.unread {
   background: var(--accent-soft);
 }
+
+/* numer wersji przy wydaniu w „Co nowego” */
+.log-v {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 6px;
+}

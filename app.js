@@ -2582,13 +2582,22 @@ function renderWiecej() {
     <section class="card" data-sec="priv"><p class="big-note">Używaj jak chcesz, tylko nie wkurwiaj kodera.</p></section>
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
     <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Sylwetki mięśni: <a href="https://pixabay.com/vectors/anatomical-anatomy-anatomy-chart-6826992/" target="_blank" rel="noopener" style="color:inherit">Pixabay</a>. Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
-    <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: …</p>
+    <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: ${APP_VERSION}</p>
     <p class="muted small settings-foot" style="margin:4px 0 0">© 2026${new Date().getFullYear() > 2026 ? '–' + new Date().getFullYear() : ''} Rozpierdol. Wszelkie prawa zastrzeżone.<br>Zrobione z miłością i odrobiną bólu mięśni 💪</p>`;
-  // numer wersji = nazwa schowka plików apki (ustawiana przy budowaniu)
-  if (window.caches) caches.keys().then(k => {
-    const v = k.find(n => /^rozpierdol-(?!img)/.test(n));
-    const el = $('#app-version'); if (el) el.textContent = 'Wersja apki: ' + (v ? v.replace('rozpierdol-', '') : 'podgląd (bez pamięci offline)');
-  }).catch(() => {});
+  // numer wersji (np. 1.14.1) + numer kompilacji = nazwa schowka plików apki (ustawiana przy budowaniu)
+  if (window.caches) {
+    caches.keys()
+      .then(k => {
+        const build = k.find(n => /^rozpierdol-(?!img)/.test(n));
+        const el = $('#app-version');
+        if (el) {
+          el.textContent = `Wersja apki: ${APP_VERSION}` + (build
+            ? ` (kompilacja ${build.replace('rozpierdol-', '')})`
+            : ' (podgląd, bez pamięci offline)');
+        }
+      })
+      .catch(() => {});
+  }
   if (typeof renderSyncCard === 'function') renderSyncCard($('#sync-card', body)); else $('#sync-card', body).remove();
   if (typeof renderShareCard === 'function') renderShareCard($('#share-card', body)); else $('#share-card', body).remove();
   if (typeof renderNotifCard === 'function') renderNotifCard($('#notif-card', body)); else $('#notif-card', body).remove();
@@ -2652,7 +2661,7 @@ function secSub(k) {
     case 'wyglad': { const a = ACCENTS.find(x => x.id === th.accent), m = MODES.find(([v]) => v === th.mode); return [a && a.label, m && m[1]].filter(Boolean).join(' · '); }
     case 'excel': return 'Zapisz albo wczytaj plik .xlsx';
     case 'dane': return `${plural(S.weights.length, 'pomiar', 'pomiary', 'pomiarów')} wagi, ${plural(S.workouts.length, 'trening', 'treningi', 'treningów')}`;
-    case 'log': return 'Ostatnio: ' + esc(CHANGELOG[0].t);
+    case 'log': return `Wersja ${APP_VERSION} · ostatnio: ${esc(CHANGELOG[0].t)}`;
     case 'sug': return 'Napisz, co ulepszyć w apce';
     case 'sugadmin': return 'Widoczne tylko dla admina';
     case 'admin': return 'Konta użytkowników';
@@ -2734,13 +2743,22 @@ $('#wiecej-back').addEventListener('click', () => goBack());
   btn.addEventListener('click', e => e.preventDefault());
 })();
 
+/* ============ Wersja apki ============
+   Format MAJOR.MINOR.PATCH (np. 1.14.1):
+     - PATCH (1.14.0 → 1.14.1): poprawki i drobne zmiany wyglądu,
+     - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
+     - MAJOR (1.x → 2.0.0): duże przebudowy.
+   Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
+const APP_VERSION = '1.14.1';
+
 /* ============ Co nowego ============
-   Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id).
+   Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
   {
     id: 14,
+    v: '1.14.0',
     t: 'Powiadomienia o udostępnianiu',
     items: [
       'Gdy ktoś coś ci udostępni, zmieni zakres albo zabierze dostęp, po otwarciu apki zobaczysz <b>powiadomienie</b>.',
@@ -2750,6 +2768,7 @@ const CHANGELOG = [
   },
   {
     id: 13,
+    v: '1.13.0',
     t: 'Udostępnianie dla każdej osoby osobno',
     items: [
       'Każdej osobie wybierasz osobno, co widzi: plany, ulubione albo wagę. Na liście przy każdej osobie widać, co jej udostępniasz.',
@@ -2758,6 +2777,7 @@ const CHANGELOG = [
   },
   {
     id: 12,
+    v: '1.12.0',
     t: 'Polityka prywatności',
     items: [
       'Zakładając konto, akceptujesz <b>politykę prywatności</b>. W formularzu jest pole wyboru i link do pełnej treści.',
@@ -2767,6 +2787,7 @@ const CHANGELOG = [
   },
   {
     id: 11,
+    v: '1.11.0',
     t: 'Kalendarz',
     items: [
       'Nowa zakładka <b>Kalendarz</b>: miesiąc w kratkach z treningami, ważeniami i pomiarami ciała.',
@@ -2777,6 +2798,7 @@ const CHANGELOG = [
   },
   {
     id: 10,
+    v: '1.10.0',
     t: 'Więcej osiągnięć',
     items: [
       'Jest już <b>91 osiągnięć</b> zamiast 44.',
@@ -2787,6 +2809,7 @@ const CHANGELOG = [
   },
   {
     id: 9,
+    v: '1.9.0',
     t: 'Poziomy i osiągnięcia',
     items: [
       '<b>Poziomy</b>: zbierasz XP za treningi, serie, rekordy, ważenie, pomiary ciała i osiągnięcia. Jest 30 poziomów. Stuknij poziom na górnym pasku, żeby zobaczyć, ile XP masz z czego.',
@@ -2799,6 +2822,7 @@ const CHANGELOG = [
   },
   {
     id: 8,
+    v: '1.8.0',
     t: 'Postęp i Ciało',
     items: [
       'Nowa pierwsza zakładka <b>Postęp</b>: aktualna waga, wynik od startu, postęp do celu, BMI, średnia 7 dni, ostatnie 30 dni, kalorie, fakt dnia i seria ważenia.',
@@ -2809,6 +2833,7 @@ const CHANGELOG = [
   },
   {
     id: 7,
+    v: '1.7.0',
     t: 'Statystyki, odznaki i timer',
     items: [
       '<b>Timer przerwy</b>: startuje sam po odhaczeniu serii ✓. Możesz dodać albo odjąć 15 s, a stuknięcie w czas zmienia domyślną długość.',
@@ -2820,37 +2845,37 @@ const CHANGELOG = [
       '<b>Seria dni ważenia</b> 🔥 w zakładce Postęp.',
     ],
   },
-  { id: 6, t: 'Blokada apki', items: [
+  { id: 6, v: '1.6.0', t: 'Blokada apki', items: [
     'Możesz zablokować apkę <b>4-cyfrowym kodem</b>: Ustawienia → Blokada apki.',
     'Odblokowanie <b>Face ID / Touch ID</b>, jeśli telefon je ma.',
     'Wybierasz, kiedy apka ma się blokować: od razu po wyjściu albo po 1, 5 lub 15 minutach.',
     'Zapomniany kod zdejmiesz hasłem do konta.',
   ] },
-  { id: 5, t: 'Forma i mapa mięśni', items: [
+  { id: 5, v: '1.5.0', t: 'Forma i mapa mięśni', items: [
     'Zakładka Dieta nazywa się teraz <b>Forma</b> i ma nową ikonę. Pasuje do każdego celu: redukcji, utrzymania i masy.',
     'Nowy ekran <b>Graf trenowanych partii mięśniowych</b> (Forma → 💪). Sylwetka z przodu i z tyłu, a ćwiczone partie świecą na czerwono. Stuknij partię, żeby zobaczyć serie z ostatnich 7 dni, dzień po dniu.',
     'Osobna sylwetka dla profilu „Kobieta”.',
     'Okno „Co nowego” po aktualizacji. Pełną listę zmian znajdziesz w Ustawieniach → Inne.',
   ] },
-  { id: 4, t: 'Konto i ustawienia', items: [
+  { id: 4, v: '1.4.0', t: 'Konto i ustawienia', items: [
     'Zmiana hasła, zmiana e-maila i usuwanie konta w karcie Konto i chmura.',
     '<b>Sugestie</b>: napisz, co dodać albo poprawić w apce.',
     'Nowe pozycje w Ustawieniach → Inne: O autorze, Przetwarzanie danych osobowych, Polityka prywatności i Reklamacje.',
     'Losowe teksty na ekranie startowym.',
   ] },
-  { id: 3, t: 'Profil i cele', items: [
+  { id: 3, v: '1.3.0', t: 'Profil i cele', items: [
     'Profil: płeć, rok urodzenia, aktywność, cel (redukcja, utrzymanie albo masa) i tempo.',
     'Kafelek z dziennym zapotrzebowaniem na kalorie.',
     'Szacowany % tkanki tłuszczowej w Pomiarach ciała.',
     'Cel treningów na tydzień i wykres kołowy z ostatnich 7 dni.',
     'Przełączniki w Ustawieniach: pokaż albo ukryj kafelek kalorii i losowy fakt.',
   ] },
-  { id: 2, t: 'Nowy układ', items: [
+  { id: 2, v: '1.2.0', t: 'Nowy układ', items: [
     '4 zakładki zamiast 6: Baza ćwiczeń jest teraz w Planach, a Pomiary ciała w Formie.',
     'Kafelek z losowym, pozytywnym faktem o twoich postępach.',
     'Na iPhonie cofasz się gestem od lewej krawędzi ekranu.',
   ] },
-  { id: 1, t: 'Treningi', items: [
+  { id: 1, v: '1.1.0', t: 'Treningi', items: [
     'Kolejność ćwiczeń i serii zmieniasz przytrzymaniem i przeciągnięciem.',
     'Własne pola w seriach: kg, powtórzenia, czas, dystans, prędkość, nachylenie, tempo, RIR, RPE i inne.',
     '<b>Rekordy osobiste</b> z gratulacjami po pobiciu.',
@@ -2862,7 +2887,13 @@ const CHANGELOG = [
 const LOG_LATEST = CHANGELOG[0].id;
 const hasAnyData = () => S.weights.length || S.workouts.length || S.plans.length || (S.measures || []).length;
 function changelogHTML(list) {
-  return list.map(r => `<section class="log-rel"><h3>${esc(r.t)}</h3><ul>${r.items.map(i => `<li>${i}</li>`).join('')}</ul></section>`).join('');
+  return list
+    .map(r => `
+      <section class="log-rel">
+        <h3>${esc(r.t)}${r.v ? ` <span class="log-v">${r.v}</span>` : ''}</h3>
+        <ul>${r.items.map(i => `<li>${i}</li>`).join('')}</ul>
+      </section>`)
+    .join('');
 }
 function showChangelog(list, title) {
   openSheet(title, `<div class="log">${changelogHTML(list)}</div><button class="btn primary block" type="button" data-close>Super</button>`);

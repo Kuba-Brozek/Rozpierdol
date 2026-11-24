@@ -638,7 +638,8 @@ async function touchUser(force) {
   const s = SY.session; if (!s) return;
   if (!force && SY.userTouched && Date.now() - SY.userTouched < 6 * 3600e3 && SY.userEmail === s.email) return;
   let ver = '';
-  try { if (window.caches) ver = ((await caches.keys()).find(n => /^rozpierdol-(?!img)/.test(n)) || '').replace('rozpierdol-', ''); } catch (e) {}
+  // wersja apki (np. 1.14.1) widoczna w panelu admina
+  if (typeof APP_VERSION !== 'undefined') ver = APP_VERSION;
   const fields = {
     email: { stringValue: s.email || '' }, createdAt: { integerValue: String(s.createdAt || 0) }, lastSeen: { integerValue: String(Date.now()) },
     weights: { integerValue: String(S.weights.length) }, workouts: { integerValue: String(S.workouts.length) }, plans: { integerValue: String(S.plans.length) },
