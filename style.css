@@ -1366,3 +1366,80 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ---------- Postęp: mniejszy kafelek z wagą ---------- */
+#start-body .hero {
+  gap: 8px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+#start-body .hero-nums .big {
+  font-size: clamp(30px, 9vw, 44px);
+}
+
+#start-body .hero h3 {
+  font-size: 12px;
+}
+
+/* ---------- Postęp: dwa kwadraty obok siebie (Osiągnięcia | fakt) ---------- */
+.duo {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.duo > .card {
+  aspect-ratio: 1 / 1;   /* zawsze równe kwadraty; za długi fakt zmniejsza czcionkę (fitFactSquare) */
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+}
+
+.sq {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sq-ic {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.sq b {
+  font-size: 17px;
+  margin-top: auto;
+}
+
+.sq-more {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* fakt w kwadracie: ikona na górze, tekst, podpowiedź na dole */
+.duo .fact {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.duo .fact .grow {
+  justify-content: space-between;
+  height: 100%;
+}
+
+.duo .fact-t {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.duo .fact .small {
+  font-size: 11px;
+}

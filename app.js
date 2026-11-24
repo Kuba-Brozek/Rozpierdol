@@ -503,6 +503,21 @@ function factCardHTML() {
 function wireFact(root) {
   const c = $('#fact-card', root); if (!c) return;
   c.onclick = () => { UI.fact = (UI.fact || 0) + 1; c.outerHTML = factCardHTML(); wireFact(root); };
+  fitFactSquare(c);
+}
+
+// fakt w kwadracie (zakładka Postęp): długi tekst zmniejsza czcionkę, żeby kwadrat się nie rozciągał
+function fitFactSquare(card) {
+  if (!card.closest('.duo')) {
+    return;
+  }
+  const t = $('.fact-t', card);
+  let size = 14;
+  t.style.fontSize = size + 'px';
+  while (card.scrollHeight > card.clientHeight + 1 && size > 11) {
+    size -= 0.5;
+    t.style.fontSize = size + 'px';
+  }
 }
 
 // Przełączniki kafelków na ekranie Forma (S.prefs, zapisywane w chmurze); domyślnie włączone
@@ -772,13 +787,28 @@ function renderStart() {
     ${has('muscleBarsHTML') ? muscleBarsHTML() : ''}
     ${musclesNavCard()}`;
 
-  // kolejność pod BMI: graf partii (sylwetka) → fakt dnia → partie w tygodniu (paski) → wykres wagi → kalorie
+  // dwa kwadraty obok siebie: Osiągnięcia (lewy) i pozytywny fakt (prawy);
+  // przy wyłączonym fakcie Osiągnięcia zostają zwykłą kartą na dole
+  const showDuo = st && pref('fact') && has('badgeCount');
+  const duo = showDuo
+    ? `<div class="duo">
+        <button class="card sq ach-sq" type="button" id="st-badges">
+          <span class="sq-ic" aria-hidden="true">🏅</span>
+          <b>Osiągnięcia</b>
+          <span class="small muted">zdobyte ${badgeCount()}</span>
+          <span class="sq-more small">Zobacz wszystkie ›</span>
+        </button>
+        ${factCardHTML()}
+      </div>`
+    : '';
+
+  // kolejność pod BMI: graf partii (sylwetka) → osiągnięcia + fakt → partie w tygodniu (paski) → wykres wagi → kalorie
   const top = st
     ? `
       ${heroHTML(st)}
       ${statTilesHTML(st)}
       ${musclesNavCard()}
-      ${pref('fact') ? factCardHTML() : ''}
+      ${showDuo ? duo : pref('fact') ? factCardHTML() : ''}
       ${has('muscleBarsHTML') ? muscleBarsHTML() : ''}
       ${has('weightTrendHTML') ? weightTrendHTML() : ''}
       ${pref('kcal') ? kcalCardHTML(st) : ''}`
@@ -793,7 +823,7 @@ function renderStart() {
   body.innerHTML = `
     ${top}
     ${has('monthSummaryHTML') ? monthSummaryHTML() : ''}
-    ${achCard}
+    ${showDuo ? '' : achCard}
     ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w Ustawieniach (ikona użytkownika w prawym górnym rogu), żeby zobaczyć BMI i postęp do celu.</p>'}`;
 
   const lv = $('#level-card', body);
