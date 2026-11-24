@@ -1388,6 +1388,23 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   gap: 8px;
 }
 
+/* przełącznik jako osobna karta (np. „Licz partie pomocnicze” na grafie): opis po lewej, przełącznik po prawej */
+.card.pref-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.card.pref-row .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 /* ---------- Postęp: mniejszy kafelek z wagą ---------- */
 #start-body .hero {
   gap: 8px;

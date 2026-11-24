@@ -1527,7 +1527,14 @@ function muscleSets(days = musDays()) {
     const n = countSets(e.sets); if (!n) return;
     const add = (m, k) => { const o = out[m] = out[m] || { main: 0, help: 0, items: [] }; o[k] += n; o.items.push({ w, e, n, k }); };
     (ex.m || []).forEach(m => add(m, 'main'));
-    (ex.s || []).forEach(m => { if (!(ex.m || []).includes(m)) add(m, 'help'); });
+    // partie pomocnicze (po ½ serii) tylko przy włączonym przełączniku „Licz partie pomocnicze”
+    // — dzięki temu graf, jego szczegóły i paski „Partie w tygodniu” liczą tak samo
+    const withHelp = typeof mbarsHelp !== 'function' || mbarsHelp();
+    (ex.s || []).forEach(m => {
+      if (withHelp && !(ex.m || []).includes(m)) {
+        add(m, 'help');
+      }
+    });
   }));
   return out;
 }
@@ -1537,7 +1544,15 @@ const muscleLevel = (v, days = 7) => { v = v * 7 / days; return v <= 0 ? 0 : v <
 const seriiWord = v => v === 1 ? 'seria' : v % 1 === 0 && v % 10 >= 2 && v % 10 <= 4 && (v % 100 < 10 || v % 100 >= 20) ? 'serie' : 'serii';
 function bodyMapHTML() {
   const d = musDays();
+  const withHelp = typeof mbarsHelp !== 'function' || mbarsHelp();
   return `<div class="seg seg-full" role="group" aria-label="Okres">${MUS_DAYS.map(n => `<button type="button" data-mdays="${n}" aria-pressed="${n === d}">${n} dni</button>`).join('')}</div>
+    <label class="card pref-row">
+      <span class="grow">
+        <span class="pref-l">Licz partie pomocnicze</span>
+        <span class="small muted">np. triceps przy wyciskaniu (po ½ serii)</span>
+      </span>
+      <input type="checkbox" class="switch" role="switch" id="mus-help" ${withHelp ? 'checked' : ''}>
+    </label>
     <section class="card bodymap">
     <p class="muted small" style="margin:0;text-align:center">Serie z ostatnich ${d} dni</p>
     <div class="body-wrap"><canvas class="body-cv" role="img" aria-label="Sylwetka z przodu i z tyłu: stuknij partię, żeby zobaczyć serie"></canvas>
@@ -1555,6 +1570,16 @@ function renderMiesnie() {
   const body = $('#miesnie-body');
   body.innerHTML = bodyMapHTML();
   $$('[data-mdays]', body).forEach(b => b.onclick = () => { UI.mDays = +b.dataset.mdays; renderMiesnie(); });
+
+  // ten sam przełącznik co w „Partiach w tygodniu” (jedno ustawienie dla obu miejsc)
+  const help = $('#mus-help', body);
+  if (help) {
+    help.onchange = () => {
+      S.prefs = Object.assign({}, S.prefs, { mbarsHelp: help.checked });
+      save();
+      renderMiesnie();
+    };
+  }
   const cv = $('.body-cv', body), load = $('.body-load', body);
   loadBody(bodySex()).then(B => {
     if (!cv.isConnected) return;
