@@ -2515,7 +2515,8 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController || $('#update-bar')) return; // pierwsza instalacja — nic nie pokazuj
     const typing = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
-    const busy = typing || !$('#sheet').hidden || Date.now() - lastTouch < 4000;
+    // ekran blokady / Face ID też liczy się jako „zajęty”: odświeżenie w tym momencie kazałoby odblokowywać drugi raz
+    const busy = typing || !$('#sheet').hidden || Date.now() - lastTouch < 4000 || !!$('#lock') || (typeof bioBusy !== 'undefined' && bioBusy);
     // Nowa wersja (wszystkie dane są już zapisane w telefonie): jeśli nic nie robisz — odśwież od razu.
     if (!busy) { location.reload(); return; }
     const bar = document.createElement('div');

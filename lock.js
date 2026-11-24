@@ -8,6 +8,10 @@ const PIN_LEN = 4;
 let LK = null;
 try { LK = JSON.parse(localStorage.getItem(LOCK_KEY) || 'null'); } catch (e) {}
 const lockOn = () => !!(LK && LK.hash);
+// stan tej sesji (przetrwa przeładowanie strony, ale nie zamknięcie apki): kiedy odblokowano i kiedy apka poszła w tło
+const SES_KEY = 'rozpierdol-blokada-sesja';
+const sesGet = () => { try { return JSON.parse(sessionStorage.getItem(SES_KEY) || '{}'); } catch (e) { return {}; } };
+const sesSet = o => { try { sessionStorage.setItem(SES_KEY, JSON.stringify(Object.assign(sesGet(), o))); } catch (e) {} };
 const lockSave = () => { try { LK ? localStorage.setItem(LOCK_KEY, JSON.stringify(LK)) : localStorage.removeItem(LOCK_KEY); } catch (e) {} };
 const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
 const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
@@ -98,11 +102,13 @@ let lockShown = false;
 function showLock() {
   if (!lockOn() || lockShown) return;
   lockShown = true;
+  sesSet({ unlocked: 0 });
   const el = document.createElement('div');
   el.id = 'lock'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Apka zablokowana');
   document.body.appendChild(el); document.body.style.overflow = 'hidden';
   const unlock = () => {
     LK.fails = 0; LK.until = 0; lockSave();
+    sesSet({ unlocked: Date.now(), hiddenAt: 0 });
     el.classList.add('hide'); setTimeout(() => el.remove(), 250);
     lockShown = false; document.body.style.overflow = '';
   };
@@ -194,10 +200,19 @@ document.addEventListener('visibilitychange', () => {
   // okienko iPhone'a z kluczem dostępu (Face ID) na chwilę „chowa” apkę — to nie jest wyjście z apki,
   // więc w trakcie Face ID i przez 2 s po nim nie liczymy tego jako ukrycia (inaczej apka zablokowałaby się drugi raz)
   const byBio = bioBusy || Date.now() - bioEnded < 2000;
-  if (document.hidden) { if (!byBio) hiddenAt = Date.now(); }
+  if (document.hidden) { if (!byBio) { hiddenAt = Date.now(); sesSet({ hiddenAt }); } }
   else if (!byBio && lockOn() && hiddenAt && Date.now() - hiddenAt >= (LK.delay || 0) * 1000) { hiddenAt = 0; showLock(); }
+  else if (!document.hidden && !lockShown) sesSet({ hiddenAt: 0 }); // wróciło szybko — apka zostaje odblokowana
 });
-if (lockOn()) showLock();
+// Przy starcie blokujemy, chyba że to tylko przeładowanie strony (np. po aktualizacji) w tej samej sesji,
+// w której apka była już odblokowana i nie leżała w tle dłużej niż ustawiony czas.
+if (lockOn()) {
+  const s = sesGet();
+  // samo przeładowanie też na chwilę „chowa” stronę, stąd co najmniej 5 s zapasu
+  // (prawdziwe wyjście z apki blokuje dalej od razu — pilnuje tego obsługa visibilitychange powyżej)
+  const fresh = s.unlocked && (!s.hiddenAt || Date.now() - s.hiddenAt < Math.max(5, LK.delay || 0) * 1000);
+  if (!fresh) showLock();
+}
 
 /* ---- karta w Ustawieniach ---- */
 const LOCK_DELAYS = [[0, 'Od razu'], [60, 'Po 1 min'], [300, 'Po 5 min'], [900, 'Po 15 min']];
