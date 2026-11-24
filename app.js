@@ -2701,7 +2701,7 @@ const CHANGELOG = [
     id: 9,
     t: 'Poziomy i osiągnięcia',
     items: [
-      '<b>Poziomy</b>: zbierasz XP za treningi, serie, rekordy, ważenie, pomiary ciała i osiągnięcia. Jest 20 poziomów, od Świeżaka do Rozpierdola. Stuknij kartę poziomu w zakładce Postęp, żeby zobaczyć, ile XP masz z czego.',
+      '<b>Poziomy</b>: zbierasz XP za treningi, serie, rekordy, ważenie, pomiary ciała i osiągnięcia. Jest 30 poziomów. Stuknij poziom na górnym pasku, żeby zobaczyć, ile XP masz z czego.',
       'Odznaki to teraz <b>Osiągnięcia</b>. Jest ich 44 w pięciu grupach: treningi, siła, rekordy, regularność oraz waga i ciało.',
       'Przy awansie na wyższy poziom i przy nowym osiągnięciu wyskakują gratulacje.',
       '<b>Górny pasek</b> na każdym ekranie: poziom, nazwa i pasek XP. Stuknij go, żeby zobaczyć szczegóły.',

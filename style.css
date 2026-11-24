@@ -1024,6 +1024,11 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   opacity: .5;
 }
 
+/* nazwa poziomu rozpycha wiersz, XP ląduje przy prawej krawędzi */
+.lvl-row .grow {
+  flex: 1;
+}
+
 .lvl-row .lvl-badge {
   background: var(--surface-2);
   color: var(--muted);

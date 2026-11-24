@@ -486,12 +486,8 @@ function badgeCount() {
 
 /* ---------- poziomy użytkownika (XP) ---------- */
 
-const LEVEL_NAMES = [
-  'Świeżak', 'Rozgrzewka', 'Bywalec', 'Wyjadacz', 'Koksik',
-  'Byczek', 'Twardziel', 'Kocur', 'Pakernik', 'Maszyna',
-  'Bestia', 'Tytan', 'Gladiator', 'Spartanin', 'Wiking',
-  'Herkules', 'Atlas', 'Olimpijczyk', 'Legenda siłowni', 'Rozpierdol',
-];
+// poziomy bez nazw — po prostu numery od 1 do 30
+const LEVEL_MAX = 30;
 
 // skąd biorą się punkty
 const XP_RULES = [
@@ -514,7 +510,7 @@ function xpOf(v) {
 
 function levelInfo(v = achVals()) {
   const xp = xpOf(v);
-  const max = LEVEL_NAMES.length;
+  const max = LEVEL_MAX;
 
   let lvl = 1;
   while (lvl < max && xp >= levelXP(lvl + 1)) {
@@ -529,7 +525,6 @@ function levelInfo(v = achVals()) {
 
   return {
     lvl,
-    name: LEVEL_NAMES[lvl - 1],
     xp,
     cur,
     next,
@@ -547,7 +542,7 @@ function levelCardHTML() {
     <button class="card level-card" type="button" id="level-card">
       <span class="lvl-badge num">${L.lvl}</span>
       <span class="grow">
-        <span class="lvl-t">Poziom ${L.lvl} · <b>${L.name}</b></span>
+        <span class="lvl-t"><b>Poziom ${L.lvl}</b> <span class="muted">z ${LEVEL_MAX}</span></span>
         <span class="bprog"><i style="width:${L.pct}%"></i></span>
         <span class="small muted">${sub}</span>
       </span>
@@ -570,14 +565,13 @@ function showLevels() {
       </div>`)
     .join('');
 
-  const levels = LEVEL_NAMES
-    .map((name, i) => {
-      const n = i + 1;
+  const levels = Array.from({ length: LEVEL_MAX }, (_, i) => i + 1)
+    .map(n => {
       const cls = n < L.lvl ? 'done' : n === L.lvl ? 'cur' : '';
       return `
         <div class="lvl-row ${cls}">
           <span class="lvl-badge sm num">${n}</span>
-          <span class="grow">${name}</span>
+          <span class="grow">Poziom ${n}</span>
           <span class="small muted num">${fmtN(levelXP(n))} XP</span>
         </div>`;
     })
@@ -713,7 +707,7 @@ function checkBadges() {
       <div class="lvl-up">
         <span class="lvl-badge big num">${L.lvl}</span>
         <b>Awans! Poziom ${L.lvl}</b>
-        <span>${L.name}</span>
+        <span class="muted">${L.next ? `do poziomu ${L.lvl + 1}: ${fmtN(L.next - L.xp)} XP` : 'najwyższy poziom!'}</span>
       </div>`
     : '';
 
@@ -1172,13 +1166,12 @@ function updateTopbar() {
     ? `${fmtN(L.xp)} / ${fmtN(L.next)} XP`
     : `${fmtN(L.xp)} XP · max`;
 
-  // druga linijka paska: [poziom] nazwa ▬▬▬ XP — wszystko w jednym rzędzie
+  // druga linijka paska: „Poziom N” ▬▬▬ XP — wszystko w jednym rzędzie
   lvlBtn.innerHTML = `
-    <span class="tb-lvl num">${L.lvl}</span>
-    <span class="tb-name">${esc(L.name)}</span>
+    <span class="tb-name">Poziom ${L.lvl}</span>
     <span class="tb-bar"><i style="width:${L.pct}%"></i></span>
     <span class="tb-xp num">${xpTxt}</span>`;
-  lvlBtn.setAttribute('aria-label', `Poziom ${L.lvl}, ${L.name}, ${xpTxt}`);
+  lvlBtn.setAttribute('aria-label', `Poziom ${L.lvl} z ${LEVEL_MAX}, ${xpTxt}`);
 
   // nazwa ekranu = nagłówek bieżącego widoku (ten na samym ekranie jest ukryty)
   const h1 = document.querySelector(`#view-${UI.tab} .vhead h1`);
