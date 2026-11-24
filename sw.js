@@ -1,6 +1,6 @@
 // Wersję poniżej ustawia automatycznie skrypt build.ps1 (skrót zawartości plików apki).
 // Gdy cokolwiek w apce się zmieni, zmienia się wersja, a telefony pobierają nowe pliki RAZ, w tle.
-const CACHE = "rozpierdol-8525b64367";
+const CACHE = "rozpierdol-677ab86f9e";
 // Zdjęcia ćwiczeń (folder img/) mają osobny schowek, który przetrwa aktualizacje apki —
 // każde zdjęcie telefon pobiera tylko raz, przy pierwszym obejrzeniu (wszystkie razem to ok. 37 MB, więc nie hurtem).
 const IMG_CACHE = "rozpierdol-img";
@@ -10,6 +10,7 @@ const FILES = [
   "style.css",
   "extras.js",
   "calendar.js",
+  "policy.js",
   "app.js",
   "config.js",
   "sync.js",

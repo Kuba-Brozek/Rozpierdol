@@ -2552,41 +2552,7 @@ function renderWiecej() {
     <section class="card" data-sec="sug" id="sug-box"></section>
     ${IS_ADMIN ? '<section class="card" data-sec="sugadmin" id="sugadmin-box"></section><section class="card" data-sec="admin"></section>' : ''}
     <section class="card rodo" data-sec="rodo">
-      <h3>Kto przetwarza dane</h3>
-      <p>Apkę prowadzi jej autor, osoba prywatna, na własny i znajomych użytek. Kontakt: przez „Sugestie” w tej karcie.</p>
-      <h3>Jakie dane</h3>
-      <ul>
-        <li><b>Konto:</b> adres e-mail i hasło. Hasło trzyma Google (Firebase Authentication) w postaci zaszyfrowanej. Autor apki go nie zna.</li>
-        <li><b>To, co wpisujesz:</b> waga, pomiary ciała, treningi, plany, ulubione i własne ćwiczenia oraz profil: wzrost, płeć, rok urodzenia, aktywność i cel.</li>
-        <li><b>Sugestie:</b> treść i twój e-mail, żeby dało się odpisać.</li>
-        <li><b>Lista kont:</b> e-mail, data założenia konta, kiedy ostatnio otwarto apkę i ile jest wpisów (sama liczba, bez treści). Autor używa jej do porządków, np. usuwania nieużywanych kont.</li>
-      </ul>
-      <p>Waga, pomiary ciała i inne dane o zdrowiu są danymi wrażliwymi. Podajesz je dobrowolnie, a wszystkie pola profilu są opcjonalne.</p>
-      <h3>Gdzie leżą</h3>
-      <ul>
-        <li><b>Na telefonie:</b> w pamięci przeglądarki. Bez konta dane nigdzie nie wychodzą.</li>
-        <li><b>W chmurze</b> (po zalogowaniu): w bazie Google Firebase (Firestore). Google działa tu jako dostawca usługi.</li>
-        <li><b>Apka</b> jest hostowana na GitHub Pages. GitHub, jak każdy serwer, może zapisywać techniczne logi wejść, np. adres IP.</li>
-      </ul>
-      <h3>Po co</h3>
-      <p>Tylko żeby apka działała: zapis, synchronizacja między telefonami i udostępnianie, które sam włączysz. Nie ma reklam, analityki ani śledzenia. Dane nie są sprzedawane ani nikomu przekazywane.</p>
-      <h3>Kto ma dostęp</h3>
-      <ul>
-        <li>Do swoich danych masz dostęp tylko ty. Pilnują tego reguły bezpieczeństwa bazy.</li>
-        <li>Osoby, którym coś udostępnisz, widzą tylko zaznaczone rzeczy: plany, ulubione albo wagę. Dostęp zabierasz w każdej chwili.</li>
-        <li>Sugestie czyta tylko autor apki.</li>
-        <li>Autor, jako właściciel projektu Firebase, ma techniczny dostęp do bazy, ale z niego nie korzysta.</li>
-      </ul>
-      <h3>Jak długo</h3>
-      <p>Dopóki ich nie usuniesz. Usunięcie konta kasuje wszystkie twoje dane w chmurze od razu.</p>
-      <h3>Twoje prawa</h3>
-      <ul>
-        <li><b>Wgląd i kopia:</b> „Zapisz kopię” w karcie Excel.</li>
-        <li><b>Poprawianie:</b> edycja wpisów w apce.</li>
-        <li><b>Usunięcie:</b> „Usuń konto” w karcie Konto i chmura albo „Usuń wszystkie dane”.</li>
-        <li><b>Wycofanie zgody na udostępnianie:</b> usunięcie osoby z listy.</li>
-        <li>Pytania i inne żądania: przez „Sugestie”.</li>
-      </ul>
+      ${rodoBodyHTML()}
     </section>
     <section class="card about" data-sec="about">
       <p class="big-note" style="text-align:left">Cześć! 👋</p>
@@ -2757,6 +2723,15 @@ $('#wiecej-back').addEventListener('click', () => goBack());
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
   {
+    id: 12,
+    t: 'Polityka prywatności',
+    items: [
+      'Zakładając konto, akceptujesz <b>politykę prywatności</b>. W formularzu jest pole wyboru i link do pełnej treści.',
+      'Po każdej zmianie zasad apka pokaże, co się zmieniło, i poprosi o ponowną akceptację.',
+      'Apka zapisuje, którą wersję zasad i kiedy zaakceptowałeś. Pełna treść jest w Ustawieniach → Przetwarzanie danych osobowych.',
+    ],
+  },
+  {
     id: 11,
     t: 'Kalendarz',
     items: [
@@ -2884,6 +2859,13 @@ rebuildExMap();
 try { setTab(S.active ? 'trening' : 'start'); } catch (e) { console.error(e); }
 loadExercises().finally(hideSplash);
 setTimeout(() => { try { whatsNew(); } catch (e) { console.error(e); } }, 2600);
+
+// polityka prywatności: bez akceptacji aktualnej wersji pokaż okno akceptacji
+setTimeout(() => {
+  if (typeof checkPolicy === 'function') {
+    checkPolicy();
+  }
+}, 2400);
 
 // odznaki: przy starcie sprawdź, czy coś nowego (np. zdobyte na innym telefonie albo po aktualizacji)
 setTimeout(() => {

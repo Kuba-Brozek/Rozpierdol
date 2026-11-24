@@ -94,6 +94,8 @@ async function cloudLogin(email, password) {
   fetchAccountCreated();
   await firstSyncAfterLogin();
   if (typeof whatsNew === 'function') setTimeout(whatsNew, 800);
+  // dane z chmury mogły podmienić S — sprawdź akceptację polityki dla tego konta
+  if (typeof checkPolicy === 'function') setTimeout(checkPolicy, 400);
 }
 async function cloudSignup(email, password) {
   const r = await authPost('signUp', { email, password, returnSecureToken: true });
@@ -521,6 +523,9 @@ async function touchUser(force) {
     // same numery lat z treningami (bez treści) — żeby przy usuwaniu konta wiadomo było, które dokumenty roczne skasować
     years: { arrayValue: { values: [...new Set([...Object.keys(SY.yearSeen || {}), ...S.workouts.map(wYear)])].map(y => ({ stringValue: y })) } },
     standalone: { booleanValue: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches }, ver: { stringValue: ver },
+    // która wersja polityki prywatności i kiedy została zaakceptowana (dowód zgody)
+    policyV: { integerValue: String((S.policy && S.policy.v) || 0) },
+    policyAt: { integerValue: String((S.policy && S.policy.at) || 0) },
   };
   try {
     await authed(usersUrl(s.uid), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
@@ -570,7 +575,7 @@ async function renderAdmin(b) {
   const blockedIds = new Set(blocked.map(x => x.id));
   const map = {};
   users.forEach(u => map[u.id] = { uid: u.id, email: fStr(u.f, 'email'), created: fNum(u.f, 'createdAt'), seen: fNum(u.f, 'lastSeen'),
-    weights: fNum(u.f, 'weights'), workouts: fNum(u.f, 'workouts'), plans: fNum(u.f, 'plans'), app: !!(u.f.standalone && u.f.standalone.booleanValue), ver: fStr(u.f, 'ver'),
+    weights: fNum(u.f, 'weights'), workouts: fNum(u.f, 'workouts'), plans: fNum(u.f, 'plans'), app: !!(u.f.standalone && u.f.standalone.booleanValue), ver: fStr(u.f, 'ver'), policyV: fNum(u.f, 'policyV'), policyAt: fNum(u.f, 'policyAt'),
     years: ((u.f.years && u.f.years.arrayValue && u.f.years.arrayValue.values) || []).map(v => v.stringValue) });
   const list = Object.values(map).filter(u => !blockedIds.has(u.uid)).sort((a, b2) => b2.seen - a.seen);
   const when = at => at ? new Date(at).toLocaleString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–';
@@ -583,7 +588,8 @@ async function renderAdmin(b) {
         ${u.uid === me ? '' : `<button class="btn danger" type="button" style="padding:6px 12px;min-height:0" data-udel="${esc(u.uid)}">Usuń</button>`}</div>
       <div class="muted small">Konto od ${day(u.created)} · ostatnio ${when(u.seen)}<br>
         ${plural(u.weights, 'pomiar', 'pomiary', 'pomiarów')} wagi, ${plural(u.workouts, 'trening', 'treningi', 'treningów')}, ${plural(u.plans, 'plan', 'plany', 'planów')}<br>
-        ${u.app ? 'Apka na ekranie początkowym' : 'W przeglądarce'}${u.ver ? ' · wersja ' + esc(u.ver) : ''}</div>
+        ${u.app ? 'Apka na ekranie początkowym' : 'W przeglądarce'}${u.ver ? ' · wersja ' + esc(u.ver) : ''}<br>
+        ${u.policyV ? `Polityka prywatności: wersja ${u.policyV}, zaakceptowana ${day(u.policyAt)}` : 'Polityka prywatności: jeszcze nie zaakceptowana'}</div>
     </div>`).join('') || '<p class="muted" style="margin:0">Brak kont.</p>'}</div>
     ${blocked.length ? `<h3 style="margin:8px 0 0">Usunięte i zablokowane</h3>
     <div class="list">${blocked.map(x => `<div class="li"><span class="grow small">${esc(fStr(x.f, 'email') || x.id)}<br><span class="muted">${when(fNum(x.f, 'at'))}</span></span>
@@ -733,6 +739,7 @@ function hideAuthScreen() {
   a.classList.add('hide'); setTimeout(() => a.remove(), 300);
   document.body.style.overflow = '';
   if (typeof whatsNew === 'function') setTimeout(whatsNew, 1200);
+  if (typeof checkPolicy === 'function') setTimeout(checkPolicy, 600);
 }
 function showAuthScreen(mode = 'login') {
   if (!cloudReady()) return;
@@ -753,6 +760,11 @@ function showAuthScreen(mode = 'login') {
           <input type="password" id="auth-pass" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="6" required>
           <button type="button" id="auth-eye" aria-label="Pokaż hasło">Pokaż</button>
         </div>
+        ${signup ? `
+        <label class="auth-check">
+          <input type="checkbox" id="auth-policy">
+          <span>Akceptuję <button type="button" class="auth-link strong" id="auth-read">politykę prywatności</button> (zasady przetwarzania danych).</span>
+        </label>` : ''}
         <p class="auth-msg" id="auth-msg" aria-live="polite"></p>
         <button class="auth-btn" type="submit">${signup ? 'Załóż konto' : 'Zaloguj'}</button>
       </form>
@@ -765,6 +777,15 @@ function showAuthScreen(mode = 'login') {
   const say = (t, ok) => { msg.textContent = t; msg.classList.toggle('ok', !!ok); };
   $a('#auth-eye').onclick = () => { const p = $a('#auth-pass'), show = p.type === 'password'; p.type = show ? 'text' : 'password'; $a('#auth-eye').textContent = show ? 'Ukryj' : 'Pokaż'; };
   $a('#auth-mode').onclick = () => showAuthScreen(signup ? 'login' : 'signup');
+
+  const read = $a('#auth-read');
+  if (read) {
+    read.onclick = () => {
+      if (typeof showPolicyText === 'function') {
+        showPolicyText();
+      }
+    };
+  }
   $a('#auth-skip').onclick = () => { try { localStorage.setItem(SKIP_KEY, '1'); } catch (e) {} hideAuthScreen(); toast('Możesz zalogować się później w Ustawieniach'); };
   const reset = $a('#auth-reset');
   if (reset) reset.onclick = async () => {
@@ -780,9 +801,25 @@ function showAuthScreen(mode = 'login') {
     const em = $a('#auth-email').value.trim(), pw = $a('#auth-pass').value;
     if (!em) { say('Wpisz e-mail.'); $a('#auth-email').focus(); return; }
     if (pw.length < 6) { say(signup ? 'Hasło musi mieć co najmniej 6 znaków.' : 'Wpisz hasło.'); $a('#auth-pass').focus(); return; }
+
+    // zakładanie konta wymaga akceptacji polityki prywatności
+    const pol = $a('#auth-policy');
+    if (signup && pol && !pol.checked) {
+      say('Zaakceptuj politykę prywatności, żeby założyć konto.');
+      pol.focus();
+      return;
+    }
     busy(true); say(signup ? 'Zakładam konto…' : 'Loguję…', true);
     try {
-      if (signup) await cloudSignup(em, pw); else await cloudLogin(em, pw);
+      if (signup) {
+        await cloudSignup(em, pw);
+        // akceptacja z formularza trafia do danych nowego konta (wersja + czas)
+        if (typeof acceptPolicy === 'function') {
+          acceptPolicy();
+        }
+      } else {
+        await cloudLogin(em, pw);
+      }
       try { localStorage.removeItem(SKIP_KEY); } catch (e2) {}
       hideAuthScreen(); toast(signup ? 'Konto założone' : 'Zalogowano');
       if (UI.tab === 'wiecej') renderWiecej();
