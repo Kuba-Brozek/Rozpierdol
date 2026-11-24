@@ -595,3 +595,5 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .pin-sheet .pin-keys button { background: var(--surface-2); }
 .pin-sheet .pin-keys .pin-fn { background: transparent; }
 .pin-sheet .pin-msg { color: var(--bad); }
+.lock-bio { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border: 0; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; font: 600 16px/1 var(--num); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lock-bio:active { background: rgba(255,255,255,.28); }

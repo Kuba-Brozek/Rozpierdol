@@ -34,15 +34,20 @@ async function bioAvailable() {
 async function bioEnroll() {
   const cred = await navigator.credentials.create({ publicKey: {
     challenge: rnd(32), rp: { name: 'Rozpierdol', id: location.hostname },
-    user: { id: rnd(16), name: 'Blokada apki Rozpierdol', displayName: 'Blokada apki Rozpierdol' },
+    // ta nazwa pokazuje się w okienku iPhone'a („Klucz dostępu… dla …”), więc ma mówić, do czego służy
+    user: { id: rnd(16), name: 'Rozpierdol – blokada apki', displayName: 'Rozpierdol – blokada apki' },
     pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
     authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' },
     timeout: 60000, attestation: 'none',
   } });
   LK.bio = b64(cred.rawId); lockSave();
 }
+// iPhone pozwala zapytać o Face ID tylko po stuknięciu w ekran (zabezpieczenie Safari),
+// dlatego automatyczna próba przy otwarciu może się nie udać — wtedy zostaje duży przycisk.
+let bioBusy = false;
 async function bioCheck() {
-  if (!LK || !LK.bio) return false;
+  if (!LK || !LK.bio || bioBusy) return false;
+  bioBusy = true;
   try {
     const r = await navigator.credentials.get({ publicKey: {
       challenge: rnd(32), rpId: location.hostname, userVerification: 'required', timeout: 60000,
@@ -50,6 +55,7 @@ async function bioCheck() {
     } });
     return !!r;
   } catch (e) { return false; }
+  finally { bioBusy = false; }
 }
 
 /* ---- klawiatura PIN (ekran blokady i okna w ustawieniach) ---- */
@@ -100,11 +106,11 @@ function showLock() {
   const main = () => {
     el.innerHTML = `<div class="lock-inner">
       <div class="lock-logo">${typeof DUMBBELL_SVG !== 'undefined' ? DUMBBELL_SVG : ''}</div>
-      <h1>Wpisz kod</h1><div id="lock-pad"></div>
+      <h1>Wpisz kod</h1>${LK.bio ? `<button class="lock-bio" type="button" id="lock-bio">${BIO_ICON}<span>Odblokuj Face ID</span></button>` : ""}<div id="lock-pad"></div>
       <button class="link" type="button" id="lock-forgot">Nie pamiętam kodu</button></div>`;
     const bioTry = LK.bio ? async () => { if (await bioCheck()) unlock(); } : null;
     const pad = pinPad(el.querySelector('#lock-pad'), {
-      bio: bioTry,
+      bio: null, // Face ID ma własny, duży przycisk nad kropkami
       onDone: async pin => {
         if (LK.until > Date.now()) { pad.clear(); return; }
         if (await checkPin(pin)) return unlock();
@@ -123,7 +129,9 @@ function showLock() {
     };
     waitTick();
     el.querySelector('#lock-forgot').onclick = forgot;
-    if (bioTry) setTimeout(bioTry, 350); // od razu zapytaj o twarz / palec
+    const bb = el.querySelector("#lock-bio"); if (bb) bb.onclick = bioTry;
+    // od razu zapytaj o twarz; jeśli iPhone nie pozwoli bez stuknięcia, zostaje przycisk wyżej
+    if (bioTry && !document.hidden) setTimeout(bioTry, 350);
   };
   // Zapomniany kod: z kontem — hasło do konta zdejmuje blokadę; bez konta — tylko usunięcie danych z telefonu
   const forgot = () => {
@@ -211,11 +219,20 @@ function renderLockCard(card) {
     });
   };
   const bio = $('#lk-bio', card);
-  if (bio) bio.onchange = async () => {
-    if (bio.checked) {
-      try { await bioEnroll(); toast('Face ID / Touch ID włączone'); }
-      catch (e) { bio.checked = false; toast('Nie udało się włączyć Face ID / Touch ID'); }
-    } else { delete LK.bio; lockSave(); toast('Face ID / Touch ID wyłączone'); }
+  if (bio) bio.onchange = () => {
+    if (!bio.checked) { delete LK.bio; lockSave(); toast('Face ID / Touch ID wyłączone'); return; }
+    bio.checked = false; // włączy się dopiero po udanym zapisaniu
+    // iPhone obsługuje Face ID w aplikacjach webowych przez „klucz dostępu” — uprzedzamy o jego okienkach
+    openSheet('Face ID / Touch ID', `
+      <p style="margin:0">Za chwilę iPhone pokaże swoje okienko z pytaniem o <b>zapisanie klucza dostępu</b> dla <b>${esc(location.hostname)}</b>. Stuknij <b>Kontynuuj</b> i potwierdź twarzą albo palcem.</p>
+      <p class="muted small" style="margin:0">To normalne: tak działa Face ID w aplikacjach z przeglądarki. Klucz nie jest hasłem do niczego, służy tylko do odblokowania tej apki. Przy odblokowaniu iPhone też może najpierw pokazać krótkie okienko „Zaloguj się kluczem dostępu”.</p>
+      <button class="btn primary block" type="button" id="bio-go">Dalej</button>
+      <button class="btn block" type="button" data-close>Anuluj</button>`, b => {
+      $('#bio-go', b).onclick = async () => {
+        try { await bioEnroll(); closeSheet(); toast('Face ID / Touch ID włączone'); renderLockCard(card); }
+        catch (e) { closeSheet(); toast('Nie udało się włączyć Face ID / Touch ID'); }
+      };
+    });
   };
   const dl = $('#lk-delay', card);
   if (dl) dl.onchange = () => { LK.delay = +dl.value; lockSave(); toast('Zapisano'); };
