@@ -1287,7 +1287,7 @@ function bodyMapHTML() {
 }
 function musclesNavCard() {
   const n = Object.values(muscleSets()).reduce((s, o) => s + o.main, 0);
-  return navCard('miesnie', '💪', 'Partie mięśni', n ? `ostatnie 7 dni: ${plural(n, 'seria', 'serie', 'serii')}` : 'serie na każdą partię z ostatnich 7 dni');
+  return navCard('miesnie', '💪', 'Graf trenowanych partii mięśniowych', n ? `ostatnie 7 dni: ${plural(n, 'seria', 'serie', 'serii')}` : 'serie na każdą partię z ostatnich 7 dni');
 }
 // Osobny ekran w zakładce Forma
 function renderMiesnie() {
@@ -2436,7 +2436,7 @@ const CHANGELOG = [
   ] },
   { id: 5, t: 'Forma i mapa mięśni', items: [
     'Zakładka Dieta nazywa się teraz <b>Forma</b> i ma nową ikonę. Pasuje do każdego celu: redukcji, utrzymania i masy.',
-    'Nowy ekran <b>Partie mięśni</b> (Forma → 💪). Sylwetka z przodu i z tyłu, a ćwiczone partie świecą na czerwono. Stuknij partię, żeby zobaczyć serie z ostatnich 7 dni, dzień po dniu.',
+    'Nowy ekran <b>Graf trenowanych partii mięśniowych</b> (Forma → 💪). Sylwetka z przodu i z tyłu, a ćwiczone partie świecą na czerwono. Stuknij partię, żeby zobaczyć serie z ostatnich 7 dni, dzień po dniu.',
     'Osobna sylwetka dla profilu „Kobieta”.',
     'Okno „Co nowego” po aktualizacji. Pełną listę zmian znajdziesz w Ustawieniach → Inne.',
   ] },
