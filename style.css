@@ -1727,3 +1727,53 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   color: var(--muted);
   margin-left: 6px;
 }
+
+/* ---------- Trening: usuwanie dowolnej serii ---------- */
+.check.del {
+  background: var(--bad-soft);
+  color: var(--bad);
+  border-color: transparent;
+  font-weight: 700;
+}
+
+/* „+ Dodaj ćwiczenie” zawsze widoczny: przykleja się nad paskiem zakładek (i nad paskiem przerwy) */
+.t-add-sticky {
+  position: sticky;
+  bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom, 0px) + 12px + var(--rest-h, 0px));
+  z-index: 5;
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / .18);
+  transition: bottom .2s ease;
+}
+
+/* ---------- Ustawienia → Poleć apkę: kod QR ---------- */
+.qr-box {
+  align-self: center;
+  width: min(72vw, 260px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.qr-box svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.qr-url {
+  margin: 0;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+a.btn.qr-link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+}

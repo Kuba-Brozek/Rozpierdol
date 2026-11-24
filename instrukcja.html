@@ -1,0 +1,264 @@
+<!doctype html>
+<!-- Strona, na którą prowadzi kod QR z Ustawień („Poleć apkę”): czym jest apka, jak ją zainstalować i co potrafi.
+     Zwykła strona (bez service workera), żeby działała też u osób, które jeszcze nie mają apki. -->
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rozpierdol: instalacja</title>
+<meta name="description" content="Jak zainstalować apkę Rozpierdol na telefonie i co potrafi.">
+<meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f12" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --surface-2: #e9ecf0;
+    --fg: #14171c;
+    --muted: #5f6774;
+    --line: #dde1e7;
+    --accent: #1f5fd1;
+    --accent-fg: #ffffff;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0f12;
+      --surface: #171a1f;
+      --surface-2: #22262d;
+      --fg: #eceef2;
+      --muted: #939aa6;
+      --line: #2b3038;
+      --accent: #6aa3ff;
+      --accent-fg: #0b0d10;
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  main {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px calc(env(safe-area-inset-bottom, 0px) + 32px);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    padding: 8px 0 4px;
+  }
+
+  .hero img {
+    width: 84px;
+    height: 84px;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / .18);
+  }
+
+  h1 {
+    margin: 4px 0 0;
+    font-size: 30px;
+    line-height: 1.1;
+    letter-spacing: -.02em;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 19px;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  .muted {
+    color: var(--muted);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  ol,
+  ul {
+    margin: 0;
+    padding-left: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .btn {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+    font-weight: 700;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--surface-2);
+  }
+
+  .tabs button {
+    border: 0;
+    border-radius: 9px;
+    padding: 9px 6px;
+    font: inherit;
+    font-weight: 600;
+    background: none;
+    color: var(--muted);
+  }
+
+  .tabs button[aria-pressed="true"] {
+    background: var(--surface);
+    color: var(--fg);
+    box-shadow: 0 1px 4px rgb(0 0 0 / .12);
+  }
+
+  .note {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .foot {
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <img src="icons/icon-192.png" alt="" width="84" height="84">
+    <h1>Rozpierdol</h1>
+    <p class="muted">Dieta i trening w jednej apce. Za darmo i bez reklam.</p>
+  </section>
+
+  <a class="btn" href="./">Otwórz apkę</a>
+
+  <section class="card">
+    <h2>Co to za apka</h2>
+    <p>Rozpierdol pomaga schudnąć, utrzymać wagę albo zbudować masę i ćwiczyć regularnie. Wpisujesz wagę i pomiary ciała, a apka liczy BMI, średnią z 7 dni, pokazuje wykres postępu i podpowiada, ile kalorii jeść. Zapisujesz treningi z bazy ćwiczeń ze zdjęciami, a apka pilnuje rekordów i pokazuje, które partie mięśni ostatnio trenowałeś.</p>
+  </section>
+
+  <section class="card">
+    <h2>Jak zainstalować</h2>
+    <p class="muted">Apki nie ma w sklepie. Instalujesz ją prosto ze strony, zajmuje to pół minuty.</p>
+    <div class="tabs" role="group" aria-label="Telefon">
+      <button type="button" data-os="ios" aria-pressed="true">iPhone</button>
+      <button type="button" data-os="android" aria-pressed="false">Android</button>
+    </div>
+
+    <div data-for="ios">
+      <ol>
+        <li>Otwórz tę stronę w <b>Safari</b>.</li>
+        <li>Stuknij przycisk <b>Udostępnij</b> (kwadrat ze strzałką w górę) na dolnym pasku.</li>
+        <li>Przewiń w dół i wybierz <b>Do ekranu początkowego</b>.</li>
+        <li>Stuknij <b>Dodaj</b>. Ikona Rozpierdolu pojawi się na ekranie telefonu.</li>
+      </ol>
+    </div>
+
+    <div data-for="android" hidden>
+      <ol>
+        <li>Otwórz tę stronę w <b>Chrome</b>.</li>
+        <li>Stuknij <b>⋮</b> w prawym górnym rogu.</li>
+        <li>Wybierz <b>Zainstaluj aplikację</b> albo <b>Dodaj do ekranu głównego</b>.</li>
+        <li>Potwierdź. Ikona Rozpierdolu pojawi się na ekranie telefonu.</li>
+      </ol>
+      <p class="note">Na telefonach Xiaomi (MIUI, HyperOS) użyj Chrome, a nie wbudowanej przeglądarki Mi. Jeśli zobaczysz błąd 404, sprawdź, czy adres to dokładnie kuba-brozek.github.io/Rozpierdol/ (z dużym R).</p>
+    </div>
+
+    <p class="note">Potem otwieraj apkę z ikony na ekranie. Działa jak zwykła aplikacja, także bez internetu.</p>
+  </section>
+
+  <section class="card">
+    <h2>Co potrafi</h2>
+    <ul>
+      <li><b>Postęp:</b> waga, BMI, trend z 7 dni, kalorie, podsumowanie miesiąca i graf trenowanych partii mięśniowych.</li>
+      <li><b>Ciało:</b> wpisy wagi i pomiary obwodów z wykresami.</li>
+      <li><b>Trening:</b> baza ćwiczeń ze zdjęciami, własne plany, serie i dropsety, licznik przerwy, rekordy i wykres progresu.</li>
+      <li><b>Kalendarz:</b> historia treningów i planowanie kolejnych.</li>
+      <li><b>Motywacja:</b> osiągnięcia, poziomy z punktami XP i seria dni z ważeniem.</li>
+      <li><b>Konto:</b> kopia w chmurze, ten sam stan na kilku telefonach i udostępnianie planów albo wagi wybranym osobom.</li>
+      <li><b>Prywatność:</b> blokada kodem albo Face ID, kopia zapasowa w Excelu.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Pierwsze kroki</h2>
+    <ol>
+      <li>W Ustawieniach (ikona w prawym górnym rogu) uzupełnij <b>profil i cel</b>.</li>
+      <li>W zakładce <b>Ciało</b> wpisz dzisiejszą wagę.</li>
+      <li>Załóż konto w Ustawieniach, żeby dane nie zginęły razem z telefonem.</li>
+      <li>W zakładce <b>Trening</b> stuknij „Zacznij trening” i dodaj ćwiczenia.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Wyskakuje „Cofnij wpisywanie”?</h2>
+    <p>To funkcja iPhone'a, która reaguje na potrząśnięcie telefonem, np. w trakcie ćwiczeń. Wyłączysz ją w <b>Ustawienia → Dostępność → Dotyk</b>: na dole wyłącz opcję cofania potrząśnięciem (po angielsku „Shake to Undo”).</p>
+  </section>
+
+  <a class="btn" href="./">Otwórz apkę</a>
+
+  <p class="foot">©2026 Rozpierdol</p>
+</main>
+
+<script>
+  // przełącznik iPhone / Android; na start zgadujemy po telefonie
+  const tabs = document.querySelectorAll('[data-os]');
+
+  function showOs(os) {
+    tabs.forEach(b => {
+      b.setAttribute('aria-pressed', String(b.dataset.os === os));
+    });
+    document.querySelectorAll('[data-for]').forEach(el => {
+      el.hidden = el.dataset.for !== os;
+    });
+  }
+
+  tabs.forEach(b => {
+    b.addEventListener('click', () => showOs(b.dataset.os));
+  });
+
+  if (/android/i.test(navigator.userAgent)) {
+    showOs('android');
+  }
+</script>
+</body>
+</html>

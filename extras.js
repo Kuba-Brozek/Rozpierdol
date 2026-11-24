@@ -963,6 +963,8 @@ function restStop() {
   if (bar) {
     bar.remove();
   }
+  // przycisk „+ Dodaj ćwiczenie” wraca na swoje miejsce nad paskiem zakładek
+  document.documentElement.style.setProperty('--rest-h', '0px');
 }
 
 function restShift(sec) {
@@ -1007,6 +1009,9 @@ function restBar() {
   const tabs = document.querySelector('.tabs');
   const tabsH = tabs ? tabs.offsetHeight : 64;
   bar.style.bottom = (tabsH + 10) + 'px';
+
+  // przyklejony przycisk „+ Dodaj ćwiczenie” podjeżdża nad pasek przerwy
+  document.documentElement.style.setProperty('--rest-h', (bar.offsetHeight + 10) + 'px');
 
   return bar;
 }

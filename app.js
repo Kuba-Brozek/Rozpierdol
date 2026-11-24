@@ -1830,6 +1830,10 @@ function renderTrening() {
     return;
   }
   const editing = !!A.editId;
+  // tryb usuwania serii nie może wskazywać na ćwiczenie, którego już nie ma
+  if (setDelEi !== null && !A.ex[setDelEi]) {
+    setDelEi = null;
+  }
   body.innerHTML = `
     ${editing ? `<section class="card edit-head">
         <div class="row"><b>Edycja zapisanego treningu</b>${A.planName ? `<span class="pill good">Plan: ${esc(A.planName)}</span>` : ''}</div>
@@ -1861,11 +1865,11 @@ function renderTrening() {
           <button class="icon-btn" type="button" data-act="more" aria-label="Opcje ćwiczenia: zamień, co wpisujesz">${MORE_ICON}</button>
           <button class="icon-btn" type="button" data-act="rm" aria-label="Usuń ćwiczenie">✕</button>
         </div>
-        ${setsEditorHTML(e, prev)}
+        ${setsEditorHTML(e, prev, ei)}
       </section>`;
     }).join('')}
     ${A.ex.length ? '' : `<div class="card empty"><strong>${editing ? 'Brak ćwiczeń' : 'Trening trwa'}</strong><span>Dodaj ${editing ? '' : 'pierwsze '}ćwiczenie.</span></div>`}
-    <button class="btn block" type="button" id="t-add">+ Dodaj ćwiczenie</button>
+    <button class="btn block t-add-sticky" type="button" id="t-add">+ Dodaj ćwiczenie</button>
     <div class="btns"><button class="btn danger" type="button" id="t-cancel">${editing ? 'Odrzuć zmiany' : 'Odrzuć'}</button><button class="btn primary" type="button" id="t-finish">Zapisz trening</button></div>`;
   const dateInp = $('#t-date', body);
   if (dateInp) dateInp.onchange = () => { if (dateInp.value) { A.date = dateInp.value; save(); } };
@@ -1880,12 +1884,12 @@ function renderTrening() {
     if (b.dataset.act === 'rm') {
       const n = A.ex[ei].sets.filter(filled).length;
       // w kompaktowym widoku serii nie widać, więc przy wpisanych seriach pytamy
-      if (compactView() && n) { confirmBox('Usunąć ćwiczenie?', `Wpisane serie (${n}) zostaną usunięte z tego treningu.`, 'Usuń', true).then(ok => { if (ok) { A.ex.splice(ei, 1); save(); renderTrening(); } }); return; }
-      A.ex.splice(ei, 1); save(); renderTrening(); return;
+      if (compactView() && n) { confirmBox('Usunąć ćwiczenie?', `Wpisane serie (${n}) zostaną usunięte z tego treningu.`, 'Usuń', true).then(ok => { if (ok) { A.ex.splice(ei, 1); setDelEi = null; save(); renderTrening(); } }); return; }
+      A.ex.splice(ei, 1); setDelEi = null; save(); renderTrening(); return;
     }
     if (setsAction(b, ei)) renderTrening();
   };
-  dragSort(body, '.ex-card', (from, to) => { moveItem(A.ex, from, to); save(); renderTrening(); });
+  dragSort(body, '.ex-card', (from, to) => { moveItem(A.ex, from, to); setDelEi = null; save(); renderTrening(); });
   $('#t-add').onclick = () => pickExercise(id => { addExToActive(id); closeSheet(); renderTrening(); toast('Dodano: ' + exName(EXMAP[id])); });
   $('#t-cancel').onclick = async () => {
     const ok = editing
@@ -1899,8 +1903,12 @@ function renderTrening() {
 const MORE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
 const compactView = () => { try { return localStorage.getItem('rozpierdol-kompakt') === '1'; } catch (e) { return false; } };
 const setCompactView = on => { try { localStorage.setItem('rozpierdol-kompakt', on ? '1' : '0'); } catch (e) {} };
-function setsEditorHTML(e, prev) {
+// Tryb usuwania serii: numer ćwiczenia (ei), w którym zamiast ✓ są czerwone ✕ przy każdej serii
+let setDelEi = null;
+
+function setsEditorHTML(e, prev, ei) {
   const ex = EXMAP[e.id], fs = exFields(e.id).map(f => FIELD[f]);
+  const delMode = setDelEi === ei && e.sets.length > 0;
   return `<div class="sets${fs.length > 3 ? ' many' : ''}" style="grid-template-columns:24px ${fs.map(F => F.text ? 'minmax(0, 1.6fr)' : 'minmax(0, 1fr)').join(' ')} 44px">
       <span class="hd">#</span>${fs.map(F => `<span class="hd">${F.h}</span>`).join('')}<span class="hd">✓</span>
       ${(() => { let no = 0; return e.sets.map((s, si) => {
@@ -1913,11 +1921,21 @@ function setsEditorHTML(e, prev) {
             ? `<input type="text" inputmode="text" autocomplete="off" maxlength="12" data-si="${si}" data-f="${k}" data-text="1" value="${esc(v ?? '')}" placeholder="${esc(p)}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`
             : `<input type="number" inputmode="${F.im}" step="${F.step}" data-si="${si}" data-f="${k}" value="${v ?? ''}" placeholder="${p}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`;
         }).join('')}
-        <button class="check" type="button" data-act="done" data-si="${si}" aria-pressed="${!!s.done}" aria-label="Seria ${si + 1} zrobiona">✓</button>`;
+        ${delMode
+          ? `<button class="check del" type="button" data-act="rmset" data-si="${si}" aria-label="Usuń serię ${si + 1}">✕</button>`
+          : `<button class="check" type="button" data-act="done" data-si="${si}" aria-pressed="${!!s.done}" aria-label="Seria ${si + 1} zrobiona">✓</button>`}`;
       }).join(''); })()}
     </div>
-    <div class="row"><span class="set-links"><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length && !isCardio(ex) ? ' <button class="link" type="button" data-act="adddrop">+ Drop</button>' : ''}</span>${e.sets.length ? '<button class="link" type="button" data-act="pop" style="color:var(--muted)">Usuń ostatnią</button>' : ''}</div>
-    ${e.sets.length > 1 && !isCardio(ex) && !e.sets.some(s => s.drop) ? '<p class="muted small" style="margin:0">Dropset: „+ Drop” albo stuknij numer serii.</p>' : ''}`;
+    ${delMode
+      ? `<div class="row">
+          <span class="small muted">Stuknij ✕ przy serii, którą chcesz usunąć</span>
+          <button class="link" type="button" data-act="delmode">Gotowe</button>
+        </div>`
+      : `<div class="row">
+          <span class="set-links"><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length && !isCardio(ex) ? ' <button class="link" type="button" data-act="adddrop">+ Drop</button>' : ''}</span>
+          ${e.sets.length ? '<button class="link" type="button" data-act="delmode" style="color:var(--muted)">Usuń serię</button>' : ''}
+        </div>`}
+    ${!delMode && e.sets.length > 1 && !isCardio(ex) && !e.sets.some(s => s.drop) ? '<p class="muted small" style="margin:0">Dropset: „+ Drop” albo stuknij numer serii.</p>' : ''}`;
 }
 function setsInput(e) {
   const inp = e.target.closest('input[data-f]'); if (!inp || !S.active) return;
@@ -1937,6 +1955,25 @@ function setsAction(b, ei) {
   }
   else if (act === 'drop') { const s = ex.sets[+b.dataset.si]; if (s.drop) delete s.drop; else s.drop = true; }
   else if (act === 'pop') ex.sets.pop();
+  else if (act === 'delmode') {
+    // jedna seria — usuwamy od razu, bez trybu wybierania
+    if (setDelEi !== ei && ex.sets.length === 1) {
+      ex.sets.pop();
+    } else {
+      setDelEi = setDelEi === ei ? null : ei;
+      return true;
+    }
+  }
+  else if (act === 'rmset') {
+    ex.sets.splice(+b.dataset.si, 1);
+    // pierwsza seria nie może być dropsetem (nie ma czego kontynuować)
+    if (ex.sets[0] && ex.sets[0].drop) {
+      delete ex.sets[0].drop;
+    }
+    if (!ex.sets.length) {
+      setDelEi = null;
+    }
+  }
   else if (act === 'done') {
     const s = ex.sets[+b.dataset.si];
     if (!s.done) { // uzupełnij puste pola podpowiedzią z poprzedniego treningu
@@ -1961,7 +1998,7 @@ function exDetail(ei) {
         <div class="small muted" style="flex:1">${prev ? `Ostatnio (${dayLabel(prev.date)}): ${setsSummary(ex, prev.sets)}` : 'Pierwszy raz'}</div>
         <button class="icon-btn" type="button" data-act="more" aria-label="Opcje ćwiczenia: zamień, co wpisujesz">${MORE_ICON}</button>
       </div>
-      ${setsEditorHTML(e, prev)}
+      ${setsEditorHTML(e, prev, ei)}
     </div>
     <button class="btn primary block" type="button" data-close>Gotowe</button>`, b => {
     b.addEventListener('input', e2 => { setsInput(e2); renderTrening(); });
@@ -1983,7 +2020,7 @@ function exMenu(ei) {
     $('#em-fields', b).onclick = () => { pickFields(e.id); SHEET_BACK = () => exMenu(ei); };
     $('#em-rm', b).onclick = async () => {
       if (n && !await confirmBox('Usunąć ćwiczenie?', `Wpisane serie (${n}) zostaną usunięte z tego treningu.`, 'Usuń', true)) return;
-      A.ex.splice(ei, 1); save(); closeSheet(); renderTrening();
+      A.ex.splice(ei, 1); setDelEi = null; save(); closeSheet(); renderTrening();
     };
     $('#em-swap', b).onclick = () => pickExercise(newId => {
       if (newId === e.id) { closeSheet(); return; }
@@ -2748,6 +2785,7 @@ function renderWiecej() {
       <button class="btn danger" type="button" id="wipe">Usuń wszystkie dane</button>
     </section>
     <section class="card" data-sec="log"></section>
+    <section class="card" data-sec="qr"></section>
     <section class="card" data-sec="sug" id="sug-box"></section>
     ${IS_ADMIN ? '<section class="card" data-sec="sugadmin" id="sugadmin-box"></section><section class="card" data-sec="admin"></section>' : ''}
     <section class="card rodo" data-sec="rodo">
@@ -2853,7 +2891,7 @@ const SECS = [
   ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], ['lock', '🔒', 'Blokada apki'], null,
   ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Postęp'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
-  ['log', '🆕', 'Co nowego'], ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
+  ['log', '🆕', 'Co nowego'], ['qr', '📲', 'Poleć apkę'], ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
 ];
 function secSub(k) {
   const p = S.profile, th = getTheme(), sy = typeof SY !== 'undefined' ? SY : null;
@@ -2866,6 +2904,7 @@ function secSub(k) {
     case 'excel': return 'Zapisz albo wczytaj plik .xlsx';
     case 'dane': return `${plural(S.weights.length, 'pomiar', 'pomiary', 'pomiarów')} wagi, ${plural(S.workouts.length, 'trening', 'treningi', 'treningów')}`;
     case 'log': return `Wersja ${APP_VERSION} · ostatnio: ${esc(CHANGELOG[0].t)}`;
+    case 'qr': return 'Kod QR z instrukcją instalacji';
     case 'sug': return 'Napisz, co ulepszyć w apce';
     case 'sugadmin': return 'Widoczne tylko dla admina';
     case 'admin': return 'Konta użytkowników';
@@ -2874,7 +2913,7 @@ function secSub(k) {
   }
 }
 // Ustawienia na jednej stronie z kartami. Sugestie / polityka / reklamacje: karta „Inne”, każda pozycja otwiera okno.
-const SHEET_SECS = ['log', 'sug', 'sugadmin', 'admin', 'about', 'rodo', 'compl'];
+const SHEET_SECS = ['log', 'qr', 'sug', 'sugadmin', 'admin', 'about', 'rodo', 'compl'];
 function applySettingsNav(body) {
   UI.sec = null;
   $('#h-wiecej').textContent = 'Ustawienia';
@@ -2888,6 +2927,86 @@ function applySettingsNav(body) {
   }).join('')}</div></section>`);
   $$('[data-open-sec]', body).forEach(b => b.onclick = () => openSec(b.dataset.openSec));
 }
+/* ============ Poleć apkę: kod QR do strony z instrukcją instalacji ============
+   Kod rysuje biblioteka vendor/qrcode.js (MIT, Kazuhiko Arase), ładowana dopiero przy otwarciu tego okna. */
+const INSTALL_URL = 'https://kuba-brozek.github.io/Rozpierdol/instrukcja.html';
+
+function loadQrLib() {
+  if (typeof qrcode === 'function') {
+    return Promise.resolve();
+  }
+  return new Promise((ok, fail) => {
+    const s = document.createElement('script');
+    s.src = 'vendor/qrcode.js';
+    s.onload = ok;
+    s.onerror = () => fail(new Error('Nie udało się wczytać generatora kodu QR.'));
+    document.head.appendChild(s);
+  });
+}
+
+// kod QR jako SVG: czarne moduły na białym tle (inaczej część aparatów go nie odczyta)
+function qrSVG(text) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  const n = qr.getModuleCount();
+  const pad = 4;
+  let d = '';
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (qr.isDark(r, c)) {
+        d += `M${c + pad} ${r + pad}h1v1h-1z`;
+      }
+    }
+  }
+  const size = n + pad * 2;
+  return `<svg viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges" role="img" aria-label="Kod QR do strony z instrukcją instalacji">
+    <rect width="${size}" height="${size}" fill="#fff"/>
+    <path fill="#000" d="${d}"/>
+  </svg>`;
+}
+
+function renderShareApp(box) {
+  box.innerHTML = `
+    <p style="margin:0">Pokaż ten kod znajomym. Po zeskanowaniu aparatem zobaczą, jak zainstalować apkę i co potrafi.</p>
+    <div class="qr-box" id="qr-box"><span class="muted small">Ładuję kod…</span></div>
+    <p class="small muted qr-url">${esc(INSTALL_URL.replace('https://', ''))}</p>
+    <div class="btns">
+      <button class="btn" type="button" id="qr-copy">Kopiuj link</button>
+      ${navigator.share ? '<button class="btn primary" type="button" id="qr-share">Wyślij</button>' : ''}
+    </div>
+    <a class="btn block qr-link" href="instrukcja.html" target="_blank" rel="noopener">Zobacz instrukcję</a>
+    <button class="btn block" type="button" data-close>OK</button>`;
+
+  loadQrLib()
+    .then(() => {
+      $('#qr-box', box).innerHTML = qrSVG(INSTALL_URL);
+    })
+    .catch(e => {
+      $('#qr-box', box).innerHTML = `<span class="small" style="color:var(--bad)">${esc(e.message)}</span>`;
+    });
+
+  $('#qr-copy', box).onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(INSTALL_URL);
+      toast('Skopiowano link');
+    } catch (e) {
+      toast('Nie udało się skopiować');
+    }
+  };
+
+  const share = $('#qr-share', box);
+  if (share) {
+    share.onclick = () => {
+      navigator.share({
+        title: 'Rozpierdol',
+        text: 'Apka do diety i treningu. Tu jest instrukcja instalacji:',
+        url: INSTALL_URL,
+      }).catch(() => {});
+    };
+  }
+}
+
 // Otwiera część ustawień: pozycje z karty „Inne” w oknie, pozostałe karty — przewija do nich
 function openSec(k) {
   const s = SECS.find(x => x && x[0] === k), src = $(`#wiecej-body [data-sec="${k}"]`);
@@ -2899,10 +3018,30 @@ function openSec(k) {
     else if (k === 'sugadmin') { if (typeof renderSuggestAdmin === 'function') renderSuggestAdmin(box); }
     else if (k === 'admin') { if (typeof renderAdmin === 'function') renderAdmin(box); }
     else if (k === 'log') { box.classList.add('log'); box.innerHTML = changelogHTML(CHANGELOG) + '<button class="btn block" type="button" data-close>OK</button>'; }
+    else if (k === 'qr') { renderShareApp(box); }
     else { src.classList.forEach(c => c !== 'card' && box.classList.add(c)); box.innerHTML = src.innerHTML + '<button class="btn block" type="button" data-close>OK</button>'; }
   });
 }
 $('#wiecej-back').addEventListener('click', () => goBack());
+
+/* ============ iPhone: okno „Cofnij wpisywanie” ============
+   iOS pokazuje je po potrząśnięciu telefonem (np. w trakcie ćwiczeń), gdy w polu jest coś do cofnięcia.
+   Strona nie może tej funkcji wyłączyć. Próbujemy ją wyciszyć: po wyjściu z pola przepisujemy jego wartość
+   skryptem, co w Safari czyści historię cofania pola. Pewny sposób: Ustawienia iPhone'a → Dostępność → Dotyk. */
+document.addEventListener('focusout', e => {
+  const el = e.target;
+  const TYPED = 'input[type="number"], input[type="text"], input[type="search"], input[type="email"], textarea';
+  if (!el || !el.matches || !el.matches(TYPED)) {
+    return;
+  }
+  const v = el.value;
+  // puste (albo niepoprawna liczba, którą przeglądarka zwraca jako '') — nie ruszamy, żeby nic nie skasować
+  if (v === '') {
+    return;
+  }
+  el.value = '';
+  el.value = v;
+}, true);
 
 /* ============ Przycisk ✕ do czyszczenia pola ============
    Jeden wspólny przycisk: pojawia się po prawej stronie aktywnego pola, gdy coś w nim jest.
@@ -2953,13 +3092,24 @@ $('#wiecej-back').addEventListener('click', () => goBack());
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.17.3';
+const APP_VERSION = '1.18.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 18,
+    v: '1.18.0',
+    t: 'Poleć apkę i wygodniejszy trening',
+    items: [
+      '<b>Usuniesz dowolną serię</b>, nie tylko ostatnią: „Usuń serię”, potem ✕ przy wybranej.',
+      'Przycisk <b>„+ Dodaj ćwiczenie”</b> jest zawsze widoczny nad dolnym paskiem, także w trakcie przerwy.',
+      'Nowe w Ustawieniach → Inne: <b>Poleć apkę</b>. Kod QR prowadzi do strony z instrukcją instalacji i opisem funkcji.',
+      'Mniej wyskakującego okna „Cofnij wpisywanie” na iPhonie. Całkiem wyłączysz je w Ustawieniach iPhone\'a → Dostępność → Dotyk.',
+    ],
+  },
   {
     id: 17,
     v: '1.17.0',
