@@ -849,3 +849,9 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   font-size: 10px;
   letter-spacing: -.02em;
 }
+
+/* „+ Seria” i „+ Drop” obok siebie */
+.set-links {
+  display: flex;
+  gap: 18px;
+}

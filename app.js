@@ -1639,7 +1639,7 @@ function setsEditorHTML(e, prev) {
         <button class="check" type="button" data-act="done" data-si="${si}" aria-pressed="${!!s.done}" aria-label="Seria ${si + 1} zrobiona">✓</button>`;
       }).join(''); })()}
     </div>
-    <div class="row"><span><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length && !isCardio(ex) ? ' <button class="link" type="button" data-act="adddrop">+ Drop</button>' : ''}</span>${e.sets.length ? '<button class="link" type="button" data-act="pop" style="color:var(--muted)">Usuń ostatnią</button>' : ''}</div>
+    <div class="row"><span class="set-links"><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length && !isCardio(ex) ? ' <button class="link" type="button" data-act="adddrop">+ Drop</button>' : ''}</span>${e.sets.length ? '<button class="link" type="button" data-act="pop" style="color:var(--muted)">Usuń ostatnią</button>' : ''}</div>
     ${e.sets.length > 1 && !isCardio(ex) && !e.sets.some(s => s.drop) ? '<p class="muted small" style="margin:0">Dropset: „+ Drop” albo stuknij numer serii.</p>' : ''}`;
 }
 function setsInput(e) {
