@@ -2653,7 +2653,7 @@ const CHANGELOG = [
       '<b>Timer przerwy</b>: startuje sam po odhaczeniu serii ✓. Możesz dodać albo odjąć 15 s, a stuknięcie w czas zmienia domyślną długość.',
       '<b>Dropsety</b>: „+ Drop” dodaje lżejszą serię ze strzałką ↘. Możesz też stuknąć numer serii. Dropset liczy się razem z poprzednią serią.',
       '<b>Wykres postępu</b> w szczegółach ćwiczenia: szacowany 1RM i objętość z każdego treningu.',
-      '<b>Podsumowanie miesiąca</b> w zakładce Trening: treningi, serie, objętość, czas, rekordy i zmiana wagi.',
+      '<b>Podsumowanie miesiąca</b> w zakładce Trening: treningi, serie, objętość, rekordy i zmiana wagi.',
       'Graf partii mięśniowych pokazuje teraz okres <b>7, 14 albo 30 dni</b>.',
       '<b>Odznaki</b> za treningi, rekordy, ciężary, ważenie i cele (Trening → 🎖️ Odznaki).',
       '<b>Seria dni ważenia</b> 🔥 w zakładce Postęp.',

@@ -206,7 +206,6 @@ function monthData(off) {
     prefix,
     n: ws.length,
     vol: ws.reduce((sum, w) => sum + volume(w), 0),
-    min: ws.reduce((sum, w) => sum + (durMin(w) || 0), 0),
     sets: ws.reduce(
       (sum, w) => sum + w.ex.reduce((t, e) => t + countSets(e.sets), 0),
       0,
@@ -243,8 +242,8 @@ function wireMonthSummary(el, off = UI.mOff || 0) {
   const canBack = c.prefix > first.slice(0, 7);
   const canFwd = off < 0;
 
-  const tile = (k, v, s) => `
-    <div class="ms-t">
+  const tile = (k, v, s, wide) => `
+    <div class="ms-t${wide ? ' wide' : ''}">
       <span class="k">${k}</span>
       <span class="v num">${v}</span>
       ${s ? `<span class="d">${s}</span>` : ''}
@@ -257,9 +256,6 @@ function wireMonthSummary(el, off = UI.mOff || 0) {
   const volTxt = c.vol >= 10000
     ? fmt(c.vol / 1000, 1) + ' t'
     : fmt(c.vol, 0) + ' kg';
-  const timeTxt = c.min >= 60
-    ? fmt(c.min / 60, 1) + ' h'
-    : c.min + ' min';
   const weightTxt = c.wch == null
     ? '–'
     : `<span class="${wcls(c.wch)}">${fmtSigned(c.wch, 1)}</span>`;
@@ -274,9 +270,8 @@ function wireMonthSummary(el, off = UI.mOff || 0) {
       ${tile('Treningi', c.n, vsPrev)}
       ${tile('Serie', c.sets)}
       ${tile('Objętość', volTxt)}
-      ${tile('Czas', timeTxt)}
       ${tile('Rekordy', c.prs ? '🏆 ' + c.prs : '0')}
-      ${tile('Waga', weightTxt, c.wch == null ? 'za mało pomiarów' : 'kg w miesiącu')}
+      ${tile('Waga', weightTxt, c.wch == null ? 'za mało pomiarów' : 'kg w miesiącu', true)}
     </div>`;
 
   $$('[data-mo]', el).forEach(b => {

@@ -855,3 +855,8 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   display: flex;
   gap: 18px;
 }
+
+/* kafelek na dwie kolumny (podsumowanie miesiąca ma 5 kafelków) */
+.ms-t.wide {
+  grid-column: span 2;
+}
