@@ -1191,6 +1191,35 @@ if (document.fonts && document.fonts.ready) {
 }
 window.addEventListener('resize', fitTopbarTitle);
 
+// Zwijanie paska przy przewijaniu: w dół za 40 px → bez nazwy ekranu, z powrotem przy samej górze.
+// Dwa różne progi (40 / 12 px), żeby pasek nie „mrugał” przy przewijaniu w okolicach jednego punktu.
+let tbCompact = false;
+let tbTicking = false;
+
+function onTopbarScroll() {
+  tbTicking = false;
+  const y = window.scrollY;
+  const bar = document.getElementById('topbar');
+  if (!bar) {
+    return;
+  }
+
+  if (!tbCompact && y > 40) {
+    tbCompact = true;
+    bar.classList.add('compact');
+  } else if (tbCompact && y < 12) {
+    tbCompact = false;
+    bar.classList.remove('compact');
+  }
+}
+
+window.addEventListener('scroll', () => {
+  if (!tbTicking) {
+    tbTicking = true;
+    requestAnimationFrame(onTopbarScroll);
+  }
+}, { passive: true });
+
 let topbarTimer = null;
 function scheduleTopbar() {
   clearTimeout(topbarTimer);

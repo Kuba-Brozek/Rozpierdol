@@ -10,6 +10,7 @@
   --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --tabs-h: 58px;
   --topbar-h: 66px;
+  --topbar-h-compact: 44px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -1074,6 +1075,42 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   -webkit-backdrop-filter: saturate(1.6) blur(14px);
   backdrop-filter: saturate(1.6) blur(14px);
   border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  transition: height .28s cubic-bezier(.2, .8, .2, 1);
+}
+
+/* po przewinięciu w dół: pasek się zwija — znika nazwa ekranu, zostaje poziom, XP i ikona */
+.topbar.compact {
+  height: calc(var(--topbar-h-compact) + env(safe-area-inset-top, 0px));
+}
+
+.topbar .tb-title,
+.topbar .tb-main,
+.topbar .tb-user {
+  transition: max-height .28s cubic-bezier(.2, .8, .2, 1),
+              opacity .2s ease,
+              transform .28s cubic-bezier(.2, .8, .2, 1),
+              gap .28s ease,
+              width .28s ease,
+              height .28s ease;
+}
+
+.topbar .tb-title {
+  max-height: 30px;
+}
+
+.topbar.compact .tb-title {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.topbar.compact .tb-main {
+  gap: 0;
+}
+
+.topbar.compact .tb-user {
+  width: 34px;
+  height: 34px;
 }
 
 /* lewa część: nazwa ekranu (duża) + pod nią poziom i XP */
