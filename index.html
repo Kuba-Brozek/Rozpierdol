@@ -68,7 +68,7 @@
   <!-- PODSUMOWANIE -->
   <section class="view" id="view-start" aria-labelledby="h-start">
     <header class="vhead">
-      <h1 id="h-start">Podsumowanie</h1>
+      <h1 id="h-start">Postęp</h1>
       <span class="vdate" id="start-date"></span>
     </header>
     <div id="start-body"></div>
@@ -89,7 +89,7 @@
   </section>
 
   <section class="view" id="view-miesnie" hidden aria-labelledby="h-miesnie">
-    <button class="link back" type="button" data-go="start">‹ Podsumowanie</button>
+    <button class="link back" type="button" data-go="start">‹ Postęp</button>
     <header class="vhead"><h1 id="h-miesnie">Graf trenowanych partii mięśniowych</h1></header>
     <div id="miesnie-body"></div>
   </section>
@@ -122,12 +122,13 @@
 
 <nav class="tabs" aria-label="Sekcje">
   <button type="button" data-tab="start" aria-current="page">
+    <!-- wykres idący w górę ze strzałką -->
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="8"/>
-      <circle cx="12" cy="12" r="4.5"/>
-      <circle cx="12" cy="12" r="1"/>
+      <path d="M4 4v16h16"/>
+      <path d="M7.5 15l3.5-4 3 2.5 4.5-6"/>
+      <path d="M15.5 7.5h3v3"/>
     </svg>
-    <span>Podsumowanie</span>
+    <span>Postęp</span>
   </button>
   <button type="button" data-tab="dieta">
     <svg viewBox="0 0 24 24" aria-hidden="true">

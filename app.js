@@ -472,7 +472,7 @@ function wireFact(root) {
 }
 
 // Przełączniki kafelków na ekranie Forma (S.prefs, zapisywane w chmurze); domyślnie włączone
-const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu', '🔥'], ['fact', 'Losowy pozytywny fakt', 'kafelek w Podsumowaniu', '✨']];
+const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu', '🔥'], ['fact', 'Losowy pozytywny fakt', 'kafelek w zakładce Postęp', '✨']];
 const pref = k => !(S.prefs && S.prefs[k] === false);
 // Kafelek „Kalorie”: zapotrzebowanie z profilu albo zachęta do uzupełnienia profilu
 function kcalCardHTML(st) {
@@ -1463,7 +1463,7 @@ function musclesNavCard() {
   const n = Object.values(muscleSets(7)).reduce((s, o) => s + o.main, 0);
   return navCard('miesnie', '💪', 'Graf trenowanych partii mięśniowych', n ? `ostatnie 7 dni: ${plural(n, 'seria', 'serie', 'serii')}` : 'serie na każdą partię z ostatnich 7 dni');
 }
-// Osobny ekran pod Podsumowaniem
+// Osobny ekran pod zakładką Postęp
 function renderMiesnie() {
   const body = $('#miesnie-body');
   body.innerHTML = bodyMapHTML();
@@ -2382,7 +2382,7 @@ function renderWiecej() {
       </div>
     </section>
     <section class="card" data-sec="dieta">
-      <h2>Ekran Podsumowanie</h2>
+      <h2>Ekran Postęp</h2>
       <div class="pref-list">${PREFS.map(([k, l, s, ic]) => `<label class="pref-row"><span class="pref-ic" aria-hidden="true">${ic}</span>
         <span class="grow"><span class="pref-l">${l}</span><span class="small muted">${s}</span></span>
         <input type="checkbox" class="switch" role="switch" data-pref="${k}" ${pref(k) ? 'checked' : ''}></label>`).join('')}</div>
@@ -2472,7 +2472,7 @@ function renderWiecej() {
     <section class="card about" data-sec="about">
       <p class="big-note" style="text-align:left">Cześć! 👋</p>
       <p>Wszystko zaczęło się od zwykłego pliku Excel. Codziennie rano nowy wiersz: data i waga. Obok formuły liczyły BMI, zrzucone kilogramy, procent celu i średnią tygodniową, a w osobnej kolumnie świeciła brutalnie szczera „rodzaj otyłości”. Wzrost i cel miały swoje stałe komórki, żeby żadna formuła się nie zgubiła.</p>
-      <p>Działało, ale wpisywanie wagi w Excelu na telefonie o 7 rano to sport ekstremalny. W końcu padło pytanie: „a może by tak zrobić to porządnie?”. Tak powstał Rozpierdol. Zakładki Podsumowanie i Waga wciąż liczą to samo co tamten arkusz, a kopia zapasowa zapisuje się w jego układzie.</p>
+      <p>Działało, ale wpisywanie wagi w Excelu na telefonie o 7 rano to sport ekstremalny. W końcu padło pytanie: „a może by tak zrobić to porządnie?”. Tak powstał Rozpierdol. Zakładki Postęp i Waga wciąż liczą to samo co tamten arkusz, a kopia zapasowa zapisuje się w jego układzie.</p>
       <p>Teraz liczy treningi, rekordy, kalorie i ma motyw tak różowy, że aż boli.</p>
       <p>Robię ją sam, za darmo i bez reklam. Pomysły i błędy wrzucaj do „Sugestii”.</p>
       <p><i>Kurwy niech giną pod ciepłą pierzyną, a zwycięzcy mają czuć chłód zwycięstwa.</i> 💪</p>
@@ -2536,7 +2536,7 @@ function renderWiecej() {
 /* ---- Ustawienia jak w iPhonie: lista pozycji, każda otwiera osobny ekran ---- */
 const SECS = [
   ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], ['lock', '🔒', 'Blokada apki'], null,
-  ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Podsumowanie'], ['wyglad', '🎨', 'Wygląd'], null,
+  ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Postęp'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
   ['log', '🆕', 'Co nowego'], ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
 ];
@@ -2639,9 +2639,9 @@ $('#wiecej-back').addEventListener('click', () => goBack());
 const CHANGELOG = [
   {
     id: 8,
-    t: 'Podsumowanie i Waga',
+    t: 'Postęp i Waga',
     items: [
-      'Nowa pierwsza zakładka <b>Podsumowanie</b>: aktualna waga, wynik od startu, postęp do celu, BMI, średnia 7 dni, ostatnie 30 dni, kalorie, fakt dnia i seria ważenia.',
+      'Nowa pierwsza zakładka <b>Postęp</b>: aktualna waga, wynik od startu, postęp do celu, BMI, średnia 7 dni, ostatnie 30 dni, kalorie, fakt dnia i seria ważenia.',
       'Jest tam też <b>podsumowanie miesiąca</b> oraz skróty do grafu partii mięśniowych i odznak.',
       'Wpisy wagi, wykres i lista pomiarów są w osobnej zakładce <b>Waga</b>, razem z Pomiarami ciała.',
     ],
@@ -2656,7 +2656,7 @@ const CHANGELOG = [
       '<b>Podsumowanie miesiąca</b> w zakładce Trening: treningi, serie, objętość, czas, rekordy i zmiana wagi.',
       'Graf partii mięśniowych pokazuje teraz okres <b>7, 14 albo 30 dni</b>.',
       '<b>Odznaki</b> za treningi, rekordy, ciężary, ważenie i cele (Trening → 🎖️ Odznaki).',
-      '<b>Seria dni ważenia</b> 🔥 w Podsumowaniu.',
+      '<b>Seria dni ważenia</b> 🔥 w zakładce Postęp.',
     ],
   },
   { id: 6, t: 'Blokada apki', items: [
