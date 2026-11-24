@@ -329,6 +329,7 @@ function setWeight(d, w) {
   const i = S.weights.findIndex(x => x.d === d);
   if (i >= 0) S.weights[i].w = w; else S.weights.push({ d, w });
   sortWeights(); save();
+  if (typeof checkBadges === 'function') setTimeout(checkBadges, 600);
 }
 
 /* ============ DIETA: wykres ============ */
@@ -551,6 +552,7 @@ function renderDieta() {
           <div class="lost"><h3>Od startu</h3><div class="big ${wcls(-st.lost)}">${st.lost > 0 ? '−' : st.lost < 0 ? '+' : ''}${fmt(Math.abs(st.lost), 2)}<small>kg</small></div></div>
         </div>
         <div class="muted small">${GOALS[goalType()].l} · dzień ${st.day} · ostatni pomiar ${dayLabel(st.last)}</div>
+        ${typeof weighStreakHTML === 'function' ? weighStreakHTML() : ''}
         ${st.prevDiff != null ? `<div class="small ${wcls(st.prevDiff) || 'muted'}">${fmtSigned(st.prevDiff, 2)} kg od poprzedniego pomiaru</div>` : ''}
         ${pct != null ? `
           <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="width:${pct}%"></i></div>
@@ -1025,8 +1027,8 @@ const exFields = id => { const c = S.exFields && S.exFields[id]; return Array.is
 // gdzie w serii leży wartość pola: dwa podstawowe pola ćwiczenia w a/b (zgodność ze starszymi danymi), reszta pod własną nazwą
 const fieldKey = (ex, f) => (isCardio(ex) ? { min: 'a', km: 'b' } : { kg: 'a', reps: 'b' })[f] || f;
 const hasVal = v => v != null && v !== '';
-const filled = s => Object.keys(s).some(k => k !== 'done' && hasVal(s[k]));
-const setVals = s => { const o = { a: null, b: null }; for (const k in s) if (k !== 'done' && hasVal(s[k])) o[k] = s[k]; return o; };
+const filled = s => Object.keys(s).some(k => k !== 'done' && k !== 'drop' && hasVal(s[k]));
+const setVals = s => { const o = { a: null, b: null }; for (const k in s) if (k !== 'done' && k !== 'drop' && hasVal(s[k])) o[k] = s[k]; if (s.drop) o.drop = true; return o; };
 function setText(ex, s) {
   const cardio = isCardio(ex), parts = [];
   if (!cardio && hasVal(s.a) && hasVal(s.b)) parts.push(`${fmtN(s.a)}×${fmtN(s.b)}`);
@@ -1034,7 +1036,8 @@ function setText(ex, s) {
   FIELDS.forEach(F => { const k = fieldKey(ex, F.id); if (k !== 'a' && k !== 'b' && hasVal(s[k])) parts.push(F.f(s[k])); });
   return parts.join(' ');
 }
-const setsSummary = (e, sets) => !(sets = sets.filter(filled)).length ? 'bez serii' : sets.map(s => setText(e, s)).join(', ');
+// dropset dopisany do poprzedniej serii strzałką: „80×8 ↘ 60×6, 80×7”
+const setsSummary = (e, sets) => !(sets = sets.filter(filled)).length ? 'bez serii' : sets.map((s, i) => (i ? (s.drop ? ' ↘ ' : ', ') : '') + setText(e, s)).join('');
 /* ---- rekordy osobiste ---- */
 // szacowany ciężar maksymalny na 1 powtórzenie (wzór Epleya), liczony z serii do 12 powtórzeń
 const e1rm = s => s.a > 0 && s.b >= 1 && s.b <= 12 ? (s.b === 1 ? s.a : s.a * (1 + s.b / 30)) : 0;
@@ -1240,9 +1243,9 @@ function loadBody(sex) {
 const hexRGB = h => { h = (h || '').trim().replace('#', ''); if (h.length === 3) h = h.split('').map(x => x + x).join(''); const n = parseInt(h, 16); return isNaN(n) ? [128, 128, 128] : [n >> 16 & 255, n >> 8 & 255, n & 255]; };
 // poziom 0 = kolor „wyciszony” motywu, 1–3 = coraz mocniejsza czerwień
 const BODY_HOT = [[240, 153, 123], [232, 97, 60], [217, 48, 28]];
-function drawBody(cv, B, data) {
+function drawBody(cv, B, data, days = 7) {
   const base = hexRGB(getComputedStyle(document.documentElement).getPropertyValue('--muted'));
-  const col = B.keys.map(k => { const lv = muscleLevel(muscleScore(data[k])); return lv ? BODY_HOT[lv - 1] : base; });
+  const col = B.keys.map(k => { const lv = muscleLevel(muscleScore(data[k]), days); return lv ? BODY_HOT[lv - 1] : base; });
   cv.width = B.w; cv.height = B.h;
   const x = cv.getContext('2d'), im = x.createImageData(B.w, B.h), o = im.data;
   for (let i = 0; i < B.A.length; i++) {
@@ -1263,11 +1266,15 @@ function bodyHit(B, px, py) {
   }
   return null;
 }
-function muscleSets(days = 7) {
+// serie „liczone”: wypełnione, a dropset (ciąg dalszy poprzedniej serii) nie liczy się jako osobna seria
+const countSets = sets => sets.filter(s => filled(s) && !s.drop).length;
+const MUS_DAYS = [7, 14, 30];
+const musDays = () => MUS_DAYS.includes(UI.mDays) ? UI.mDays : 7;
+function muscleSets(days = musDays()) {
   const from = addDays(today(), -(days - 1)), out = {};
   S.workouts.filter(w => w.date >= from && w.date <= today()).forEach(w => w.ex.forEach(e => {
     const ex = EXMAP[e.id]; if (!ex || isCardio(ex)) return;
-    const n = e.sets.filter(filled).length; if (!n) return;
+    const n = countSets(e.sets); if (!n) return;
     const add = (m, k) => { const o = out[m] = out[m] || { main: 0, help: 0, items: [] }; o[k] += n; o.items.push({ w, e, n, k }); };
     (ex.m || []).forEach(m => add(m, 'main'));
     (ex.s || []).forEach(m => { if (!(ex.m || []).includes(m)) add(m, 'help'); });
@@ -1275,28 +1282,33 @@ function muscleSets(days = 7) {
   return out;
 }
 const muscleScore = o => o ? o.main + o.help / 2 : 0;
-const muscleLevel = v => v <= 0 ? 0 : v < 4 ? 1 : v < 10 ? 2 : 3;
+// progi kolorów są „na tydzień” (1–3, 4–9, 10+ serii); przy 14 i 30 dniach przeliczamy na średnią tygodniową
+const muscleLevel = (v, days = 7) => { v = v * 7 / days; return v <= 0 ? 0 : v < 4 ? 1 : v < 10 ? 2 : 3; };
+const seriiWord = v => v === 1 ? 'seria' : v % 1 === 0 && v % 10 >= 2 && v % 10 <= 4 && (v % 100 < 10 || v % 100 >= 20) ? 'serie' : 'serii';
 function bodyMapHTML() {
-  return `<section class="card bodymap">
-    <p class="muted small" style="margin:0;text-align:center">Serie z ostatnich 7 dni</p>
+  const d = musDays();
+  return `<div class="seg seg-full" role="group" aria-label="Okres">${MUS_DAYS.map(n => `<button type="button" data-mdays="${n}" aria-pressed="${n === d}">${n} dni</button>`).join('')}</div>
+    <section class="card bodymap">
+    <p class="muted small" style="margin:0;text-align:center">Serie z ostatnich ${d} dni</p>
     <div class="body-wrap"><canvas class="body-cv" role="img" aria-label="Sylwetka z przodu i z tyłu: stuknij partię, żeby zobaczyć serie"></canvas>
       <p class="muted small body-load">Wczytuję sylwetkę…</p></div>
     <div class="body-lab muted small"><span>Przód</span><span>Tył</span></div>
-    <div class="body-leg small muted"><i class="l1"></i>1–3<i class="l2"></i>4–9<i class="l3"></i>10+ serii</div>
+    <div class="body-leg small muted"><i class="l1"></i>1–3<i class="l2"></i>4–9<i class="l3"></i>10+ serii${d > 7 ? ' na tydzień' : ''}</div>
     <p class="muted small" style="margin:0;text-align:center">Stuknij partię, żeby zobaczyć serie</p></section>`;
 }
 function musclesNavCard() {
-  const n = Object.values(muscleSets()).reduce((s, o) => s + o.main, 0);
+  const n = Object.values(muscleSets(7)).reduce((s, o) => s + o.main, 0);
   return navCard('miesnie', '💪', 'Graf trenowanych partii mięśniowych', n ? `ostatnie 7 dni: ${plural(n, 'seria', 'serie', 'serii')}` : 'serie na każdą partię z ostatnich 7 dni');
 }
 // Osobny ekran w zakładce Forma
 function renderMiesnie() {
   const body = $('#miesnie-body');
   body.innerHTML = bodyMapHTML();
+  $$('[data-mdays]', body).forEach(b => b.onclick = () => { UI.mDays = +b.dataset.mdays; renderMiesnie(); });
   const cv = $('.body-cv', body), load = $('.body-load', body);
   loadBody(bodySex()).then(B => {
     if (!cv.isConnected) return;
-    drawBody(cv, B, muscleSets()); load.remove();
+    drawBody(cv, B, muscleSets(), musDays()); load.remove();
     cv.addEventListener('click', e => {
       const r = cv.getBoundingClientRect(), m = bodyHit(B, (e.clientX - r.left) * B.w / r.width, (e.clientY - r.top) * B.h / r.height);
       if (m) showMuscle(m);
@@ -1304,23 +1316,28 @@ function renderMiesnie() {
   }).catch(() => { load.textContent = 'Nie udało się wczytać sylwetki.'; });
 }
 function showMuscle(m) {
-  const o = muscleSets()[m] || { main: 0, help: 0, items: [] }, name = MUSCLE[m] || m;
-  const days = [...Array(7)].map((_, i) => addDays(today(), i - 6));
-  const perDay = days.map(d => o.items.filter(x => x.w.date === d).reduce((s, x) => s + (x.k === 'main' ? x.n : x.n / 2), 0));
-  const max = Math.max(1, ...perDay);
-  const v = muscleScore(o);
+  const days = musDays(), o = muscleSets(days)[m] || { main: 0, help: 0, items: [] }, name = MUSCLE[m] || m;
+  const val = x => x.k === 'main' ? x.n : x.n / 2;
+  // słupki: dzień po dniu (7 i 14 dni) albo tydzień po tygodniu (30 dni)
+  const step = days > 14 ? 7 : 1, buckets = [];
+  for (let end = today(); buckets.length * step < days; end = addDays(end, -step)) {
+    const start = addDays(end, -(Math.min(step, days - buckets.length * step) - 1));
+    buckets.unshift({ start, end, v: o.items.filter(x => x.w.date >= start && x.w.date <= end).reduce((s, x) => s + val(x), 0) });
+  }
+  const max = Math.max(1, ...buckets.map(b => b.v)), v = muscleScore(o);
+  const lab = b => step === 1 ? parseD(b.end).toLocaleDateString('pl-PL', days > 7 ? { day: 'numeric' } : { weekday: 'short' }).replace('.', '') : dayLabel(b.start, { day: 'numeric', month: 'numeric' });
   openSheet(name, `
-    <div class="mus-head"><b class="num">${fmt(v, v % 1 ? 1 : 0)}</b><span>${v === 1 ? 'seria' : v % 1 === 0 && v % 10 >= 2 && v % 10 <= 4 && (v % 100 < 10 || v % 100 >= 20) ? 'serie' : 'serii'} w 7 dni</span></div>
-    <p class="muted small" style="margin:0">${o.main} jako główna partia${o.help ? `, ${o.help} jako pomocnicza (liczone po ½)` : ''}.</p>
-    <div class="mus-bars" role="img" aria-label="Serie dzień po dniu">${days.map((d, i) => `<div class="mb${d === today() ? ' today' : ''}">
-      <span class="v num">${perDay[i] ? fmt(perDay[i], perDay[i] % 1 ? 1 : 0) : ''}</span>
-      <span class="bar" style="height:${Math.round(perDay[i] / max * 100)}%"></span>
-      <span class="d">${parseD(d).toLocaleDateString('pl-PL', { weekday: 'short' }).replace('.', '')}</span></div>`).join('')}</div>
+    <div class="mus-head"><b class="num">${fmt(v, v % 1 ? 1 : 0)}</b><span>${seriiWord(v)} w ${days} dni</span></div>
+    <p class="muted small" style="margin:0">${o.main} jako główna partia${o.help ? `, ${o.help} jako pomocnicza (liczone po ½)` : ''}${days > 7 ? ` · średnio ${fmt(v * 7 / days, 1)} na tydzień` : ''}.</p>
+    <div class="mus-bars${buckets.length > 7 ? ' dense' : ''}" style="grid-template-columns:repeat(${buckets.length},1fr)" role="img" aria-label="Serie ${step === 1 ? 'dzień po dniu' : 'tydzień po tygodniu'}">${buckets.map(b => `<div class="mb${b.end === today() ? ' today' : ''}">
+      <span class="v num">${b.v ? fmt(b.v, b.v % 1 ? 1 : 0) : ''}</span>
+      <span class="bar" style="height:${Math.round(b.v / max * 100)}%"></span>
+      <span class="d">${lab(b)}</span></div>`).join('')}</div>
     ${o.items.length ? `<div class="list">${[...o.items].sort((a, b) => b.w.date < a.w.date ? -1 : 1).map(x => `
       <button class="li" type="button" data-w="${x.w.id}">${thumbHTML(EXMAP[x.e.id])}<div class="grow"><div class="t">${esc(exName(EXMAP[x.e.id]))}</div>
         <div class="s">${dayLabel(x.w.date, { weekday: 'long', day: 'numeric', month: 'short' })}${x.k === 'help' ? ' · pomocniczo' : ''}</div></div>
         <div class="r small muted">${plural(x.n, 'seria', 'serie', 'serii')}</div></button>`).join('')}</div>`
-      : '<p class="muted" style="margin:0">W ostatnich 7 dniach nic na tę partię.</p>'}
+      : `<p class="muted" style="margin:0">W ostatnich ${days} dniach nic na tę partię.</p>`}
     <button class="btn block" type="button" data-close>OK</button>`, b => {
     $$('[data-w]', b).forEach(x => x.onclick = () => showWorkout(x.dataset.w));
   });
@@ -1347,17 +1364,28 @@ function renderTrening() {
               <span class="d ${n >= t ? 'down' : ''}">${n >= t ? 'plan wykonany ✓' : 'zostało ' + (t - n)}</span></div>`; })()}
           <div class="tile"><span class="k">Ostatni</span><span class="v" style="font-size:17px">${dayLabel(hist[0].date)}</span><span class="d">${(n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : n + ' dni temu')(daysBetween(hist[0].date, today()))}</span></div>
         </div>
-        <button class="btn block" type="button" id="t-prs">🏆 Rekordy osobiste</button>
+        ${typeof monthSummaryHTML === 'function' ? monthSummaryHTML() : ''}
+        <div class="btns"><button class="btn" type="button" id="t-prs">🏆 Rekordy</button><button class="btn" type="button" id="t-badges">🎖️ Odznaki${typeof badgeCount === 'function' ? ` <span class="muted">${badgeCount()}</span>` : ''}</button></div>
         <h3>Historia</h3>
         <div class="list">${hist.map(w => `
           <button class="li" type="button" data-w="${w.id}">
             <div class="grow"><div class="t">${dayLabel(w.date, { weekday: 'long', day: 'numeric', month: 'long' })}${w.planName ? ` <span class="pill">${esc(w.planName)}</span>` : ''}${prW[w.id] ? ` <span class="pill pr" title="Pobite rekordy">🏆 ${prW[w.id].length}</span>` : ''}</div>
             <div class="s">${w.ex.map(e => esc(exName(EXMAP[e.id]))).slice(0, 3).join(', ')}${w.ex.length > 3 ? ` +${w.ex.length - 3}` : ''}</div></div>
-            <div class="r small muted">${w.ex.reduce((s, e) => s + e.sets.filter(filled).length, 0)} serii${volume(w) ? '<br>' + fmt(volume(w), 0) + ' kg' : ''}</div>
+            <div class="r small muted">
+              ${plural(
+                w.ex.reduce((s, e) => s + countSets(e.sets), 0),
+                'seria',
+                'serie',
+                'serii',
+              )}
+              ${volume(w) ? '<br>' + fmt(volume(w), 0) + ' kg' : ''}
+            </div>
           </button>`).join('')}</div>`
       : `<div class="card empty"><strong>Brak treningów</strong><span>Rozpocznij trening, dodaj ćwiczenia z bazy i zapisuj serie: ciężar i powtórzenia. Przy kolejnym treningu zobaczysz, co zrobiłeś ostatnio.</span></div>`}`;
     $('#t-start').onclick = startWorkoutSheet;
-    const prb = $('#t-prs', body); if (prb) prb.onclick = showRecords;    $$('[data-w]', body).forEach(b => b.onclick = () => showWorkout(b.dataset.w));
+    const prb = $('#t-prs', body); if (prb) prb.onclick = showRecords;
+    const bdg = $('#t-badges', body); if (bdg) bdg.onclick = () => typeof showBadges === 'function' && showBadges();
+    const ms = $('#month-sum', body); if (ms && typeof wireMonthSummary === 'function') wireMonthSummary(ms);    $$('[data-w]', body).forEach(b => b.onclick = () => showWorkout(b.dataset.w));
     return;
   }
   const editing = !!A.editId;
@@ -1434,18 +1462,21 @@ function setsEditorHTML(e, prev) {
   const ex = EXMAP[e.id], fs = exFields(e.id).map(f => FIELD[f]);
   return `<div class="sets${fs.length > 3 ? ' many' : ''}" style="grid-template-columns:24px ${fs.map(F => F.text ? 'minmax(0, 1.6fr)' : 'minmax(0, 1fr)').join(' ')} 44px">
       <span class="hd">#</span>${fs.map(F => `<span class="hd">${F.h}</span>`).join('')}<span class="hd">✓</span>
-      ${e.sets.map((s, si) => {
+      ${(() => { let no = 0; return e.sets.map((s, si) => {
         const ph = prev && prev.sets[Math.min(si, prev.sets.length - 1)];
-        return `<span class="n">${si + 1}</span>
+        // numer serii; dropset (ciąg dalszy poprzedniej) dostaje strzałkę zamiast numeru. Stuknięcie w numer przełącza dropset.
+        const drop = si > 0 && s.drop; if (!drop) no++;
+        return `${si > 0 ? `<button type="button" class="n n-btn${drop ? ' drop' : ''}" data-act="drop" data-si="${si}" aria-pressed="${!!drop}" aria-label="Seria ${si + 1}: ${drop ? 'dropset, stuknij, żeby zrobić zwykłą serię' : 'stuknij, żeby oznaczyć jako dropset'}">${drop ? '↘' : no}</button>` : `<span class="n">${no}</span>`}
         ${fs.map(F => { const k = fieldKey(ex, F.id), v = s[k], p = ph && hasVal(ph[k]) ? ph[k] : '';
           return F.text
             ? `<input type="text" inputmode="text" autocomplete="off" maxlength="12" data-si="${si}" data-f="${k}" data-text="1" value="${esc(v ?? '')}" placeholder="${esc(p)}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`
             : `<input type="number" inputmode="${F.im}" step="${F.step}" data-si="${si}" data-f="${k}" value="${v ?? ''}" placeholder="${p}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`;
         }).join('')}
         <button class="check" type="button" data-act="done" data-si="${si}" aria-pressed="${!!s.done}" aria-label="Seria ${si + 1} zrobiona">✓</button>`;
-      }).join('')}
+      }).join(''); })()}
     </div>
-    <div class="row"><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length ? '<button class="link" type="button" data-act="pop" style="color:var(--muted)">Usuń ostatnią</button>' : ''}</div>`;
+    <div class="row"><span><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length && !isCardio(ex) ? ' <button class="link" type="button" data-act="adddrop">+ Drop</button>' : ''}</span>${e.sets.length ? '<button class="link" type="button" data-act="pop" style="color:var(--muted)">Usuń ostatnią</button>' : ''}</div>
+    ${e.sets.length > 1 && !isCardio(ex) && !e.sets.some(s => s.drop) ? '<p class="muted small" style="margin:0">Dropset: „+ Drop” albo stuknij numer serii.</p>' : ''}`;
 }
 function setsInput(e) {
   const inp = e.target.closest('input[data-f]'); if (!inp || !S.active) return;
@@ -1457,7 +1488,13 @@ function setsInput(e) {
 function setsAction(b, ei) {
   const ex = S.active.ex[ei], act = b.dataset.act;
   if (act === 'more') { exMenu(ei); return false; }
-  if (act === 'add') { const l = [...ex.sets].reverse().find(filled); ex.sets.push(Object.assign(l ? setVals(l) : { a: null, b: null }, { done: false })); }
+  if (act === 'add') { const l = [...ex.sets].reverse().find(s => filled(s) && !s.drop); const n = l ? setVals(l) : { a: null, b: null }; delete n.drop; ex.sets.push(Object.assign(n, { done: false })); }
+  else if (act === 'adddrop') {
+    // dropset: ok. 20% lżej niż ostatnia seria (zaokrąglone do 2,5 kg), powtórzenia do wpisania
+    const l = [...ex.sets].reverse().find(filled), kg = l && l.a > 0 ? Math.max(0, Math.round(l.a * 0.8 / 2.5) * 2.5) : null;
+    ex.sets.push({ a: kg, b: null, drop: true, done: false });
+  }
+  else if (act === 'drop') { const s = ex.sets[+b.dataset.si]; if (s.drop) delete s.drop; else s.drop = true; }
   else if (act === 'pop') ex.sets.pop();
   else if (act === 'done') {
     const s = ex.sets[+b.dataset.si];
@@ -1466,6 +1503,9 @@ function setsAction(b, ei) {
     }
     s.done = !s.done;
     if (s.done && navigator.vibrate) navigator.vibrate(10);
+    // timer przerwy po zrobionej serii (nie przed dropsetem — tam nie ma przerwy; nie przy edycji starego treningu)
+    const next = ex.sets[+b.dataset.si + 1];
+    if (s.done && !S.active.editId && !isCardio(EXMAP[ex.id]) && !(next && next.drop) && typeof restStart === 'function') restStart();
   } else return false;
   save(); return true;
 }
@@ -1579,13 +1619,16 @@ async function finishWorkout() {
     S.workouts.sort((a, b) => a.start - b.start);
     S.active = null; save(); renderTrening();
     if (!celebratePRs(w.id)) toast('Zapisano zmiany w treningu');
+    if (typeof checkBadges === 'function') checkBadges();
     return;
   }
   const w = { id: A.id, date: A.date, start: A.start, end: Date.now(), ex };
   if (A.planName) { w.planId = A.planId; w.planName = A.planName; }
   S.workouts.push(w); S.workouts.sort((a, b) => a.start - b.start);
   S.active = null; save(); renderTrening();
+  if (typeof restStop === 'function') restStop();
   if (!celebratePRs(w.id)) toast('Zapisano trening');
+  if (typeof checkBadges === 'function') checkBadges();
 }
 function editWorkout(id) {
   const w = S.workouts.find(x => x.id === id); if (!w) return;
@@ -2062,6 +2105,7 @@ function showExercise(id) {
       ${S.active ? `<button class="btn primary" type="button" id="ex-add">Dodaj do treningu</button>` : ''}
     </div>
     ${recHTML ? `<div class="card"><h3>🏆 Rekordy osobiste</h3>${recHTML}</div>` : ''}
+    ${typeof exProgressHTML === 'function' ? exProgressHTML(id) : ''}
     ${hist.length ? `<div class="card"><h3>Twoja historia</h3>
       ${hist.slice(0, 5).map(h => `<div class="row small"><span class="muted">${dayLabel(h.date)}</span><span class="num">${setsSummary(e, h.sets)}</span></div>`).join('')}</div>` : ''}
     ${e.ins && e.ins.length ? `<div class="card"><h3>Jak wykonać${e.insPl ? '' : ' (po angielsku)'}</h3><ol class="steps">${e.ins.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>` : ''}
@@ -2072,6 +2116,7 @@ function showExercise(id) {
       if (UI.tab === 'cwiczenia') renderCw();
     };
     const add = $('#ex-add', b); add && (add.onclick = () => { addExToActive(id); closeSheet(); setTab('trening'); toast('Dodano do treningu'); });
+    const pg = $('.exprog', b); if (pg && typeof wireExProgress === 'function') wireExProgress(pg);
     const del = $('#ex-del', b); del && (del.onclick = () => { S.custom = S.custom.filter(c => c.id !== id); save(); rebuildExMap(); closeSheet(); renderCw(); });
   });
 }
@@ -2428,6 +2473,19 @@ $('#wiecej-back').addEventListener('click', () => goBack());
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 7,
+    t: 'Statystyki, odznaki i timer',
+    items: [
+      '<b>Timer przerwy</b>: startuje sam po odhaczeniu serii ✓. Możesz dodać albo odjąć 15 s, a stuknięcie w czas zmienia domyślną długość.',
+      '<b>Dropsety</b>: „+ Drop” dodaje lżejszą serię ze strzałką ↘. Możesz też stuknąć numer serii. Dropset liczy się razem z poprzednią serią.',
+      '<b>Wykres postępu</b> w szczegółach ćwiczenia: szacowany 1RM i objętość z każdego treningu.',
+      '<b>Podsumowanie miesiąca</b> w zakładce Trening: treningi, serie, objętość, czas, rekordy i zmiana wagi.',
+      'Graf partii mięśniowych pokazuje teraz okres <b>7, 14 albo 30 dni</b>.',
+      '<b>Odznaki</b> za treningi, rekordy, ciężary, ważenie i cele (Trening → 🎖️ Odznaki).',
+      '<b>Seria dni ważenia</b> 🔥 w zakładce Forma.',
+    ],
+  },
   { id: 6, t: 'Blokada apki', items: [
     'Możesz zablokować apkę <b>4-cyfrowym kodem</b>: Ustawienia → Blokada apki.',
     'Odblokowanie <b>Face ID / Touch ID</b>, jeśli telefon je ma.',
@@ -2501,6 +2559,13 @@ rebuildExMap();
 try { setTab(S.active ? 'trening' : 'dieta'); } catch (e) { console.error(e); }
 loadExercises().finally(hideSplash);
 setTimeout(() => { try { whatsNew(); } catch (e) { console.error(e); } }, 2600);
+
+// odznaki: przy starcie sprawdź, czy coś nowego (np. zdobyte na innym telefonie albo po aktualizacji)
+setTimeout(() => {
+  if (typeof checkBadges === 'function') {
+    checkBadges();
+  }
+}, 4000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && UI.tab === 'dieta') renderDieta(); });
 // Apka działa z pamięci telefonu. Nowa wersja pobiera się w tle (raz), a potem proponujemy odświeżenie.
 if ('serviceWorker' in navigator) {
