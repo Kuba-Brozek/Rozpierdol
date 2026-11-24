@@ -87,13 +87,13 @@
   <!-- WAGA (identyfikator „dieta” zostaje dla zgodności) -->
   <section class="view" id="view-dieta" hidden aria-labelledby="h-dieta">
     <header class="vhead">
-      <h1 id="h-dieta">Waga</h1>
+      <h1 id="h-dieta">Ciało</h1>
     </header>
     <div id="dieta-body"></div>
   </section>
 
   <section class="view" id="view-cialo" hidden aria-labelledby="h-cialo">
-    <button class="link back" type="button" data-go="dieta">‹ Waga</button>
+    <button class="link back" type="button" data-go="dieta">‹ Ciało</button>
     <header class="vhead"><h1 id="h-cialo">Pomiary ciała</h1></header>
     <div id="cialo-body"></div>
   </section>
@@ -141,12 +141,14 @@
     <span>Postęp</span>
   </button>
   <button type="button" data-tab="dieta">
+    <!-- sylwetka człowieka: głowa, ramiona, tułów, nogi -->
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="4" y="4" width="16" height="16" rx="4"/>
-      <path d="M8.5 10a4.5 4.5 0 0 1 7 0"/>
-      <path d="M12 10.5l1.3-1.8"/>
+      <circle cx="12" cy="4.6" r="2"/>
+      <path d="M6 9.2l6 1 6-1"/>
+      <path d="M12 10.2v5"/>
+      <path d="M9.5 21l2.5-5.8 2.5 5.8"/>
     </svg>
-    <span>Waga</span>
+    <span>Ciało</span>
   </button>
   <button type="button" data-tab="trening">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8v8M3.5 10v4M18 8v8M20.5 10v4M6 12h12"/></svg>

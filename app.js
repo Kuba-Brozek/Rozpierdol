@@ -669,7 +669,7 @@ function renderDieta() {
 }
 /* ============ PODSUMOWANIE: ogólne liczby w jednym miejscu ============
    Kafelek z wagą i celem, BMI / średnia / 30 dni, seria ważenia, kalorie, fakt dnia,
-   podsumowanie miesiąca i skróty (graf partii, odznaki). Wpisy wagi są w zakładce Waga. */
+   podsumowanie miesiąca i skróty (graf partii, odznaki). Wpisy wagi są w zakładce Ciało. */
 function heroHTML(st) {
   const pct = st.pct != null
     ? Math.max(0, Math.min(100, st.pct))
@@ -780,8 +780,8 @@ function renderStart() {
     : `
       <div class="card empty">
         <strong>Zacznij od wagi</strong>
-        <span>Wpisz pierwszy pomiar w zakładce Waga, a tu pojawi się podsumowanie: postęp do celu, BMI, średnie i ciekawostki.</span>
-        <button class="btn primary" type="button" data-go="dieta">Przejdź do Wagi</button>
+        <span>Wpisz pierwszy pomiar w zakładce Ciało, a tu pojawi się podsumowanie: postęp do celu, BMI, średnie i ciekawostki.</span>
+        <button class="btn primary" type="button" data-go="dieta">Przejdź do zakładki Ciało</button>
       </div>
       ${muscles}`;
 
@@ -2532,7 +2532,7 @@ function renderWiecej() {
     <section class="card about" data-sec="about">
       <p class="big-note" style="text-align:left">Cześć! 👋</p>
       <p>Wszystko zaczęło się od zwykłego pliku Excel. Codziennie rano nowy wiersz: data i waga. Obok formuły liczyły BMI, zrzucone kilogramy, procent celu i średnią tygodniową, a w osobnej kolumnie świeciła brutalnie szczera „rodzaj otyłości”. Wzrost i cel miały swoje stałe komórki, żeby żadna formuła się nie zgubiła.</p>
-      <p>Działało, ale wpisywanie wagi w Excelu na telefonie o 7 rano to sport ekstremalny. W końcu padło pytanie: „a może by tak zrobić to porządnie?”. Tak powstał Rozpierdol. Zakładki Postęp i Waga wciąż liczą to samo co tamten arkusz, a kopia zapasowa zapisuje się w jego układzie.</p>
+      <p>Działało, ale wpisywanie wagi w Excelu na telefonie o 7 rano to sport ekstremalny. W końcu padło pytanie: „a może by tak zrobić to porządnie?”. Tak powstał Rozpierdol. Zakładki Postęp i Ciało wciąż liczą to samo co tamten arkusz, a kopia zapasowa zapisuje się w jego układzie.</p>
       <p>Teraz liczy treningi, rekordy, kalorie i ma motyw tak różowy, że aż boli.</p>
       <p>Robię ją sam, za darmo i bez reklam. Pomysły i błędy wrzucaj do „Sugestii”.</p>
       <p><i>Kurwy niech giną pod ciepłą pierzyną, a zwycięzcy mają czuć chłód zwycięstwa.</i> 💪</p>
@@ -2721,11 +2721,11 @@ const CHANGELOG = [
   },
   {
     id: 8,
-    t: 'Postęp i Waga',
+    t: 'Postęp i Ciało',
     items: [
       'Nowa pierwsza zakładka <b>Postęp</b>: aktualna waga, wynik od startu, postęp do celu, BMI, średnia 7 dni, ostatnie 30 dni, kalorie, fakt dnia i seria ważenia.',
       'Jest tam też <b>podsumowanie miesiąca</b> oraz skróty do grafu partii mięśniowych i odznak.',
-      'Wpisy wagi, wykres i lista pomiarów są w osobnej zakładce <b>Waga</b>, razem z Pomiarami ciała.',
+      'Wpisy wagi, wykres i lista pomiarów są w osobnej zakładce <b>Ciało</b>, razem z Pomiarami ciała.',
       'W zakładce Postęp jest też <b>wykres trendu wagi</b> (średnia z 7 dni, linia celu) i <b>paski serii na partie</b> z ostatnich 7 dni.',
     ],
   },
