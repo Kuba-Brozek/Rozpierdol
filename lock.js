@@ -32,6 +32,8 @@ async function bioAvailable() {
   catch (e) { return false; }
 }
 async function bioEnroll() {
+  bioBusy = true;
+  try {
   const cred = await navigator.credentials.create({ publicKey: {
     challenge: rnd(32), rp: { name: 'Rozpierdol', id: location.hostname },
     // ta nazwa pokazuje się w okienku iPhone'a („Klucz dostępu… dla …”), więc ma mówić, do czego służy
@@ -41,10 +43,11 @@ async function bioEnroll() {
     timeout: 60000, attestation: 'none',
   } });
   LK.bio = b64(cred.rawId); lockSave();
+  } finally { bioBusy = false; bioEnded = Date.now(); }
 }
 // iPhone pozwala zapytać o Face ID tylko po stuknięciu w ekran (zabezpieczenie Safari),
 // dlatego automatyczna próba przy otwarciu może się nie udać — wtedy zostaje duży przycisk.
-let bioBusy = false;
+let bioBusy = false, bioEnded = 0;
 async function bioCheck() {
   if (!LK || !LK.bio || bioBusy) return false;
   bioBusy = true;
@@ -55,7 +58,7 @@ async function bioCheck() {
     } });
     return !!r;
   } catch (e) { return false; }
-  finally { bioBusy = false; }
+  finally { bioBusy = false; bioEnded = Date.now(); }
 }
 
 /* ---- klawiatura PIN (ekran blokady i okna w ustawieniach) ---- */
@@ -188,8 +191,11 @@ function showLock() {
 /* ---- kiedy blokować: przy starcie i po powrocie do apki po ustawionym czasie ---- */
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) hiddenAt = Date.now();
-  else if (lockOn() && hiddenAt && Date.now() - hiddenAt >= (LK.delay || 0) * 1000) showLock();
+  // okienko iPhone'a z kluczem dostępu (Face ID) na chwilę „chowa” apkę — to nie jest wyjście z apki,
+  // więc w trakcie Face ID i przez 2 s po nim nie liczymy tego jako ukrycia (inaczej apka zablokowałaby się drugi raz)
+  const byBio = bioBusy || Date.now() - bioEnded < 2000;
+  if (document.hidden) { if (!byBio) hiddenAt = Date.now(); }
+  else if (!byBio && lockOn() && hiddenAt && Date.now() - hiddenAt >= (LK.delay || 0) * 1000) { hiddenAt = 0; showLock(); }
 });
 if (lockOn()) showLock();
 
