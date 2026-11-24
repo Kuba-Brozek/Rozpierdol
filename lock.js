@@ -103,14 +103,32 @@ function showLock() {
     el.classList.add('hide'); setTimeout(() => el.remove(), 250);
     lockShown = false; document.body.style.overflow = '';
   };
-  const main = () => {
+  // Gdy Face ID / Touch ID jest włączone, to ono jest domyślne: ekran z twarzą, od razu próba rozpoznania.
+  // Kod pojawia się dopiero, gdy rozpoznanie się nie uda albo ktoś stuknie „Użyj kodu”.
+  const main = () => LK.bio ? bioView() : pinView();
+  const bioView = () => {
     el.innerHTML = `<div class="lock-inner">
       <div class="lock-logo">${typeof DUMBBELL_SVG !== 'undefined' ? DUMBBELL_SVG : ''}</div>
-      <h1>Wpisz kod</h1>${LK.bio ? `<button class="lock-bio" type="button" id="lock-bio">${BIO_ICON}<span>Odblokuj Face ID</span></button>` : ""}<div id="lock-pad"></div>
+      <h1>Apka zablokowana</h1>
+      <button class="lock-face" type="button" id="lock-bio" aria-label="Odblokuj Face ID">${BIO_ICON}</button>
+      <p id="lock-bio-msg">Stuknij, żeby odblokować Face ID</p>
+      <button class="link" type="button" id="lock-usepin">Użyj kodu</button></div>`;
+    // tapped = próba po stuknięciu; nieudana przełącza na kod. Próba automatyczna (bez stuknięcia) iPhone może zablokować — wtedy czekamy na stuknięcie.
+    const go = async tapped => {
+      if (await bioCheck()) return unlock();
+      if (tapped && el.isConnected) pinView('Nie udało się rozpoznać. Wpisz kod.');
+    };
+    el.querySelector('#lock-usepin').onclick = e => { e.stopPropagation(); pinView(); };
+    el.querySelector('.lock-inner').onclick = e => { if (!e.target.closest('#lock-usepin')) go(true); };
+    if (!document.hidden) setTimeout(() => go(false), 300);
+  };
+  const pinView = (hint) => {
+    el.innerHTML = `<div class="lock-inner">
+      <div class="lock-logo">${typeof DUMBBELL_SVG !== 'undefined' ? DUMBBELL_SVG : ''}</div>
+      <h1>Wpisz kod</h1><div id="lock-pad"></div>
+      ${LK.bio ? `<button class="lock-bio" type="button" id="lock-bio">${BIO_ICON}<span>Spróbuj Face ID</span></button>` : ''}
       <button class="link" type="button" id="lock-forgot">Nie pamiętam kodu</button></div>`;
-    const bioTry = LK.bio ? async () => { if (await bioCheck()) unlock(); } : null;
     const pad = pinPad(el.querySelector('#lock-pad'), {
-      bio: null, // Face ID ma własny, duży przycisk nad kropkami
       onDone: async pin => {
         if (LK.until > Date.now()) { pad.clear(); return; }
         if (await checkPin(pin)) return unlock();
@@ -122,16 +140,16 @@ function showLock() {
         waitTick();
       },
     });
+    if (hint) pad.msg(hint);
     const waitTick = () => {
-      const left = Math.ceil(((LK && LK.until) || 0) - Date.now()) / 1000;
+      const left = (((LK && LK.until) || 0) - Date.now()) / 1000;
       if (left > 0) { pad.disable(true); pad.msg(`Za dużo prób. Spróbuj za ${left >= 60 ? Math.ceil(left / 60) + ' min' : Math.ceil(left) + ' s'}.`); setTimeout(waitTick, 1000); }
       else { pad.disable(false); if (LK && LK.fails >= 5) pad.msg(''); }
     };
     waitTick();
     el.querySelector('#lock-forgot').onclick = forgot;
-    const bb = el.querySelector("#lock-bio"); if (bb) bb.onclick = bioTry;
-    // od razu zapytaj o twarz; jeśli iPhone nie pozwoli bez stuknięcia, zostaje przycisk wyżej
-    if (bioTry && !document.hidden) setTimeout(bioTry, 350);
+    const bb = el.querySelector('#lock-bio');
+    if (bb) bb.onclick = async () => { if (await bioCheck()) unlock(); else pad.msg('Nie udało się rozpoznać. Wpisz kod.'); };
   };
   // Zapomniany kod: z kontem — hasło do konta zdejmuje blokadę; bez konta — tylko usunięcie danych z telefonu
   const forgot = () => {
@@ -144,7 +162,7 @@ function showLock() {
       : `<p>Bez konta w chmurze kodu nie da się odzyskać. Możesz usunąć wszystkie dane z tego telefonu i zacząć od nowa.</p>
         <button class="btn danger block" type="button" id="lock-wipe">Usuń dane i blokadę</button>`}
       <button class="link" type="button" id="lock-back">‹ Wróć do kodu</button></div>`;
-    el.querySelector('#lock-back').onclick = main;
+    el.querySelector('#lock-back').onclick = () => pinView();
     const f = el.querySelector('#lock-pw');
     if (f) f.onsubmit = async e => {
       e.preventDefault();
