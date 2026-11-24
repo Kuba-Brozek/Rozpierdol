@@ -860,3 +860,91 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .ms-t.wide {
   grid-column: span 2;
 }
+
+/* trend wagi w zakładce Postęp: blade pomiary, linia celu */
+.chart .raw {
+  fill: var(--muted);
+  opacity: .35;
+}
+
+.chart .goal {
+  stroke: var(--good);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.chart .goal-l {
+  fill: var(--good);
+}
+
+.legend i.dots {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: .5;
+}
+
+.legend i.goal {
+  height: 0;
+  border-top: 2px dashed var(--good);
+  background: none;
+}
+
+/* partie w tygodniu: poziome paski */
+.mbars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mbar {
+  display: grid;
+  grid-template-columns: 142px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mbar-l {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mbar-t {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.mbar-t i {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+}
+
+.mbar-t i.l1 {
+  background: rgb(240, 153, 123);
+}
+
+.mbar-t i.l2 {
+  background: rgb(232, 97, 60);
+}
+
+.mbar-t i.l3 {
+  background: rgb(217, 48, 28);
+}
+
+.mbar-v {
+  font-weight: 700;
+  text-align: right;
+}

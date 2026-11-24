@@ -707,3 +707,187 @@ setTimeout(() => {
     restTick();
   }
 }, 500);
+
+
+/* ---------- zakładka Postęp: wykres trendu wagi ---------- */
+
+// średnia krocząca z 7 dni: dla każdego pomiaru średnia ze wszystkich pomiarów z 7 dni do tego dnia
+function movingAvg(pts, days = 7) {
+  return pts.map(p => {
+    const from = addDays(p.d, -(days - 1));
+    const win = pts.filter(q => q.d >= from && q.d <= p.d);
+    const avg = win.reduce((s, q) => s + q.w, 0) / win.length;
+    return { d: p.d, w: avg };
+  });
+}
+
+const TREND_RANGES = [[30, '30 dni'], [90, '90 dni'], [0, 'Całość']];
+
+function weightTrendHTML() {
+  if (S.weights.length < 2) {
+    return '';
+  }
+  return `<section class="card chart" id="trend-card"></section>`;
+}
+
+function wireWeightTrend(el) {
+  const range = TREND_RANGES.some(([v]) => v === UI.trend) ? UI.trend : 90;
+  const all = S.weights;
+  const last = all[all.length - 1].d;
+  const from = range === 0 ? all[0].d : addDays(last, -range + 1);
+  const pts = all.filter(x => x.d >= from);
+  const st = stats();
+
+  const buttons = TREND_RANGES
+    .map(([v, l]) => `<button type="button" data-tr="${v}" aria-pressed="${v === range}">${l}</button>`)
+    .join('');
+
+  const chart = pts.length < 2
+    ? '<p class="muted small" style="margin:0">Za mało pomiarów w tym okresie.</p>'
+    : trendSVG(pts, st && st.target);
+
+  // zmiana średniej z 7 dni od początku okresu do dziś
+  const avg = movingAvg(pts);
+  const change = avg.length > 1
+    ? avg[avg.length - 1].w - avg[0].w
+    : null;
+  const changeTxt = change == null
+    ? ''
+    : `<span class="${wcls(change)}">${fmtSigned(change, 1)} kg</span> w tym okresie (średnia z 7 dni)`;
+
+  el.innerHTML = `
+    <div class="row">
+      <h2>Waga</h2>
+      <div class="seg" role="group" aria-label="Zakres wykresu">${buttons}</div>
+    </div>
+    ${chart}
+    <div class="legend">
+      <span><i></i>średnia z 7 dni</span>
+      <span><i class="dots"></i>pomiary</span>
+      ${st && st.target ? '<span><i class="goal"></i>cel</span>' : ''}
+    </div>
+    ${changeTxt ? `<p class="small" style="margin:0">${changeTxt}</p>` : ''}
+    <button class="link" type="button" data-go="dieta">Wszystkie wpisy ›</button>`;
+
+  $$('[data-tr]', el).forEach(b => {
+    b.onclick = () => {
+      UI.trend = +b.dataset.tr;
+      wireWeightTrend(el);
+    };
+  });
+}
+
+function trendSVG(pts, target) {
+  const W = 340;
+  const H = 180;
+  const L = 36;
+  const R = 8;
+  const T = 10;
+  const B = 24;
+
+  const avg = movingAvg(pts);
+  const vals = pts.map(p => p.w);
+  if (target) {
+    vals.push(target);
+  }
+
+  let lo = Math.min(...vals);
+  let hi = Math.max(...vals);
+  const padY = Math.max(0.5, (hi - lo) * 0.08);
+  lo -= padY;
+  hi += padY;
+
+  const step = [0.5, 1, 2, 2.5, 5, 10, 20].find(s => s >= (hi - lo) / 4) || 50;
+  const yLo = Math.floor(lo / step) * step;
+  const yHi = Math.ceil(hi / step) * step;
+
+  const d0 = pts[0].d;
+  const dn = daysBetween(d0, pts[pts.length - 1].d) || 1;
+  const x = d => L + (W - L - R) * daysBetween(d0, d) / dn;
+  const y = v => T + (H - T - B) * (1 - (v - yLo) / (yHi - yLo));
+
+  let grid = '';
+  for (let v = yLo; v <= yHi + 1e-9; v += step) {
+    grid += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/>`;
+    grid += `<text class="lbl" x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${fmt(v, step < 1 ? 1 : 0)}</text>`;
+  }
+
+  const xLabels = [pts[0].d, pts[pts.length - 1].d]
+    .map((d, i) => `<text class="lbl" x="${x(d).toFixed(1)}" y="${H - 6}" text-anchor="${i ? 'end' : 'start'}">${dayLabel(d)}</text>`)
+    .join('');
+
+  const goal = target
+    ? `<line class="goal" x1="${L}" x2="${W - R}" y1="${y(target).toFixed(1)}" y2="${y(target).toFixed(1)}"/>
+       <text class="lbl goal-l" x="${W - R}" y="${(y(target) - 4).toFixed(1)}" text-anchor="end">cel ${fmt(target, 1)}</text>`
+    : '';
+
+  const dots = pts
+    .map(p => `<circle class="raw" cx="${x(p.d).toFixed(1)}" cy="${y(p.w).toFixed(1)}" r="2"/>`)
+    .join('');
+
+  const line = avg
+    .map(p => `${x(p.d).toFixed(1)},${y(p.w).toFixed(1)}`)
+    .join(' ');
+  const end = avg[avg.length - 1];
+
+  return `
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Trend wagi">
+      ${grid}
+      ${goal}
+      ${dots}
+      <polyline class="avg" points="${line}"/>
+      <circle class="end" cx="${x(end.d).toFixed(1)}" cy="${y(end.w).toFixed(1)}" r="4.5"/>
+      ${xLabels}
+    </svg>`;
+}
+
+
+/* ---------- zakładka Postęp: serie na partie w ostatnich 7 dniach (poziome paski) ---------- */
+
+function muscleBarsHTML() {
+  if (!S.workouts.length) {
+    return '';
+  }
+
+  const data = muscleSets(7);
+  const rows = Object.entries(data)
+    .map(([m, o]) => ({ m, v: muscleScore(o) }))
+    .filter(r => r.v > 0)
+    .sort((a, b) => b.v - a.v);
+
+  const max = Math.max(10, ...rows.map(r => r.v));
+
+  const list = rows.length
+    ? rows
+      .map(r => {
+        const lv = muscleLevel(r.v, 7);
+        const width = Math.max(4, Math.round(r.v / max * 100));
+        const vTxt = fmt(r.v, r.v % 1 ? 1 : 0);
+        return `
+          <button class="mbar" type="button" data-mbar="${r.m}">
+            <span class="mbar-l">${MUSCLE[r.m] || r.m}</span>
+            <span class="mbar-t"><i class="l${lv}" style="width:${width}%"></i></span>
+            <span class="mbar-v num">${vTxt}</span>
+          </button>`;
+      })
+      .join('')
+    : '<p class="muted small" style="margin:0">W ostatnich 7 dniach nie było treningów siłowych.</p>';
+
+  return `
+    <section class="card" id="mbars">
+      <div class="row">
+        <h2>Partie w tygodniu</h2>
+        <span class="muted small">serie, 7 dni</span>
+      </div>
+      <div class="mbars">${list}</div>
+    </section>`;
+}
+
+function wireMuscleBars(el) {
+  $$('[data-mbar]', el).forEach(b => {
+    b.onclick = () => {
+      UI.mDays = 7;
+      showMuscle(b.dataset.mbar);
+    };
+  });
+}

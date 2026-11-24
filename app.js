@@ -733,6 +733,7 @@ function renderStart() {
     ? `
       ${heroHTML(st)}
       ${statTilesHTML(st)}
+      ${typeof weightTrendHTML === 'function' ? weightTrendHTML() : ''}
       ${pref('kcal') ? kcalCardHTML(st) : ''}
       ${pref('fact') ? factCardHTML() : ''}`
     : `
@@ -745,6 +746,7 @@ function renderStart() {
   body.innerHTML = `
     ${weightPart}
     ${typeof monthSummaryHTML === 'function' ? monthSummaryHTML() : ''}
+    ${typeof muscleBarsHTML === 'function' ? muscleBarsHTML() : ''}
     ${musclesNavCard()}
     ${badgesCard}
     ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w zakładce Ustawienia, żeby zobaczyć BMI i postęp do celu.</p>'}`;
@@ -761,6 +763,16 @@ function renderStart() {
   const ms = $('#month-sum', body);
   if (ms && typeof wireMonthSummary === 'function') {
     wireMonthSummary(ms);
+  }
+
+  const tr = $('#trend-card', body);
+  if (tr && typeof wireWeightTrend === 'function') {
+    wireWeightTrend(tr);
+  }
+
+  const mb = $('#mbars', body);
+  if (mb && typeof wireMuscleBars === 'function') {
+    wireMuscleBars(mb);
   }
 
   const bd = $('#st-badges', body);
@@ -2644,6 +2656,7 @@ const CHANGELOG = [
       'Nowa pierwsza zakładka <b>Postęp</b>: aktualna waga, wynik od startu, postęp do celu, BMI, średnia 7 dni, ostatnie 30 dni, kalorie, fakt dnia i seria ważenia.',
       'Jest tam też <b>podsumowanie miesiąca</b> oraz skróty do grafu partii mięśniowych i odznak.',
       'Wpisy wagi, wykres i lista pomiarów są w osobnej zakładce <b>Waga</b>, razem z Pomiarami ciała.',
+      'W zakładce Postęp jest też <b>wykres trendu wagi</b> (średnia z 7 dni, linia celu) i <b>paski serii na partie</b> z ostatnich 7 dni.',
     ],
   },
   {
