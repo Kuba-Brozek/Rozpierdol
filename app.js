@@ -2162,6 +2162,7 @@ function renderWiecej() {
   body.innerHTML = `
     <section class="card" id="sync-card" data-sec="konto"></section>
     <section class="card" id="share-card" data-sec="share"></section>
+    <section class="card" id="lock-card" data-sec="lock"></section>
     <section class="card" data-sec="wyglad">
       <h2>Wygląd</h2>
       <div class="swatches" role="group" aria-label="Kolor apki">
@@ -2280,6 +2281,7 @@ function renderWiecej() {
   }).catch(() => {});
   if (typeof renderSyncCard === 'function') renderSyncCard($('#sync-card', body)); else $('#sync-card', body).remove();
   if (typeof renderShareCard === 'function') renderShareCard($('#share-card', body)); else $('#share-card', body).remove();
+  if (typeof renderLockCard === 'function') renderLockCard($('#lock-card', body)); else $('#lock-card', body).remove();
   // Zawsze aktualny profil (synchronizacja w tle może podmienić obiekt S)
   const P = () => S.profile;
   const info = () => {
@@ -2324,7 +2326,7 @@ function renderWiecej() {
 
 /* ---- Ustawienia jak w iPhonie: lista pozycji, każda otwiera osobny ekran ---- */
 const SECS = [
-  ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], null,
+  ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], ['lock', '🔒', 'Blokada apki'], null,
   ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Forma'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
   ['log', '🆕', 'Co nowego'], ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
@@ -2426,6 +2428,12 @@ $('#wiecej-back').addEventListener('click', () => goBack());
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  { id: 6, t: 'Blokada apki', items: [
+    'Możesz zablokować apkę <b>4-cyfrowym kodem</b>: Ustawienia → Blokada apki.',
+    'Odblokowanie <b>Face ID / Touch ID</b>, jeśli telefon je ma.',
+    'Wybierasz, kiedy apka ma się blokować: od razu po wyjściu albo po 1, 5 lub 15 minutach.',
+    'Zapomniany kod zdejmiesz hasłem do konta.',
+  ] },
   { id: 5, t: 'Forma i mapa mięśni', items: [
     'Zakładka Dieta nazywa się teraz <b>Forma</b> i ma nową ikonę. Pasuje do każdego celu: redukcji, utrzymania i masy.',
     'Nowy ekran <b>Partie mięśni</b> (Forma → 💪). Sylwetka z przodu i z tyłu, a ćwiczone partie świecą na czerwono. Stuknij partię, żeby zobaczyć serie z ostatnich 7 dni, dzień po dniu.',
