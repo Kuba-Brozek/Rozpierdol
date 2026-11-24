@@ -1076,14 +1076,25 @@ function trendSVG(pts, target) {
 
 /* ---------- zakładka Postęp: serie na partie w ostatnich 7 dniach (poziome paski) ---------- */
 
+// czy w „Partiach w tygodniu” liczyć serie, w których partia pracowała pomocniczo (po ½)
+const mbarsHelp = () => !(S.prefs && S.prefs.mbarsHelp === false);
+
 function muscleBarsHTML() {
   if (!S.workouts.length) {
     return '';
   }
 
+  return `<section class="card" id="mbars">${muscleBarsInner()}</section>`;
+}
+
+function muscleBarsInner() {
+  const withHelp = mbarsHelp();
   const data = muscleSets(7);
   const rows = Object.entries(data)
-    .map(([m, o]) => ({ m, v: muscleScore(o) }))
+    .map(([m, o]) => ({
+      m,
+      v: withHelp ? muscleScore(o) : o.main,
+    }))
     .filter(r => r.v > 0)
     .sort((a, b) => b.v - a.v);
 
@@ -1106,13 +1117,18 @@ function muscleBarsHTML() {
     : '<p class="muted small" style="margin:0">W ostatnich 7 dniach nie było treningów siłowych.</p>';
 
   return `
-    <section class="card" id="mbars">
-      <div class="row">
-        <h2>Partie w tygodniu</h2>
-        <span class="muted small">serie, 7 dni</span>
-      </div>
-      <div class="mbars">${list}</div>
-    </section>`;
+    <div class="row">
+      <h2>Partie w tygodniu</h2>
+      <span class="muted small">serie, 7 dni</span>
+    </div>
+    <label class="pref-row mbars-help">
+      <span class="grow">
+        <span class="pref-l">Licz partie pomocnicze</span>
+        <span class="small muted">np. triceps przy wyciskaniu (po ½ serii)</span>
+      </span>
+      <input type="checkbox" class="switch" role="switch" id="mbars-help" ${withHelp ? 'checked' : ''}>
+    </label>
+    <div class="mbars">${list}</div>`;
 }
 
 function wireMuscleBars(el) {
@@ -1122,6 +1138,17 @@ function wireMuscleBars(el) {
       showMuscle(b.dataset.mbar);
     };
   });
+
+  const sw = $('#mbars-help', el);
+  if (sw) {
+    sw.onchange = () => {
+      S.prefs = Object.assign({}, S.prefs, { mbarsHelp: sw.checked });
+      save();
+      // przerysuj tylko tę kartę (bez skakania całego ekranu)
+      el.innerHTML = muscleBarsInner();
+      wireMuscleBars(el);
+    };
+  }
 }
 
 
