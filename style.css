@@ -1128,18 +1128,18 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   flex: 1;
 }
 
-/* pierwszy wiersz paska: nazwa ekranu po lewej, data po prawej */
+/* pierwszy wiersz paska: nazwa ekranu, a zaraz za nią „· data” */
 .tb-row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 0;
   min-width: 0;
   overflow: hidden;
 }
 
 .tb-title {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   font: 700 22px/1.1 var(--num);
   letter-spacing: -.01em;
@@ -1150,11 +1150,19 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 
 .tb-date {
   flex: none;
+  white-space: nowrap;
   color: var(--muted);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: .05em;
   font-variant-numeric: tabular-nums;
+}
+
+/* kropka na środku wysokości tekstu (·) między nazwą ekranu a datą */
+.tb-date::before {
+  content: '·';
+  margin: 0 7px;
+  font-weight: 700;
 }
 
 .tb-level {

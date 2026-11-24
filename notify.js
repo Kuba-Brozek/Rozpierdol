@@ -81,7 +81,7 @@ async function checkShareNotifs(force) {
     const now = {};
     list.forEach(x => {
       now[x.uid] = {
-        owner: x.owner || 'Ktoś',
+        owner: typeof shareOwnerLabel === 'function' ? shareOwnerLabel(x) : (x.owner || 'Ktoś'),
         what: (x.data && x.data.what) || {},
       };
     });

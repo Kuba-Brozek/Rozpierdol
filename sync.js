@@ -311,6 +311,8 @@ async function pushOneShare(p) {
   const fields = {
     ownerUid: { stringValue: uid },
     owner: { stringValue: SY.session.email || '' },
+    // imię i nazwisko z profilu (jeśli podane) — odbiorca widzi je przed adresem e-mail
+    ownerName: { stringValue: typeof fullName === 'function' ? fullName() : '' },
     viewer: { stringValue: normEmail(p.email) },
     json: { stringValue: JSON.stringify(sharedPayload(p)) },
     updatedAt: { integerValue: String(Date.now()) },
@@ -350,6 +352,16 @@ async function pushShared() {
   sySave();
 }
 
+// „Imię Nazwisko (e-mail)”, samo imię, gdy brak nazwiska, albo sam e-mail, gdy ktoś nie podał imienia
+function shareOwnerLabel(x) {
+  const name = (x.ownerName || '').trim();
+  const email = x.owner || '';
+  if (name && email) {
+    return `${name} (${email})`;
+  }
+  return name || email || 'Użytkownik';
+}
+
 function shareRow(f) {
   let data = {};
   try {
@@ -357,6 +369,7 @@ function shareRow(f) {
   } catch (e) {}
   return {
     owner: f.owner && f.owner.stringValue,
+    ownerName: (f.ownerName && f.ownerName.stringValue) || '',
     ownerUid: f.ownerUid && f.ownerUid.stringValue,
     updatedAt: +((f.updatedAt && f.updatedAt.integerValue) || 0),
     data,
@@ -1148,7 +1161,7 @@ async function loadSharedWithMe(box) {
     box.innerHTML = `<div class="list">${list.map((x, i) => {
       const w = x.data.what || {};
       const parts = [w.weights && 'waga', w.plans && plural((x.data.plans || []).length, 'plan', 'plany', 'planów'), w.fav && plural((x.data.fav || []).length, 'ulubione', 'ulubione', 'ulubionych')].filter(Boolean).join(' · ');
-      return `<button class="li" type="button" data-sh="${i}"><div class="grow"><div class="t">${esc(x.owner || 'Użytkownik')}</div><div class="s">${parts}</div></div><span class="chev" aria-hidden="true">›</span></button>`;
+      return `<button class="li" type="button" data-sh="${i}"><div class="grow"><div class="t">${esc(shareOwnerLabel(x))}</div><div class="s">${parts}</div></div><span class="chev" aria-hidden="true">›</span></button>`;
     }).join('')}</div>`;
     box.querySelectorAll('[data-sh]').forEach(b => b.onclick = () => showShared(list[+b.dataset.sh]));
   } catch (e) {
@@ -1187,7 +1200,8 @@ function showShared(x) {
       </div>`).join('')}</div>` : '<p class="muted small" style="margin:0">Brak planów.</p>'}` : '';
   const favHTML = w.fav ? `<h3>Ulubione ćwiczenia</h3>${(d.fav || []).length ? `<div class="list">${d.fav.map(id => { const e = exOf(id); return `
       <div class="li li-row"><div class="li-main" style="cursor:default">${thumbHTML(e)}<div class="grow"><div class="t">${esc(exName(e))}</div><div class="s">${e ? [...(e.m || []).map(m => MUSCLE[m] || m), EQUIP[e.e] || ''].filter(Boolean).join(' · ') : ''}</div></div></div>${EXMAP[id] ? starBtn(id) : ''}</div>`; }).join('')}</div>` : '<p class="muted small" style="margin:0">Brak ulubionych.</p>'}` : '';
-  openSheet(x.owner || 'Udostępnione', `
+  openSheet(x.ownerName || x.owner || 'Udostępnione', `
+    ${x.ownerName && x.owner ? `<p class="small" style="margin:0">${esc(x.owner)}</p>` : ''}
     <p class="muted small" style="margin:0">Podgląd danych udostępnionych przez tę osobę${x.updatedAt ? ' · stan z ' + new Date(x.updatedAt).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}. Gwiazdką dodasz ćwiczenie do swoich ulubionych.</p>
     ${weightHTML}${plansHTML}${favHTML}`, b => {
     requestAnimationFrame(() => fitHero(b));
@@ -1196,7 +1210,8 @@ function showShared(x) {
       if (c) {
         const p = d.plans[+c.dataset.copy];
         (d.custom || []).forEach(cu => { if (p.ex.some(x => x.id === cu.id) && !S.custom.some(m => m.id === cu.id)) S.custom.push(cu); });
-        const base = p.name + ' (od ' + String(x.owner || '').split('@')[0] + ')';
+        const from = (x.ownerName || '').split(' ')[0] || String(x.owner || '').split('@')[0];
+        const base = p.name + ' (od ' + from + ')';
         S.plans.push({ id: 'p_' + uid(), name: base, ex: p.ex.map(x => ({ id: x.id, sets: x.sets })) });
         save(); rebuildExMap(); toast('Skopiowano plan „' + base + '” do twoich planów'); c.disabled = true; c.textContent = 'Skopiowano';
         return;

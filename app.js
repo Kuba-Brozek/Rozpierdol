@@ -2552,7 +2552,7 @@ function renderWiecej() {
     </section>
     <section class="card" data-sec="profil">
       <h2>Profil</h2>
-      <p class="muted small" style="margin:0">Wszystkie pola są opcjonalne. Płeć, rok urodzenia i aktywność są potrzebne do kalorii i % tkanki tłuszczowej z obwodów. Te dane nie trafiają do udostępniania.</p>
+      <p class="muted small" style="margin:0">Wszystkie pola są opcjonalne. Płeć, rok urodzenia i aktywność są potrzebne do kalorii i % tkanki tłuszczowej z obwodów. Te dane nie trafiają do udostępniania. Imię i nazwisko widzą tylko osoby, którym coś udostępniasz.</p>
       <!-- imię i nazwisko: do powitania na górze Ustawień (opcjonalne) -->
       <div class="add-weight" style="grid-template-columns:1fr 1fr">
         <div class="field">
@@ -2808,13 +2808,23 @@ $('#wiecej-back').addEventListener('click', () => goBack());
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.15.0';
+const APP_VERSION = '1.16.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 16,
+    v: '1.16.0',
+    t: 'Imię przy udostępnianiu',
+    items: [
+      'Gdy ktoś ci coś udostępnia i ma w profilu imię (i nazwisko), zobaczysz je <b>przed jego adresem e-mail</b>, także w powiadomieniach.',
+      'Data na górnym pasku jest teraz zaraz za nazwą ekranu, po kropce.',
+      'Polityka prywatności: dopisaliśmy, że imię i nazwisko widzą osoby, którym coś udostępniasz.',
+    ],
+  },
   {
     id: 15,
     v: '1.15.0',

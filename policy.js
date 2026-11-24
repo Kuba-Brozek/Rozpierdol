@@ -8,7 +8,7 @@
    — synchronizuje się z kontem — oraz w pamięci telefonu (żeby nie znikła przy logowaniu na innym koncie danych).
    Plik ładuje się PRZED app.js — na górnym poziomie tylko definicje. */
 
-const POLICY_VERSION = 2;
+const POLICY_VERSION = 3;
 const POLICY_DATE = '2026-11-24';
 const POLICY_LOCAL_KEY = 'rozpierdol-polityka';
 
@@ -19,7 +19,10 @@ const POLICY_CHANGES = {
     'Zapisujemy też, kiedy i którą wersję zasad zaakceptowałeś.',
   ],
   2: [
-    'W profilu możesz podać <b>imię i nazwisko</b> (oba pola są opcjonalne). Służą tylko do powitania w Ustawieniach i nie trafiają do udostępniania.',
+    'W profilu możesz podać <b>imię i nazwisko</b> (oba pola są opcjonalne). Apka wita cię nimi w Ustawieniach.',
+  ],
+  3: [
+    'Jeśli podasz imię (i nazwisko), zobaczą je przed twoim adresem e-mail <b>osoby, którym coś udostępniasz</b>. Nikt inny ich nie widzi.',
   ],
 };
 
@@ -32,7 +35,7 @@ function rodoBodyHTML() {
     <h3>Jakie dane</h3>
     <ul>
       <li><b>Konto:</b> adres e-mail i hasło. Hasło trzyma Google (Firebase Authentication) w postaci zaszyfrowanej. Autor apki go nie zna.</li>
-      <li><b>To, co wpisujesz:</b> waga, pomiary ciała, treningi, plany, zaplanowane treningi, ulubione i własne ćwiczenia oraz profil: imię i nazwisko (opcjonalnie, tylko do powitania w apce), wzrost, płeć, rok urodzenia, aktywność i cel.</li>
+      <li><b>To, co wpisujesz:</b> waga, pomiary ciała, treningi, plany, zaplanowane treningi, ulubione i własne ćwiczenia oraz profil: imię i nazwisko (opcjonalnie: powitanie w apce i podpis przy udostępnianiu), wzrost, płeć, rok urodzenia, aktywność i cel.</li>
       <li><b>Sugestie:</b> treść i twój e-mail, żeby dało się odpisać.</li>
       <li><b>Lista kont:</b> e-mail, data założenia konta, kiedy ostatnio otwarto apkę i ile jest wpisów (sama liczba, bez treści). Autor używa jej do porządków, np. usuwania nieużywanych kont.</li>
       <li><b>Akceptacja zasad:</b> która wersja tych zasad i kiedy została zaakceptowana.</li>
@@ -49,7 +52,7 @@ function rodoBodyHTML() {
     <h3>Kto ma dostęp</h3>
     <ul>
       <li>Do swoich danych masz dostęp tylko ty. Pilnują tego reguły bezpieczeństwa bazy.</li>
-      <li>Osoby, którym coś udostępnisz, widzą tylko zaznaczone rzeczy: plany, ulubione albo wagę. Dostęp zabierasz w każdej chwili.</li>
+      <li>Osoby, którym coś udostępnisz, widzą tylko zaznaczone rzeczy: plany, ulubione albo wagę, a do tego twój e-mail i imię z nazwiskiem, jeśli je podasz. Dostęp zabierasz w każdej chwili.</li>
       <li>Sugestie czyta tylko autor apki.</li>
       <li>Autor, jako właściciel projektu Firebase, ma techniczny dostęp do bazy, ale z niego nie korzysta.</li>
     </ul>
