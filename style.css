@@ -1405,6 +1405,31 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   min-width: 0;
 }
 
+/* ---------- Ustawienia: powitanie na górze ---------- */
+.card.hello {
+  gap: 4px;
+  padding: 18px 16px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    var(--surface);
+}
+
+.card.hello .hello-t {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.card.hello p {
+  overflow-wrap: anywhere;
+}
+
+.card.hello .link {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
 /* ---------- Postęp: mniejszy kafelek z wagą ---------- */
 #start-body .hero {
   gap: 8px;

@@ -2499,10 +2499,38 @@ function setTheme(patch) {
   applyTheme(t);
 }
 
+/* ---- powitanie na górze Ustawień ---- */
+function fullName() {
+  const p = S.profile || {};
+  return [p.name, p.surname].filter(Boolean).join(' ');
+}
+
+function helloText() {
+  const n = fullName();
+  return n ? `Cześć, ${n}! 👋` : 'Cześć! 👋';
+}
+
+function helloCardHTML() {
+  const email = typeof SY !== 'undefined' && SY.session ? SY.session.email : '';
+  const L = typeof levelInfo === 'function' ? levelInfo() : null;
+  const sub = [
+    email ? esc(email) : 'bez konta (dane tylko na tym telefonie)',
+    L ? `poziom ${L.lvl}` : '',
+  ].filter(Boolean).join(' · ');
+
+  return `
+    <section class="card hello">
+      <h2 class="hello-t" id="hello-name">${esc(helloText())}</h2>
+      <p class="muted small" style="margin:0">${sub}</p>
+      ${fullName() ? '' : '<button class="link" type="button" data-go="wiecej:profil">Podaj imię w profilu ›</button>'}
+    </section>`;
+}
+
 function renderWiecej() {
   const p = S.profile, th = getTheme();
   const body = $('#wiecej-body');
   body.innerHTML = `
+    ${helloCardHTML()}
     <section class="card" id="notif-card" data-sec="notif"></section>
     <section class="card" id="sync-card" data-sec="konto"></section>
     <section class="card" id="share-card" data-sec="share"></section>
@@ -2525,6 +2553,17 @@ function renderWiecej() {
     <section class="card" data-sec="profil">
       <h2>Profil</h2>
       <p class="muted small" style="margin:0">Wszystkie pola są opcjonalne. Płeć, rok urodzenia i aktywność są potrzebne do kalorii i % tkanki tłuszczowej z obwodów. Te dane nie trafiają do udostępniania.</p>
+      <!-- imię i nazwisko: do powitania na górze Ustawień (opcjonalne) -->
+      <div class="add-weight" style="grid-template-columns:1fr 1fr">
+        <div class="field">
+          <label for="p-name">Imię</label>
+          <input type="text" id="p-name" autocomplete="given-name" maxlength="30" value="${esc(p.name || '')}" placeholder="np. Kuba">
+        </div>
+        <div class="field">
+          <label for="p-surname">Nazwisko</label>
+          <input type="text" id="p-surname" autocomplete="family-name" maxlength="40" value="${esc(p.surname || '')}" placeholder="opcjonalnie">
+        </div>
+      </div>
       <div class="add-weight" style="grid-template-columns:1fr 1fr">
         <div class="field"><label for="p-h">Wzrost (m)</label><input type="number" id="p-h" inputmode="decimal" step="0.01" min="1" max="2.5" value="${p.height ?? ''}" placeholder="1.76"></div>
         <div class="field"><label for="p-born">Rok urodzenia</label><input type="number" id="p-born" inputmode="numeric" step="1" min="1920" max="${new Date().getFullYear() - 10}" value="${p.born ?? ''}" placeholder="1998"></div>
@@ -2583,7 +2622,7 @@ function renderWiecej() {
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
     <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Sylwetki mięśni: <a href="https://pixabay.com/vectors/anatomical-anatomy-anatomy-chart-6826992/" target="_blank" rel="noopener" style="color:inherit">Pixabay</a>. Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
     <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: ${APP_VERSION}</p>
-    <p class="muted small settings-foot" style="margin:4px 0 0">© 2026${new Date().getFullYear() > 2026 ? '–' + new Date().getFullYear() : ''} Rozpierdol. Wszelkie prawa zastrzeżone.<br>Zrobione z miłością i odrobiną bólu mięśni 💪</p>`;
+    <p class="muted small settings-foot" style="margin:4px 0 0">©2026${new Date().getFullYear() > 2026 ? '–' + new Date().getFullYear() : ''} Rozpierdol. Wszelkie prawa zastrzeżone.<br>Zrobione z miłością i odrobiną bólu mięśni 💪</p>`;
   // numer wersji (np. 1.14.1) + numer kompilacji = nazwa schowka plików apki (ustawiana przy budowaniu)
   if (window.caches) {
     caches.keys()
@@ -2622,6 +2661,26 @@ function renderWiecej() {
   };
   const syncSoonSafe = () => { if (typeof syncSoon === 'function') syncSoon(); };
   numField('#p-h', v => { let n = num(v); if (n > 3) n = n / 100; P().height = n; }, ['Zapisano wzrost']);
+
+  // imię i nazwisko: zapis przy wpisywaniu, powitanie i ikona na górnym pasku odświeżają się od razu
+  [['#p-name', 'name', 'Zapisano imię'], ['#p-surname', 'surname', 'Zapisano nazwisko']].forEach(([sel, key, msg]) => {
+    const el = $(sel, body);
+    if (!el) {
+      return;
+    }
+    el.addEventListener('input', () => {
+      P()[key] = el.value.trim() || null;
+      save();
+      const hello = $('#hello-name', body);
+      if (hello) {
+        hello.textContent = helloText();
+      }
+      if (typeof updateTopbar === 'function') {
+        updateTopbar();
+      }
+    });
+    el.addEventListener('change', () => toast(msg));
+  });
   numField('#p-born', v => { const n = Math.round(num(v)); const ok = n >= 1920 && n <= new Date().getFullYear() - 10; P().born = ok ? n : null; return ok; }, ['Zapisano rok urodzenia', 'Wpisz rok, np. 1998']);
   numField('#p-g', v => { P().goalLoss = num(v); }, ['Zapisano cel']);
   $('#p-act').addEventListener('change', e => { P().activity = num(e.target.value); save(); toast('Zapisano aktywność'); });
@@ -2749,13 +2808,22 @@ $('#wiecej-back').addEventListener('click', () => goBack());
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.14.1';
+const APP_VERSION = '1.15.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 15,
+    v: '1.15.0',
+    t: 'Powitanie i imię w profilu',
+    items: [
+      'W profilu możesz podać <b>imię i nazwisko</b> (opcjonalnie). Ustawienia witają cię po imieniu, a jego pierwsza litera jest na ikonie użytkownika.',
+      'Zaktualizowaliśmy politykę prywatności (dopisane imię i nazwisko). Apka poprosi o jej ponowną akceptację.',
+    ],
+  },
   {
     id: 14,
     v: '1.14.0',

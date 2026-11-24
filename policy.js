@@ -8,7 +8,7 @@
    — synchronizuje się z kontem — oraz w pamięci telefonu (żeby nie znikła przy logowaniu na innym koncie danych).
    Plik ładuje się PRZED app.js — na górnym poziomie tylko definicje. */
 
-const POLICY_VERSION = 1;
+const POLICY_VERSION = 2;
 const POLICY_DATE = '2026-11-24';
 const POLICY_LOCAL_KEY = 'rozpierdol-polityka';
 
@@ -17,6 +17,9 @@ const POLICY_CHANGES = {
   1: [
     'Pierwsza spisana wersja zasad: jakie dane zbiera apka, gdzie leżą, kto ma do nich dostęp i jakie masz prawa.',
     'Zapisujemy też, kiedy i którą wersję zasad zaakceptowałeś.',
+  ],
+  2: [
+    'W profilu możesz podać <b>imię i nazwisko</b> (oba pola są opcjonalne). Służą tylko do powitania w Ustawieniach i nie trafiają do udostępniania.',
   ],
 };
 
@@ -29,7 +32,7 @@ function rodoBodyHTML() {
     <h3>Jakie dane</h3>
     <ul>
       <li><b>Konto:</b> adres e-mail i hasło. Hasło trzyma Google (Firebase Authentication) w postaci zaszyfrowanej. Autor apki go nie zna.</li>
-      <li><b>To, co wpisujesz:</b> waga, pomiary ciała, treningi, plany, zaplanowane treningi, ulubione i własne ćwiczenia oraz profil: wzrost, płeć, rok urodzenia, aktywność i cel.</li>
+      <li><b>To, co wpisujesz:</b> waga, pomiary ciała, treningi, plany, zaplanowane treningi, ulubione i własne ćwiczenia oraz profil: imię i nazwisko (opcjonalnie, tylko do powitania w apce), wzrost, płeć, rok urodzenia, aktywność i cel.</li>
       <li><b>Sugestie:</b> treść i twój e-mail, żeby dało się odpisać.</li>
       <li><b>Lista kont:</b> e-mail, data założenia konta, kiedy ostatnio otwarto apkę i ile jest wpisów (sama liczba, bez treści). Autor używa jej do porządków, np. usuwania nieużywanych kont.</li>
       <li><b>Akceptacja zasad:</b> która wersja tych zasad i kiedy została zaakceptowana.</li>

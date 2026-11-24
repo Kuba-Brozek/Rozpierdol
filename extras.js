@@ -1339,9 +1339,11 @@ function updateTopbar() {
     requestAnimationFrame(fitTopbarTitle);
   }
 
-  // inicjał z e-maila zalogowanego konta, inaczej ikonka ludzika
+  // inicjał z imienia (jeśli podane), potem z e-maila konta, inaczej ikonka ludzika
   const email = typeof SY !== 'undefined' && SY.session && SY.session.email;
-  const initial = email ? email.trim()[0].toUpperCase() : '';
+  const name = ((S.profile && S.profile.name) || '').trim();
+  const source = name || (email ? email.trim() : '');
+  const initial = source ? source[0].toUpperCase() : '';
   userBtn.innerHTML = initial
     ? `<span class="tb-initial">${esc(initial)}</span>`
     : USER_ICON;
