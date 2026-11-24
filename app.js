@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /* ============ Pomocnicze ============ */
 const IMG = 'img/'; // zdjęcia ćwiczeń są częścią apki (pomniejszone kopie z Free Exercise DB)
