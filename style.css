@@ -1622,3 +1622,30 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   font-size: 14px;
   white-space: nowrap;
 }
+
+/* kropka na ikonie użytkownika: nieprzeczytane powiadomienia */
+.tb-user {
+  position: relative;
+}
+
+.tb-user.dot::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--bad);
+  border: 2px solid var(--bg);
+}
+
+/* lista powiadomień: nieprzeczytane wyróżnione */
+.notif .t {
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.notif.unread {
+  background: var(--accent-soft);
+}

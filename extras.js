@@ -1346,6 +1346,13 @@ function updateTopbar() {
     ? `<span class="tb-initial">${esc(initial)}</span>`
     : USER_ICON;
   userBtn.classList.toggle('on', UI.tab === 'wiecej');
+
+  // kropka = nieprzeczytane powiadomienia (np. ktoś coś udostępnił)
+  const unread = typeof unreadCount === 'function' ? unreadCount() : 0;
+  userBtn.classList.toggle('dot', unread > 0);
+  userBtn.setAttribute('aria-label', unread
+    ? `Ustawienia i konto, ${unread} nowe powiadomienia`
+    : 'Ustawienia i konto');
 }
 
 // długa nazwa (np. „Graf trenowanych partii mięśniowych”): zmniejszaj czcionkę, aż się zmieści

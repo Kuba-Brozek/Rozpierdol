@@ -2503,6 +2503,7 @@ function renderWiecej() {
   const p = S.profile, th = getTheme();
   const body = $('#wiecej-body');
   body.innerHTML = `
+    <section class="card" id="notif-card" data-sec="notif"></section>
     <section class="card" id="sync-card" data-sec="konto"></section>
     <section class="card" id="share-card" data-sec="share"></section>
     <section class="card" id="lock-card" data-sec="lock"></section>
@@ -2590,6 +2591,7 @@ function renderWiecej() {
   }).catch(() => {});
   if (typeof renderSyncCard === 'function') renderSyncCard($('#sync-card', body)); else $('#sync-card', body).remove();
   if (typeof renderShareCard === 'function') renderShareCard($('#share-card', body)); else $('#share-card', body).remove();
+  if (typeof renderNotifCard === 'function') renderNotifCard($('#notif-card', body)); else $('#notif-card', body).remove();
   if (typeof renderLockCard === 'function') renderLockCard($('#lock-card', body)); else $('#lock-card', body).remove();
   // Zawsze aktualny profil (synchronizacja w tle może podmienić obiekt S)
   const P = () => S.profile;
@@ -2737,6 +2739,15 @@ $('#wiecej-back').addEventListener('click', () => goBack());
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 14,
+    t: 'Powiadomienia o udostępnianiu',
+    items: [
+      'Gdy ktoś coś ci udostępni, zmieni zakres albo zabierze dostęp, po otwarciu apki zobaczysz <b>powiadomienie</b>.',
+      'Nieprzeczytane powiadomienia to czerwona kropka na ikonie użytkownika. Ich historia jest na górze Ustawień.',
+      'Powiadomienia działają, gdy masz konto z potwierdzonym e-mailem.',
+    ],
+  },
   {
     id: 13,
     t: 'Udostępnianie dla każdej osoby osobno',
