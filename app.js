@@ -119,7 +119,10 @@ function setTab(t, fromHistory) {
   }
   UI.tab = t;
   if (!fromHistory) UI.sec = null; // zakładka z dolnego paska zawsze otwiera listę ustawień
-  const nav = TAB_PARENT[t] || t;
+  // w Ustawieniach żadna zakładka na dole nie jest podświetlona (nie są częścią żadnej z nich)
+  const nav = t === 'wiecej'
+    ? null
+    : TAB_PARENT[t] || t;
   $$('.tabs button').forEach(b => b.dataset.tab === nav ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   $$('main > .view').forEach(v => v.hidden = v.id !== 'view-' + t);
   // historia: ekran podrzędny dostaje wpis, żeby działał gest/przycisk „wstecz”

@@ -66,7 +66,11 @@
 
 <!-- górny pasek na każdym ekranie: poziom i XP (stuknij = szczegóły), ikona użytkownika = Ustawienia -->
 <header class="topbar" id="topbar">
-  <button type="button" class="tb-level" id="tb-level" aria-label="Twój poziom"></button>
+  <div class="tb-main">
+    <!-- nazwa ekranu, na którym jesteś (zamiast dużego nagłówka na samym ekranie) -->
+    <div class="tb-title" id="tb-title" aria-hidden="true"></div>
+    <button type="button" class="tb-level" id="tb-level" aria-label="Twój poziom"></button>
+  </div>
   <button type="button" class="tb-user" id="tb-user" aria-label="Ustawienia i konto"></button>
 </header>
 

@@ -1145,14 +1145,22 @@ function updateTopbar() {
     ? `${fmtN(L.xp)} / ${fmtN(L.next)} XP`
     : `${fmtN(L.xp)} XP · max`;
 
+  // druga linijka paska: [poziom] nazwa ▬▬▬ XP — wszystko w jednym rzędzie
   lvlBtn.innerHTML = `
     <span class="tb-lvl num">${L.lvl}</span>
-    <span class="tb-info">
-      <span class="tb-name">${esc(L.name)}</span>
-      <span class="tb-bar"><i style="width:${L.pct}%"></i></span>
-      <span class="tb-xp num">${xpTxt}</span>
-    </span>`;
+    <span class="tb-name">${esc(L.name)}</span>
+    <span class="tb-bar"><i style="width:${L.pct}%"></i></span>
+    <span class="tb-xp num">${xpTxt}</span>`;
   lvlBtn.setAttribute('aria-label', `Poziom ${L.lvl}, ${L.name}, ${xpTxt}`);
+
+  // nazwa ekranu = nagłówek bieżącego widoku (ten na samym ekranie jest ukryty)
+  const h1 = document.querySelector(`#view-${UI.tab} .vhead h1`);
+  const title = document.getElementById('tb-title');
+  if (title) {
+    title.textContent = h1 ? h1.textContent : '';
+    fitTopbarTitle();
+    requestAnimationFrame(fitTopbarTitle);
+  }
 
   // inicjał z e-maila zalogowanego konta, inaczej ikonka ludzika
   const email = typeof SY !== 'undefined' && SY.session && SY.session.email;
@@ -1162,6 +1170,26 @@ function updateTopbar() {
     : USER_ICON;
   userBtn.classList.toggle('on', UI.tab === 'wiecej');
 }
+
+// długa nazwa (np. „Graf trenowanych partii mięśniowych”): zmniejszaj czcionkę, aż się zmieści
+function fitTopbarTitle() {
+  const title = document.getElementById('tb-title');
+  if (!title || !title.clientWidth) {
+    return;
+  }
+  let size = 22;
+  title.style.fontSize = size + 'px';
+  while (title.scrollWidth > title.clientWidth && size > 14) {
+    size--;
+    title.style.fontSize = size + 'px';
+  }
+}
+
+// czcionka z nagłówków ładuje się chwilę po starcie i ma inną szerokość — dopasuj jeszcze raz
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(fitTopbarTitle);
+}
+window.addEventListener('resize', fitTopbarTitle);
 
 let topbarTimer = null;
 function scheduleTopbar() {
