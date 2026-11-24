@@ -710,7 +710,8 @@ function heroHTML(st) {
       <div class="muted small">${GOALS[goalType()].l} · dzień ${st.day} · ostatni pomiar ${dayLabel(st.last)}</div>
       ${typeof weighStreakHTML === 'function' ? weighStreakHTML() : ''}
       ${st.prevDiff != null
-        ? `<div class="small ${wcls(st.prevDiff) || 'muted'}">${fmtSigned(st.prevDiff, 2)} kg od poprzedniego pomiaru</div>`
+        // zawsze szare: wahania z dnia na dzień są normalne (woda, sól), nie oceniamy ich kolorem
+        ? `<div class="small muted">${fmtSigned(st.prevDiff, 2)} kg od poprzedniego pomiaru</div>`
         : ''}
       ${goalPart}
     </section>`;
