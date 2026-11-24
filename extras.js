@@ -673,14 +673,17 @@ function levelInfo(v = achVals()) {
     cur,
     next,
     pct,
+    // licznik w obrębie bieżącego poziomu: ile XP zebrane na tym poziomie i ile ten poziom wymaga
+    inLvl: xp - cur,
+    need: next ? next - cur : 0,
   };
 }
 
 function levelCardHTML() {
   const L = levelInfo();
   const sub = L.next
-    ? `${fmtN(L.xp)} / ${fmtN(L.next)} XP · do poziomu ${L.lvl + 1}: ${fmtN(L.next - L.xp)} XP`
-    : `${fmtN(L.xp)} XP · najwyższy poziom!`;
+    ? `${fmtN(L.inLvl)} / ${fmtN(L.need)} XP · do poziomu ${L.lvl + 1}: ${fmtN(L.next - L.xp)} XP`
+    : `najwyższy poziom! · łącznie ${fmtN(L.xp)} XP`;
 
   return `
     <button class="card level-card" type="button" id="level-card">
@@ -716,7 +719,7 @@ function showLevels() {
         <div class="lvl-row ${cls}">
           <span class="lvl-badge sm num">${n}</span>
           <span class="grow">Poziom ${n}</span>
-          <span class="small muted num">${fmtN(levelXP(n))} XP</span>
+          <span class="small muted num">${n < LEVEL_MAX ? fmtN(levelXP(n + 1) - levelXP(n)) + ' XP' : 'ostatni'}</span>
         </div>`;
     })
     .join('');
@@ -1307,8 +1310,8 @@ function updateTopbar() {
 
   const L = levelInfo();
   const xpTxt = L.next
-    ? `${fmtN(L.xp)} / ${fmtN(L.next)} XP`
-    : `${fmtN(L.xp)} XP · max`;
+    ? `${fmtN(L.inLvl)} / ${fmtN(L.need)} XP`
+    : `max · ${fmtN(L.xp)} XP`;
 
   // druga linijka paska: „Poziom N” ▬▬▬ XP — wszystko w jednym rzędzie
   lvlBtn.innerHTML = `
