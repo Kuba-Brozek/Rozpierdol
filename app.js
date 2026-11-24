@@ -3192,13 +3192,24 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.18.1';
+const APP_VERSION = '1.19.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 19,
+    v: '1.19.0',
+    t: 'Udostępnianie treningów',
+    items: [
+      'W Udostępnianiu możesz zaznaczyć <b>Historię treningów</b>. Wybrana osoba zobaczy twoje treningi z ostatnich 12 miesięcy: daty, ćwiczenia i serie.',
+      'Opcja jest domyślnie wyłączona. Włączasz ją osobno dla każdej osoby (stuknij osobę na liście).',
+      'Dropset dodasz do konkretnej serii: stuknij numer serii.',
+      'Zaktualizowaliśmy politykę prywatności. Apka poprosi o jej ponowną akceptację.',
+    ],
+  },
   {
     id: 18,
     v: '1.18.0',

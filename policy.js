@@ -8,7 +8,7 @@
    — synchronizuje się z kontem — oraz w pamięci telefonu (żeby nie znikła przy logowaniu na innym koncie danych).
    Plik ładuje się PRZED app.js — na górnym poziomie tylko definicje. */
 
-const POLICY_VERSION = 3;
+const POLICY_VERSION = 4;
 const POLICY_DATE = '2026-11-24';
 const POLICY_LOCAL_KEY = 'rozpierdol-polityka';
 
@@ -23,6 +23,9 @@ const POLICY_CHANGES = {
   ],
   3: [
     'Jeśli podasz imię (i nazwisko), zobaczą je przed twoim adresem e-mail <b>osoby, którym coś udostępniasz</b>. Nikt inny ich nie widzi.',
+  ],
+  4: [
+    'Możesz też udostępnić wybranej osobie <b>historię treningów</b> z ostatnich 12 miesięcy: daty, ćwiczenia i serie. To opcja domyślnie wyłączona, włączasz ją osobno dla każdej osoby.',
   ],
 };
 
@@ -52,7 +55,7 @@ function rodoBodyHTML() {
     <h3>Kto ma dostęp</h3>
     <ul>
       <li>Do swoich danych masz dostęp tylko ty. Pilnują tego reguły bezpieczeństwa bazy.</li>
-      <li>Osoby, którym coś udostępnisz, widzą tylko zaznaczone rzeczy: plany, ulubione albo wagę, a do tego twój e-mail i imię z nazwiskiem, jeśli je podasz. Dostęp zabierasz w każdej chwili.</li>
+      <li>Osoby, którym coś udostępnisz, widzą tylko zaznaczone rzeczy: plany, ulubione, wagę albo historię treningów z ostatnich 12 miesięcy, a do tego twój e-mail i imię z nazwiskiem, jeśli je podasz. Dostęp zabierasz w każdej chwili.</li>
       <li>Sugestie czyta tylko autor apki.</li>
       <li>Autor, jako właściciel projektu Firebase, ma techniczny dostęp do bazy, ale z niego nie korzysta.</li>
     </ul>

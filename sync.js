@@ -244,6 +244,8 @@ const SHARE_WHAT = [
   ['plans', 'Plany treningowe', 'plany'],
   ['fav', 'Ulubione ćwiczenia', 'ulubione'],
   ['weights', 'Historia wagi', 'waga'],
+  // treningi to dużo prywatnych danych — przy dodawaniu nowej osoby domyślnie odznaczone
+  ['workouts', 'Historia treningów', 'treningi', false],
 ];
 
 function shareSettings() {
@@ -277,8 +279,12 @@ function sharedPayload(p) {
       plans: !!p.plans,
       fav: !!p.fav,
       weights: !!p.weights,
+      workouts: !!p.workouts,
     },
   };
+  if (p.workouts) {
+    d.workouts = sharedWorkouts();
+  }
   if (p.plans) {
     d.plans = S.plans;
   }
@@ -292,13 +298,48 @@ function sharedPayload(p) {
       goalLoss: S.profile.goalLoss,
     };
   }
-  // własne ćwiczenia użyte w planach/ulubionych — żeby u oglądającego miały nazwy
+  // własne ćwiczenia użyte w planach/ulubionych/treningach — żeby u oglądającego miały nazwy
   const ids = new Set([
     ...(p.plans ? S.plans.flatMap(pl => pl.ex.map(e => e.id)) : []),
     ...(p.fav ? S.fav : []),
+    ...(d.workouts ? d.workouts.flatMap(w => w.ex.map(e => e.id)) : []),
   ]);
   d.custom = (S.custom || []).filter(c => ids.has(c.id));
   return d;
+}
+
+// Treningi do udostępnienia: ostatnie 12 miesięcy (najwyżej 300), w skróconej postaci —
+// dokument w Firestore ma limit 1 MB, a pełna historia z kilku lat by się nie zmieściła.
+const SHARE_WORKOUT_DAYS = 365;
+const SHARE_WORKOUT_MAX = 300;
+
+function sharedWorkouts() {
+  const from = new Date(Date.now() - SHARE_WORKOUT_DAYS * 86400000).toISOString().slice(0, 10);
+  return (S.workouts || [])
+    .filter(w => w.date >= from)
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.start || 0) - (a.start || 0)))
+    .slice(0, SHARE_WORKOUT_MAX)
+    .map(w => {
+      const out = {
+        date: w.date,
+        ex: w.ex.map(e => ({
+          id: e.id,
+          // bez znaczników „zrobione” — u oglądającego liczą się tylko wpisane wartości
+          sets: e.sets.map(s => {
+            const c = Object.assign({}, s);
+            delete c.done;
+            return c;
+          }),
+        })),
+      };
+      if (w.planName) {
+        out.planName = w.planName;
+      }
+      if (w.start && w.end && w.end > w.start) {
+        out.min = Math.max(1, Math.round((w.end - w.start) / 60000));
+      }
+      return out;
+    });
 }
 
 async function pushOneShare(p) {
@@ -996,16 +1037,16 @@ function renderShareCard(card) {
     : '<div class="li"><span class="muted small">Nikt jeszcze nie ma dostępu.</span></div>';
 
   const checks = SHARE_WHAT
-    .map(([k, label]) => `
+    .map(([k, label, , def]) => `
       <label class="share-opt">
-        <input type="checkbox" data-new="${k}" checked>
+        <input type="checkbox" data-new="${k}" ${def === false ? "" : "checked"}>
         <span>${label}</span>
       </label>`)
     .join('');
 
   card.innerHTML = `
     <h2>Udostępnianie</h2>
-    <p class="muted small" style="margin:0">Każdej osobie wybierasz osobno, co zobaczy: plany, ulubione albo wagę. Tylko do podglądu. Treningi i reszta danych zostają prywatne. Stuknij osobę, żeby zmienić jej zakres.</p>
+    <p class="muted small" style="margin:0">Każdej osobie wybierasz osobno, co zobaczy: plany, ulubione, wagę albo historię treningów. Tylko do podglądu. Reszta danych zostaje prywatna. Stuknij osobę, żeby zmienić jej zakres.</p>
     <div class="list" id="share-viewers">${people}</div>
     <form id="share-add" class="view share-add" autocomplete="off" style="gap:10px">
       <div class="field">
@@ -1160,7 +1201,7 @@ async function loadSharedWithMe(box) {
     if (!list.length) { box.innerHTML = '<p class="muted small" style="margin:0">Nikt jeszcze niczego ci nie udostępnił. Poproś tę osobę, żeby w swoich Ustawieniach → Udostępnianie dopisała twój e-mail.</p><button class="btn" type="button" id="shared-load">Sprawdź ponownie</button>'; box.querySelector('#shared-load').onclick = () => loadSharedWithMe(box); return; }
     box.innerHTML = `<div class="list">${list.map((x, i) => {
       const w = x.data.what || {};
-      const parts = [w.weights && 'waga', w.plans && plural((x.data.plans || []).length, 'plan', 'plany', 'planów'), w.fav && plural((x.data.fav || []).length, 'ulubione', 'ulubione', 'ulubionych')].filter(Boolean).join(' · ');
+      const parts = [w.weights && 'waga', w.plans && plural((x.data.plans || []).length, 'plan', 'plany', 'planów'), w.fav && plural((x.data.fav || []).length, 'ulubione', 'ulubione', 'ulubionych'), w.workouts && plural((x.data.workouts || []).length, 'trening', 'treningi', 'treningów')].filter(Boolean).join(' · ');
       return `<button class="li" type="button" data-sh="${i}"><div class="grow"><div class="t">${esc(shareOwnerLabel(x))}</div><div class="s">${parts}</div></div><span class="chev" aria-hidden="true">›</span></button>`;
     }).join('')}</div>`;
     box.querySelectorAll('[data-sh]').forEach(b => b.onclick = () => showShared(list[+b.dataset.sh]));
@@ -1200,12 +1241,49 @@ function showShared(x) {
       </div>`).join('')}</div>` : '<p class="muted small" style="margin:0">Brak planów.</p>'}` : '';
   const favHTML = w.fav ? `<h3>Ulubione ćwiczenia</h3>${(d.fav || []).length ? `<div class="list">${d.fav.map(id => { const e = exOf(id); return `
       <div class="li li-row"><div class="li-main" style="cursor:default">${thumbHTML(e)}<div class="grow"><div class="t">${esc(exName(e))}</div><div class="s">${e ? [...(e.m || []).map(m => MUSCLE[m] || m), EQUIP[e.e] || ''].filter(Boolean).join(' · ') : ''}</div></div></div>${EXMAP[id] ? starBtn(id) : ''}</div>`; }).join('')}</div>` : '<p class="muted small" style="margin:0">Brak ulubionych.</p>'}` : '';
+  // historia treningów: najnowsze na górze, na start 15, reszta po „Pokaż wszystkie”
+  const wos = d.workouts || [];
+  const woRow = (wo, i) => {
+    const sets = wo.ex.reduce((n, e) => n + countSets(e.sets), 0);
+    const vol = wo.ex.reduce((sum, e) => isCardio(exOf(e.id))
+      ? sum
+      : sum + e.sets.reduce((s, z) => s + (z.a || 0) * (z.b || 0), 0), 0);
+    return `
+      <button class="li" type="button" data-wo="${i}"${i >= 15 ? ' hidden' : ''}>
+        <div class="grow">
+          <div class="t">${dayLabel(wo.date, { weekday: 'short', day: 'numeric', month: 'long' })}${wo.planName ? ` <span class="pill">${esc(wo.planName)}</span>` : ''}</div>
+          <div class="s">${wo.ex.map(e => esc(exName(exOf(e.id)))).slice(0, 3).join(', ')}${wo.ex.length > 3 ? ` +${wo.ex.length - 3}` : ''}</div>
+        </div>
+        <div class="r small muted">${plural(sets, 'seria', 'serie', 'serii')}${vol ? '<br>' + fmt(vol, 0) + ' kg' : ''}</div>
+      </button>`;
+  };
+  const workoutsHTML = w.workouts
+    ? `<h3>Historia treningów</h3>${wos.length
+      ? `<p class="muted small" style="margin:0">${plural(wos.length, 'trening', 'treningi', 'treningów')} z ostatnich 12 miesięcy. Stuknij, żeby zobaczyć serie.</p>
+        <div class="list" id="sh-wos">${wos.map(woRow).join('')}</div>
+        ${wos.length > 15 ? `<button class="btn block" type="button" id="sh-wos-all">Pokaż wszystkie (${wos.length})</button>` : ''}`
+      : '<p class="muted small" style="margin:0">Brak treningów z ostatnich 12 miesięcy.</p>'}`
+    : '';
+
   openSheet(x.ownerName || x.owner || 'Udostępnione', `
     ${x.ownerName && x.owner ? `<p class="small" style="margin:0">${esc(x.owner)}</p>` : ''}
     <p class="muted small" style="margin:0">Podgląd danych udostępnionych przez tę osobę${x.updatedAt ? ' · stan z ' + new Date(x.updatedAt).toLocaleString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}. Gwiazdką dodasz ćwiczenie do swoich ulubionych.</p>
-    ${weightHTML}${plansHTML}${favHTML}`, b => {
+    ${weightHTML}${workoutsHTML}${plansHTML}${favHTML}`, b => {
     requestAnimationFrame(() => fitHero(b));
     b.addEventListener('click', e => {
+      const all = e.target.closest('#sh-wos-all');
+      if (all) {
+        $$('#sh-wos [data-wo]', b).forEach(r => {
+          r.hidden = false;
+        });
+        all.remove();
+        return;
+      }
+      const wo = e.target.closest('[data-wo]');
+      if (wo) {
+        showSharedWorkout(x, +wo.dataset.wo, exOf);
+        return;
+      }
       const c = e.target.closest('[data-copy]');
       if (c) {
         const p = d.plans[+c.dataset.copy];
@@ -1220,6 +1298,37 @@ function showShared(x) {
       if (f) { const on = toggleFav(f.dataset.fav); f.outerHTML = starBtn(f.dataset.fav); toast(on ? 'Dodano do twoich ulubionych' : 'Usunięto z twoich ulubionych'); }
     });
   });
+}
+
+// jeden udostępniony trening: ćwiczenia i serie (tylko do podglądu); „✕”/gest wraca do podglądu osoby
+function showSharedWorkout(x, i, exOf) {
+  const wo = ((x.data || {}).workouts || [])[i];
+  if (!wo) {
+    return;
+  }
+  const exHTML = wo.ex.map(e => {
+    const ex = exOf(e.id);
+    return `
+      <div class="li" style="align-items:flex-start">
+        ${thumbHTML(ex)}
+        <div class="grow">
+          <div class="t">${esc(exName(ex))}</div>
+          <div class="s">${esc(setsSummary(ex, e.sets))}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  openSheet(dayLabel(wo.date, { weekday: 'long', day: 'numeric', month: 'long' }), `
+    <p class="muted small" style="margin:0">${[
+      wo.planName ? 'Plan: ' + esc(wo.planName) : '',
+      wo.min ? wo.min + ' min' : '',
+      plural(wo.ex.length, 'ćwiczenie', 'ćwiczenia', 'ćwiczeń'),
+    ].filter(Boolean).join(' · ')}</p>
+    <div class="list">${exHTML}</div>
+    <button class="btn block" type="button" id="sw-back">Wróć</button>`, b => {
+    $('#sw-back', b).onclick = () => showShared(x);
+  });
+  SHEET_BACK = () => showShared(x);
 }
 
 /* ---- start ---- */

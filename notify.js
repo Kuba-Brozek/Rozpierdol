@@ -53,11 +53,12 @@ function whatText(w) {
     w && w.plans ? 'plany' : '',
     w && w.fav ? 'ulubione ćwiczenia' : '',
     w && w.weights ? 'historię wagi' : '',
+    w && w.workouts ? 'historię treningów' : '',
   ].filter(Boolean);
   return parts.join(', ') || 'nic';
 }
 
-const sameWhat = (a, b) => ['plans', 'fav', 'weights']
+const sameWhat = (a, b) => ['plans', 'fav', 'weights', 'workouts']
   .every(k => !!(a && a[k]) === !!(b && b[k]));
 
 /* ---- sprawdzenie zmian ---- */
