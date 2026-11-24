@@ -1325,6 +1325,16 @@ function updateTopbar() {
   const title = document.getElementById('tb-title');
   if (title) {
     title.textContent = h1 ? h1.textContent : '';
+
+    // dzisiejsza data obok nazwy ekranu, np. „wt., 24 lis”
+    const date = document.getElementById('tb-date');
+    if (date) {
+      date.textContent = new Date().toLocaleDateString('pl-PL', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      });
+    }
     fitTopbarTitle();
     requestAnimationFrame(fitTopbarTitle);
   }
@@ -1341,14 +1351,28 @@ function updateTopbar() {
 // długa nazwa (np. „Graf trenowanych partii mięśniowych”): zmniejszaj czcionkę, aż się zmieści
 function fitTopbarTitle() {
   const title = document.getElementById('tb-title');
+  const date = document.getElementById('tb-date');
   if (!title || !title.clientWidth) {
     return;
   }
-  let size = 22;
-  title.style.fontSize = size + 'px';
-  while (title.scrollWidth > title.clientWidth && size > 14) {
-    size--;
+
+  const fit = min => {
+    let size = 22;
     title.style.fontSize = size + 'px';
+    while (title.scrollWidth > title.clientWidth && size > min) {
+      size--;
+      title.style.fontSize = size + 'px';
+    }
+    return title.scrollWidth <= title.clientWidth;
+  };
+
+  // najpierw z datą; jeśli nazwa nie mieści się nawet w 17 px — chowamy datę i dopasowujemy jeszcze raz
+  if (date) {
+    date.hidden = false;
+  }
+  if (!fit(17) && date) {
+    date.hidden = true;
+    fit(14);
   }
 }
 

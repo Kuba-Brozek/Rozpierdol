@@ -1088,7 +1088,7 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   height: calc(var(--topbar-h-compact) + env(safe-area-inset-top, 0px));
 }
 
-.topbar .tb-title,
+.topbar .tb-row,
 .topbar .tb-main,
 .topbar .tb-user {
   transition: max-height .28s cubic-bezier(.2, .8, .2, 1),
@@ -1099,11 +1099,11 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
               height .28s ease;
 }
 
-.topbar .tb-title {
+.topbar .tb-row {
   max-height: 30px;
 }
 
-.topbar.compact .tb-title {
+.topbar.compact .tb-row {
   max-height: 0;
   opacity: 0;
   transform: translateY(-6px);
@@ -1128,12 +1128,33 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   flex: 1;
 }
 
+/* pierwszy wiersz paska: nazwa ekranu po lewej, data po prawej */
+.tb-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .tb-title {
+  flex: 1;
+  min-width: 0;
   font: 700 22px/1.1 var(--num);
   letter-spacing: -.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.tb-date {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-variant-numeric: tabular-nums;
 }
 
 .tb-level {

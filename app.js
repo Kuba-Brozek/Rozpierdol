@@ -760,12 +760,7 @@ function statTilesHTML(st) {
 }
 
 function renderStart() {
-  $('#start-date').textContent = new Date().toLocaleDateString('pl-PL', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-
+  // data jest na górnym pasku (updateTopbar)
   const st = stats();
   const body = $('#start-body');
 
