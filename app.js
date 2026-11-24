@@ -2644,7 +2644,7 @@ function secSub(k) {
   const p = S.profile, th = getTheme(), sy = typeof SY !== 'undefined' ? SY : null;
   switch (k) {
     case 'konto': return sy && sy.session ? esc(sy.session.email || '') : 'Nie zalogowano';
-    case 'share': { const n = ((S.share || {}).viewers || []).length; return n ? 'Udostępniasz: ' + plural(n, 'osoba', 'osoby', 'osób') : 'Nikomu nie udostępniasz'; }
+    case 'share': { const n = ((S.share || {}).people || (S.share || {}).viewers || []).length; return n ? 'Udostępniasz: ' + plural(n, 'osoba', 'osoby', 'osób') : 'Nikomu nie udostępniasz'; }
     case 'profil': return [GOALS[goalType()].l, p.height ? fmt(p.height, 2) + ' m' : '', p.weekly ? p.weekly + ' tr./tydz.' : ''].filter(Boolean).join(' · ');
     case 'dieta': return PREFS.filter(([k2]) => pref(k2)).map(([, l]) => l).join(', ') || 'Wszystko wyłączone';
     case 'wyglad': { const a = ACCENTS.find(x => x.id === th.accent), m = MODES.find(([v]) => v === th.mode); return [a && a.label, m && m[1]].filter(Boolean).join(' · '); }
@@ -2737,6 +2737,14 @@ $('#wiecej-back').addEventListener('click', () => goBack());
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 13,
+    t: 'Udostępnianie dla każdej osoby osobno',
+    items: [
+      'Każdej osobie wybierasz osobno, co widzi: plany, ulubione albo wagę. Na liście przy każdej osobie widać, co jej udostępniasz.',
+      'Stuknij osobę, żeby zmienić jej zakres. Zabranie dostępu działa od razu, bez czekania na synchronizację.',
+    ],
+  },
   {
     id: 12,
     t: 'Polityka prywatności',

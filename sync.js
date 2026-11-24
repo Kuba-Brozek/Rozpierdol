@@ -20,7 +20,7 @@ try { Object.assign(SY, JSON.parse(localStorage.getItem(SYNC_KEY) || '{}')); } c
 if (SY.session && !SY.session.idToken) SY.session = null; // sesja ze starej wersji (Supabase)
 SY.status = 'idle'; SY.error = '';
 function sySave() {
-  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ session: SY.session, lastSyncAt: SY.lastSyncAt, lastRemoteAt: SY.lastRemoteAt, dirty: SY.dirty, sharedPublished: SY.sharedPublished, yearSeen: SY.yearSeen, splitBlocked: SY.splitBlocked, userTouched: SY.userTouched, userEmail: SY.userEmail })); } catch (e) {}
+  try { localStorage.setItem(SYNC_KEY, JSON.stringify({ session: SY.session, lastSyncAt: SY.lastSyncAt, lastRemoteAt: SY.lastRemoteAt, dirty: SY.dirty, sharedPublished: SY.sharedPublished, sharedTo: SY.sharedTo, yearSeen: SY.yearSeen, splitBlocked: SY.splitBlocked, userTouched: SY.userTouched, userEmail: SY.userEmail })); } catch (e) {}
 }
 
 /* ---- błędy po polsku ---- */
@@ -134,6 +134,10 @@ async function deleteAccount(password) {
   for (const y of years) await soft(authed(yearUrl(uid, y), { method: 'DELETE' }));
   await authed(docUrl(uid), { method: 'DELETE' });
   await soft(authed(sharedUrl(uid), { method: 'DELETE' }));
+  // udostępnienia dla poszczególnych osób
+  for (const p of shareSettings().people) {
+    await soft(removeOneShare(p.email));
+  }
   await soft(authed(usersUrl(uid), { method: 'DELETE' }));
   await authPost('delete', { idToken: SY.session.idToken });
   await cloudLogout();
@@ -142,7 +146,7 @@ async function cloudResetPassword(email) {
   await authPost('sendOobCode', { requestType: 'PASSWORD_RESET', email });
 }
 async function cloudLogout() {
-  SY.session = null; SY.lastRemoteAt = 0; SY.lastSyncAt = 0; SY.dirty = false; SY.sharedPublished = undefined; SY.yearSeen = {}; SY.splitBlocked = false; SY.userTouched = 0; SY.userEmail = ''; SY.status = 'idle'; sySave();
+  SY.session = null; SY.lastRemoteAt = 0; SY.lastSyncAt = 0; SY.dirty = false; SY.sharedPublished = undefined; SY.sharedTo = []; SY.yearSeen = {}; SY.splitBlocked = false; SY.userTouched = 0; SY.userEmail = ''; SY.status = 'idle'; sySave();
   checkSpecialTheme(null);
 }
 
@@ -225,55 +229,173 @@ async function pushRemote(remoteYears) {
   try { await pushShared(); SY.shareErr = ''; } catch (e) { SY.shareErr = e.message; }
 }
 
-/* ---- UDOSTĘPNIANIE: wybrane dane do podglądu dla wskazanych osób ----
-   Dokument shared/{uid}: owner, viewers (lista e-maili), json (tylko zaznaczone: plany / ulubione / waga).
-   Czytać go może tylko właściciel i osoby z listy viewers, które potwierdziły swój e-mail (reguły Firestore). */
-const sharedUrl = uid => `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FB_PROJECT)}/databases/(default)/documents/shared/${encodeURIComponent(uid)}`;
+/* ---- UDOSTĘPNIANIE: każdej osobie osobno, z własnym zakresem ----
+   S.share.people = [{ email, plans, fav, weights }] — kto i co widzi (synchronizuje się z kontem).
+   W Firestore każda osoba ma swój dokument shares/{mojeUid}_{skrót e-maila}: ownerUid, owner, viewer, json.
+   Czytać go może tylko właściciel i ta jedna osoba (po potwierdzeniu e-maila) — reguły w FIREBASE.md.
+   Zabranie dostępu od razu kasuje dokument tej osoby (nie czeka na synchronizację).
+   Stary format (jeden dokument shared/{uid} dla wszystkich) jest przy pierwszej okazji usuwany. */
+const FS_DOCS = () => `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FB_PROJECT)}/databases/(default)/documents/`;
+const sharedUrl = uid => FS_DOCS() + 'shared/' + encodeURIComponent(uid);
 const normEmail = s => String(s || '').trim().toLowerCase();
+const shareId = (uid, email) => uid + '_' + hashStr(normEmail(email));
+const shareUrl = (uid, email) => FS_DOCS() + 'shares/' + encodeURIComponent(shareId(uid, email));
+const SHARE_WHAT = [
+  ['plans', 'Plany treningowe', 'plany'],
+  ['fav', 'Ulubione ćwiczenia', 'ulubione'],
+  ['weights', 'Historia wagi', 'waga'],
+];
+
 function shareSettings() {
-  S.share = Object.assign({ viewers: [], plans: true, fav: true, weights: true }, S.share || {});
-  return S.share;
+  const sh = S.share = Object.assign({}, S.share || {});
+
+  // przejście ze starego formatu (jedna lista e-maili + wspólny zakres dla wszystkich)
+  if (!Array.isArray(sh.people)) {
+    const old = Array.isArray(sh.viewers) ? sh.viewers : [];
+    sh.people = old.map(email => ({
+      email,
+      plans: sh.plans !== false,
+      fav: sh.fav !== false,
+      weights: sh.weights !== false,
+    }));
+  }
+  delete sh.viewers;
+  delete sh.plans;
+  delete sh.fav;
+  delete sh.weights;
+  return sh;
 }
-function sharedPayload() {
-  const sh = shareSettings(), d = { what: { plans: !!sh.plans, fav: !!sh.fav, weights: !!sh.weights } };
-  if (sh.plans) d.plans = S.plans;
-  if (sh.fav) d.fav = S.fav;
-  if (sh.weights) { d.weights = S.weights; d.profile = { height: S.profile.height, goalLoss: S.profile.goalLoss }; }
+
+const shareParts = p => SHARE_WHAT
+  .filter(([k]) => p[k])
+  .map(([, , short]) => short);
+
+// co dokładnie zobaczy dana osoba
+function sharedPayload(p) {
+  const d = {
+    what: {
+      plans: !!p.plans,
+      fav: !!p.fav,
+      weights: !!p.weights,
+    },
+  };
+  if (p.plans) {
+    d.plans = S.plans;
+  }
+  if (p.fav) {
+    d.fav = S.fav;
+  }
+  if (p.weights) {
+    d.weights = S.weights;
+    d.profile = {
+      height: S.profile.height,
+      goalLoss: S.profile.goalLoss,
+    };
+  }
   // własne ćwiczenia użyte w planach/ulubionych — żeby u oglądającego miały nazwy
-  const ids = new Set([...(sh.plans ? S.plans.flatMap(p => p.ex.map(e => e.id)) : []), ...(sh.fav ? S.fav : [])]);
+  const ids = new Set([
+    ...(p.plans ? S.plans.flatMap(pl => pl.ex.map(e => e.id)) : []),
+    ...(p.fav ? S.fav : []),
+  ]);
   d.custom = (S.custom || []).filter(c => ids.has(c.id));
   return d;
 }
-async function pushShared() {
-  const sh = shareSettings(), uid = SY.session.uid;
-  if (!sh.viewers.length || !(sh.plans || sh.fav || sh.weights)) {
-    // nic nie udostępniam — usuń dokument (brak dokumentu = brak dostępu dla kogokolwiek), ale tylko jeśli istniał
-    if (SY.sharedPublished === false) return;
-    await authed(sharedUrl(uid), { method: 'DELETE' });
-    SY.sharedPublished = false; sySave();
+
+async function pushOneShare(p) {
+  const uid = SY.session.uid;
+  if (!shareParts(p).length) {
+    // nic zaznaczonego = brak dostępu: dokument tej osoby znika
+    await authed(shareUrl(uid, p.email), { method: 'DELETE' });
     return;
   }
   const fields = {
+    ownerUid: { stringValue: uid },
     owner: { stringValue: SY.session.email || '' },
-    viewers: { arrayValue: { values: sh.viewers.map(v => ({ stringValue: v })) } },
-    json: { stringValue: JSON.stringify(sharedPayload()) },
+    viewer: { stringValue: normEmail(p.email) },
+    json: { stringValue: JSON.stringify(sharedPayload(p)) },
     updatedAt: { integerValue: String(Date.now()) },
   };
-  await authed(sharedUrl(uid), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
-  SY.sharedPublished = true; sySave();
+  await authed(shareUrl(uid, p.email), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
 }
-async function listSharedWithMe() {
-  const email = normEmail(SY.session.email);
-  const r = await authed(`https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FB_PROJECT)}/databases/(default)/documents:runQuery`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'shared' }], where: { fieldFilter: { field: { fieldPath: 'viewers' }, op: 'ARRAY_CONTAINS', value: { stringValue: email } } } } }),
+
+async function removeOneShare(email) {
+  await authed(shareUrl(SY.session.uid, email), { method: 'DELETE' });
+}
+
+// przy synchronizacji: odśwież dokumenty wszystkich osób, skasuj dokumenty osób usuniętych i stary wspólny dokument
+async function pushShared() {
+  const sh = shareSettings();
+  const now = sh.people.map(p => normEmail(p.email));
+
+  for (const p of sh.people) {
+    await pushOneShare(p);
+  }
+
+  const gone = (SY.sharedTo || []).filter(e => !now.includes(e));
+  for (const email of gone) {
+    await removeOneShare(email);
+  }
+  SY.sharedTo = now;
+
+  if (SY.sharedPublished !== false) {
+    try {
+      await authed(sharedUrl(SY.session.uid), { method: 'DELETE' });
+    } catch (e) {}
+    SY.sharedPublished = false;
+  }
+  sySave();
+}
+
+function shareRow(f) {
+  let data = {};
+  try {
+    data = JSON.parse((f.json && f.json.stringValue) || '{}');
+  } catch (e) {}
+  return {
+    owner: f.owner && f.owner.stringValue,
+    ownerUid: f.ownerUid && f.ownerUid.stringValue,
+    updatedAt: +((f.updatedAt && f.updatedAt.integerValue) || 0),
+    data,
+  };
+}
+
+async function runQuery(body) {
+  const r = await authed(FS_DOCS().replace(/\/$/, '') + ':runQuery', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ structuredQuery: body }),
   });
   const rows = await r.json();
-  return (Array.isArray(rows) ? rows : []).filter(x => x.document).map(x => {
-    const f = x.document.fields || {}; let data = {};
-    try { data = JSON.parse(f.json && f.json.stringValue || '{}'); } catch (e) {}
-    return { uid: x.document.name.split('/').pop(), owner: f.owner && f.owner.stringValue, updatedAt: +(f.updatedAt && f.updatedAt.integerValue || 0), data };
-  }).filter(x => x.uid !== SY.session.uid);
+  return (Array.isArray(rows) ? rows : []).filter(x => x.document);
+}
+
+async function listSharedWithMe() {
+  const email = normEmail(SY.session.email);
+
+  // nowy format: jeden dokument na osobę
+  const fresh = (await runQuery({
+    from: [{ collectionId: 'shares' }],
+    where: { fieldFilter: { field: { fieldPath: 'viewer' }, op: 'EQUAL', value: { stringValue: email } } },
+  }))
+    .map(x => Object.assign(shareRow(x.document.fields || {}), { uid: (x.document.fields.ownerUid || {}).stringValue }));
+
+  // stary format (osoby, które jeszcze nie zaktualizowały apki)
+  let old = [];
+  try {
+    old = (await runQuery({
+      from: [{ collectionId: 'shared' }],
+      where: { fieldFilter: { field: { fieldPath: 'viewers' }, op: 'ARRAY_CONTAINS', value: { stringValue: email } } },
+    }))
+      .map(x => Object.assign(shareRow(x.document.fields || {}), { uid: x.document.name.split('/').pop() }));
+  } catch (e) {}
+
+  const seen = new Set(fresh.map(x => x.uid));
+  return [...fresh, ...old.filter(x => !seen.has(x.uid))]
+    .filter(x => x.uid !== SY.session.uid);
 }
 // Weryfikacja e-maila (potrzebna osobie, która ogląda cudze dane)
 // Data założenia konta — do faktu „dbasz o siebie od …”; pobierana raz i zapamiętywana w sesji
@@ -829,43 +951,182 @@ function showAuthScreen(mode = 'login') {
 
 /* ---- interfejs: sekcja „Udostępnianie” w Ustawieniach ---- */
 function renderShareCard(card) {
-  if (!card) return;
-  if (!cloudReady() || !SY.session) { card.remove(); return; }
+  if (!card) {
+    return;
+  }
+  if (!cloudReady() || !SY.session) {
+    card.remove();
+    return;
+  }
   const sh = shareSettings();
-  const chk = (k, label) => `<label class="share-opt"><input type="checkbox" data-what="${k}" ${sh[k] ? 'checked' : ''}><span>${label}</span></label>`;
+
+  // lista osób: e-mail + co dokładnie widzi; stuknięcie = edycja zakresu, ✕ = zabranie dostępu
+  const people = sh.people.length
+    ? sh.people
+      .map((p, i) => {
+        const parts = shareParts(p);
+        return `
+          <div class="li share-person">
+            <button type="button" class="grow share-edit" data-pi="${i}" aria-label="Zmień, co widzi ${esc(p.email)}">
+              <span class="t">${esc(p.email)}</span>
+              <span class="share-tags">
+                ${parts.length
+                  ? parts.map(x => `<span class="pill">${x}</span>`).join('')
+                  : '<span class="small muted">nic (brak dostępu)</span>'}
+              </span>
+            </button>
+            <button class="icon-btn" type="button" data-unshare="${i}" aria-label="Zabierz dostęp ${esc(p.email)}">✕</button>
+          </div>`;
+      })
+      .join('')
+    : '<div class="li"><span class="muted small">Nikt jeszcze nie ma dostępu.</span></div>';
+
+  const checks = SHARE_WHAT
+    .map(([k, label]) => `
+      <label class="share-opt">
+        <input type="checkbox" data-new="${k}" checked>
+        <span>${label}</span>
+      </label>`)
+    .join('');
+
   card.innerHTML = `
     <h2>Udostępnianie</h2>
-    <p class="muted small" style="margin:0">Osoby z listy po zalogowaniu zobaczą zaznaczone rzeczy, tylko do podglądu. Treningi i reszta danych zostają prywatne. Usunięcie osoby z listy od razu zabiera jej dostęp.</p>
-    <div class="share-opts">${chk('plans', 'Plany treningowe')}${chk('fav', 'Ulubione ćwiczenia')}${chk('weights', 'Historia wagi')}</div>
-    <div class="list" id="share-viewers">${sh.viewers.length ? sh.viewers.map(v => `
-      <div class="li"><div class="grow"><div class="t" style="font-weight:500">${esc(v)}</div></div>
-        <button class="icon-btn" type="button" data-unshare="${esc(v)}" aria-label="Zabierz dostęp ${esc(v)}">✕</button></div>`).join('')
-      : '<div class="li"><span class="muted small">Nikt jeszcze nie ma dostępu.</span></div>'}</div>
-    <form id="share-add" class="add-weight" style="grid-template-columns:minmax(0,1fr) auto" autocomplete="off">
-      <div class="field"><label for="share-email">E-mail osoby (jej konto w apce)</label><input type="email" id="share-email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="np. ona@gmail.com"></div>
-      <button class="btn primary" type="submit">Udostępnij</button>
+    <p class="muted small" style="margin:0">Każdej osobie wybierasz osobno, co zobaczy: plany, ulubione albo wagę. Tylko do podglądu. Treningi i reszta danych zostają prywatne. Stuknij osobę, żeby zmienić jej zakres.</p>
+    <div class="list" id="share-viewers">${people}</div>
+    <form id="share-add" class="view share-add" autocomplete="off" style="gap:10px">
+      <div class="field">
+        <label for="share-email">Dodaj osobę: e-mail (jej konto w apce)</label>
+        <input type="email" id="share-email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="np. ona@gmail.com">
+      </div>
+      <div class="share-opts">${checks}</div>
+      <button class="btn primary block" type="submit">Udostępnij</button>
     </form>
     ${SY.shareErr ? `<p class="small" style="margin:0;color:var(--bad)">Nie udało się zapisać udostępnienia: ${esc(SY.shareErr)}</p>` : ''}
     <hr class="sep">
     <h2>Udostępnione mi</h2>
-    <div id="shared-me" class="view" style="gap:10px"><button class="btn" type="button" id="shared-load">Pokaż, co inni mi udostępnili</button></div>`;
-  const changed = msg => { save(); toast(msg); renderShareCard(card); };
-  card.querySelectorAll('[data-what]').forEach(c => c.onchange = () => { sh[c.dataset.what] = c.checked; changed('Zapisano. Zmiana trafi do chmury za chwilę'); });
-  card.querySelectorAll('[data-unshare]').forEach(b => b.onclick = async () => {
-    if (!await confirmBox('Zabrać dostęp?', `${esc(b.dataset.unshare)} przestanie widzieć twoje udostępnione dane.`, 'Zabierz dostęp', true)) return;
-    sh.viewers = sh.viewers.filter(v => v !== b.dataset.unshare); changed('Dostęp zabrany');
+    <div id="shared-me" class="view" style="gap:10px">
+      <button class="btn" type="button" id="shared-load">Pokaż, co inni mi udostępnili</button>
+    </div>`;
+
+  // zapis zmiany jednej osoby: od razu do chmury (bez czekania na synchronizację)
+  const pushNow = async (p, okMsg) => {
+    save();
+    renderShareCard(card);
+    try {
+      await pushOneShare(p);
+      SY.sharedTo = [...new Set([...(SY.sharedTo || []), normEmail(p.email)])];
+      SY.shareErr = '';
+      sySave();
+      toast(okMsg);
+    } catch (e) {
+      SY.shareErr = e.message;
+      toast('Nie udało się: ' + e.message);
+      renderShareCard(card);
+    }
+  };
+
+  card.querySelectorAll('[data-pi]').forEach(b => {
+    b.onclick = () => editSharePerson(+b.dataset.pi, card, pushNow);
   });
+
+  card.querySelectorAll('[data-unshare]').forEach(b => {
+    b.onclick = async () => {
+      const p = sh.people[+b.dataset.unshare];
+      if (!await confirmBox('Zabrać dostęp?', `${esc(p.email)} przestanie widzieć twoje udostępnione dane.`, 'Zabierz dostęp', true)) {
+        return;
+      }
+      sh.people = sh.people.filter(x => x !== p);
+      save();
+      renderShareCard(card);
+      try {
+        // dokument tej osoby znika od razu — bez niego nie ma żadnego dostępu
+        await removeOneShare(p.email);
+        SY.sharedTo = (SY.sharedTo || []).filter(e => e !== normEmail(p.email));
+        sySave();
+        toast('Dostęp zabrany: ' + p.email);
+      } catch (e) {
+        SY.shareErr = e.message;
+        toast('Nie udało się zabrać dostępu: ' + e.message);
+        renderShareCard(card);
+      }
+    };
+  });
+
   card.querySelector('#share-add').addEventListener('submit', e => {
     e.preventDefault();
-    const v = normEmail(card.querySelector('#share-email').value);
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { toast('Wpisz poprawny e-mail'); return; }
-    if (v === normEmail(SY.session.email)) { toast('To twój własny e-mail'); return; }
-    if (sh.viewers.includes(v)) { toast('Ta osoba już ma dostęp'); return; }
-    if (sh.viewers.length >= 20) { toast('Maksymalnie 20 osób'); return; }
-    sh.viewers.push(v); changed('Udostępniono: ' + v);
+    const email = normEmail(card.querySelector('#share-email').value);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast('Wpisz poprawny e-mail');
+      return;
+    }
+    if (email === normEmail(SY.session.email)) {
+      toast('To twój własny e-mail');
+      return;
+    }
+    if (sh.people.some(p => normEmail(p.email) === email)) {
+      toast('Ta osoba już ma dostęp. Stuknij ją na liście, żeby zmienić zakres.');
+      return;
+    }
+    if (sh.people.length >= 20) {
+      toast('Maksymalnie 20 osób');
+      return;
+    }
+    const p = { email };
+    SHARE_WHAT.forEach(([k]) => {
+      p[k] = card.querySelector(`[data-new="${k}"]`).checked;
+    });
+    if (!shareParts(p).length) {
+      toast('Zaznacz, co ta osoba ma widzieć');
+      return;
+    }
+    sh.people.push(p);
+    pushNow(p, 'Udostępniono: ' + email);
   });
+
   card.querySelector('#shared-load').onclick = () => loadSharedWithMe(card.querySelector('#shared-me'));
 }
+
+// okno jednej osoby: co widzi + zabranie dostępu
+function editSharePerson(i, card, pushNow) {
+  const sh = shareSettings();
+  const p = sh.people[i];
+  if (!p) {
+    return;
+  }
+
+  openSheet(p.email, `
+    <p class="muted small" style="margin:0">Co ta osoba widzi (tylko do podglądu):</p>
+    <div class="share-opts">
+      ${SHARE_WHAT
+        .map(([k, label]) => `
+          <label class="share-opt">
+            <input type="checkbox" data-what="${k}" ${p[k] ? 'checked' : ''}>
+            <span>${label}</span>
+          </label>`)
+        .join('')}
+    </div>
+    <button class="btn primary block" type="button" id="sp-save">Zapisz</button>
+    <button class="btn danger block" type="button" id="sp-remove">Zabierz dostęp</button>`,
+    b => {
+      $('#sp-save', b).onclick = () => {
+        SHARE_WHAT.forEach(([k]) => {
+          p[k] = $(`[data-what="${k}"]`, b).checked;
+        });
+        closeSheet();
+        if (!shareParts(p).length) {
+          // nic nie zaznaczone = to samo co zabranie dostępu
+          card.querySelector(`[data-unshare="${i}"]`).click();
+          return;
+        }
+        pushNow(p, 'Zapisano: ' + p.email);
+      };
+      $('#sp-remove', b).onclick = () => {
+        closeSheet();
+        setTimeout(() => card.querySelector(`[data-unshare="${i}"]`).click(), 50);
+      };
+    });
+}
+
 
 async function loadSharedWithMe(box) {
   box.innerHTML = '<p class="muted small" style="margin:0">Sprawdzam…</p>';

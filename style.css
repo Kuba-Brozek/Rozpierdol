@@ -1574,6 +1574,41 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
   margin-top: 10px;
 }
 
+/* udostępnianie: osoba + co widzi (etykiety), stuknięcie = edycja */
+.share-person {
+  gap: 8px;
+}
+
+.share-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.share-edit .t {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.share-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.share-add .share-opts {
+  margin-top: -4px;
+}
+
 /* trzy przyciski w jednym rzędzie (Trening: Rekordy | Plany | Ćwiczenia) */
 .btns.three {
   display: grid;
