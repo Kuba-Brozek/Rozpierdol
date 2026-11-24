@@ -626,15 +626,15 @@ function renderDieta() {
         ${chartSVG()}
         <div class="legend"><span><i></i>waga z pomiarów (kg)</span></div>
       </section>
+      ${cialoNavCard()}
       <section class="view" style="gap:10px">
         <div class="row">
-          <h3>Pomiary</h3>
+          <h3>Wpisy wagi</h3>
           <span class="muted small">${S.weights.length} wpisów</span>
         </div>
         <div class="list">${rows}</div>
         ${moreBtn}
-      </section>
-      ${cialoNavCard()}`;
+      </section>`;
 
     $$('[data-range]', body).forEach(b => {
       b.addEventListener('click', () => {
