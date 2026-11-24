@@ -1339,13 +1339,19 @@ function updateTopbar() {
     requestAnimationFrame(fitTopbarTitle);
   }
 
-  // inicjał z imienia (jeśli podane), potem z e-maila konta, inaczej ikonka ludzika
+  // inicjały z imienia i nazwiska (np. „JK”), samo imię = jedna litera,
+  // bez imienia — pierwsza litera e-maila konta, inaczej ikonka ludzika
   const email = typeof SY !== 'undefined' && SY.session && SY.session.email;
   const name = ((S.profile && S.profile.name) || '').trim();
-  const source = name || (email ? email.trim() : '');
-  const initial = source ? source[0].toUpperCase() : '';
+  const surname = ((S.profile && S.profile.surname) || '').trim();
+  let initial = '';
+  if (name) {
+    initial = (name[0] + (surname ? surname[0] : '')).toUpperCase();
+  } else if (email) {
+    initial = email.trim()[0].toUpperCase();
+  }
   userBtn.innerHTML = initial
-    ? `<span class="tb-initial">${esc(initial)}</span>`
+    ? `<span class="tb-initial${initial.length > 1 ? ' two' : ''}">${esc(initial)}</span>`
     : USER_ICON;
   userBtn.classList.toggle('on', UI.tab === 'wiecej');
 

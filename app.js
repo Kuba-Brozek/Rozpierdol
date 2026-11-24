@@ -264,6 +264,149 @@ $('#sheet').addEventListener('click', e => {
   if (e.target.closest('#sheet-body')) { closeSheet(); return; }
   sheetBack();
 });
+
+/* ---- Zamykanie okna przeciągnięciem w dół ----
+   Ciągnąć można za uchwyt i nagłówek, a za treść — gdy jest przewinięta na samą górę
+   (wtedy ruch w dół zamyka okno zamiast przewijać). Puszczone daleko albo szybko = zamknij,
+   inaczej okno wraca na miejsce. Zamknięcie działa jak „✕” (wraca do poprzedniego okna, jeśli było). */
+const sheetDrag = {
+  on: false,       // palec położony na oknie i gest jeszcze możliwy
+  dragging: false, // ruch rozpoznany jako przeciąganie w dół
+  inBody: false,
+  x0: 0,
+  y0: 0,
+  dy: 0,
+  lastY: 0,
+  lastT: 0,
+  v: 0,            // prędkość w px/ms (dodatnia = w dół)
+};
+
+function sheetPanel() {
+  return $('#sheet .sheet');
+}
+
+function sheetDragReset(animate) {
+  const sh = sheetPanel();
+  const back = $('#sheet .sheet-backdrop');
+  sh.classList.remove('dragging');
+  sh.style.transition = animate ? 'transform .22s cubic-bezier(.2, .8, .2, 1)' : '';
+  sh.style.transform = '';
+  back.style.transition = animate ? 'opacity .22s ease' : '';
+  back.style.opacity = '';
+  if (animate) {
+    setTimeout(() => {
+      sh.style.transition = '';
+      back.style.transition = '';
+    }, 240);
+  }
+}
+
+$('#sheet').addEventListener('touchstart', e => {
+  sheetDrag.on = false;
+  if (e.touches.length !== 1) {
+    return;
+  }
+  const sh = sheetPanel();
+  const t = e.target;
+  // suwaki, pola tekstowe i listy wyboru mają własne gesty
+  if (!sh.contains(t) || t.closest('input[type=range], textarea, select, .no-drag')) {
+    return;
+  }
+  const body = $('#sheet-body');
+  const inBody = body.contains(t);
+  if (inBody && body.scrollTop > 0) {
+    return;
+  }
+
+  const p = e.touches[0];
+  Object.assign(sheetDrag, {
+    on: true,
+    dragging: false,
+    inBody,
+    x0: p.clientX,
+    y0: p.clientY,
+    dy: 0,
+    lastY: p.clientY,
+    lastT: e.timeStamp,
+    v: 0,
+  });
+}, { passive: true });
+
+$('#sheet').addEventListener('touchmove', e => {
+  if (!sheetDrag.on) {
+    return;
+  }
+  const p = e.touches[0];
+  const dx = p.clientX - sheetDrag.x0;
+  const dy = p.clientY - sheetDrag.y0;
+
+  if (!sheetDrag.dragging) {
+    // jeszcze nie wiadomo, co to za ruch — czekamy na kilka pikseli
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) {
+      return;
+    }
+    // w bok (np. przewijane chipy) albo w górę (przewijanie treści) = to nie nasz gest
+    const body = $('#sheet-body');
+    if (Math.abs(dx) > Math.abs(dy) || dy < 0 || (sheetDrag.inBody && body.scrollTop > 0)) {
+      sheetDrag.on = false;
+      return;
+    }
+    sheetDrag.dragging = true;
+    sheetPanel().classList.add('dragging');
+    // klawiatura przeszkadza w przeciąganiu
+    if (document.activeElement && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
+  }
+
+  e.preventDefault();
+  const move = Math.max(0, dy);
+  const dt = Math.max(1, e.timeStamp - sheetDrag.lastT);
+  sheetDrag.v = (p.clientY - sheetDrag.lastY) / dt;
+  sheetDrag.lastY = p.clientY;
+  sheetDrag.lastT = e.timeStamp;
+  sheetDrag.dy = move;
+
+  const sh = sheetPanel();
+  sh.style.transform = `translateY(${move}px)`;
+  const h = sh.offsetHeight || 1;
+  $('#sheet .sheet-backdrop').style.opacity = String(Math.max(0, 1 - move / h));
+}, { passive: false });
+
+function sheetDragEnd() {
+  if (!sheetDrag.on) {
+    return;
+  }
+  sheetDrag.on = false;
+  if (!sheetDrag.dragging) {
+    return;
+  }
+  sheetDrag.dragging = false;
+
+  const sh = sheetPanel();
+  const h = sh.offsetHeight || 1;
+  const far = sheetDrag.dy > Math.min(140, h * 0.3);
+  const fast = sheetDrag.v > 0.5 && sheetDrag.dy > 30;
+  if (!far && !fast) {
+    sheetDragReset(true);
+    return;
+  }
+
+  // zjazd do końca, potem zamknięcie (albo powrót do poprzedniego okna)
+  sh.classList.remove('dragging');
+  sh.style.transition = 'transform .2s ease-in';
+  sh.style.transform = `translateY(${h + 40}px)`;
+  const back = $('#sheet .sheet-backdrop');
+  back.style.transition = 'opacity .2s ease-in';
+  back.style.opacity = '0';
+  setTimeout(() => {
+    sheetDragReset(false);
+    sheetBack();
+  }, 200);
+}
+
+$('#sheet').addEventListener('touchend', sheetDragEnd);
+$('#sheet').addEventListener('touchcancel', sheetDragEnd);
 function confirmBox(title, text, okLabel, danger) {
   return new Promise(res => {
     openSheet(title, `<p>${text}</p><div class="btns"><button class="btn" data-a="no" type="button">Anuluj</button><button class="btn ${danger ? 'danger solid' : 'primary'}" data-a="ok" type="button">${esc(okLabel)}</button></div>`, b => {
@@ -2808,13 +2951,22 @@ $('#wiecej-back').addEventListener('click', () => goBack());
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.16.0';
+const APP_VERSION = '1.17.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 17,
+    v: '1.17.0',
+    t: 'Zamykanie okien gestem',
+    items: [
+      'Okna wysuwane od dołu zamkniesz, <b>przeciągając je w dół</b>: za uchwyt, nagłówek albo treść przewiniętą na samą górę.',
+      'Ikona użytkownika na górnym pasku pokazuje <b>inicjały</b> imienia i nazwiska z profilu.',
+    ],
+  },
   {
     id: 16,
     v: '1.16.0',

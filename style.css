@@ -199,7 +199,28 @@ ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column;
 @keyframes up { from { transform: translateY(40px); opacity: .6; } }
 @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
 .sheet-body > *, .view > * { flex-shrink: 0; }
-.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); }
+
+/* uchwyt na górze okna — podpowiada, że można je zamknąć, przeciągając w dół */
+.sheet-grab {
+  flex: none;
+  width: 40px;
+  height: 5px;
+  margin: 8px auto 2px;
+  border-radius: 3px;
+  background: var(--muted);
+  opacity: .45;
+}
+
+/* w trakcie przeciągania: okno idzie za palcem (bez opóźnienia), treść się nie przewija */
+.sheet.dragging {
+  transition: none;
+  will-change: transform;
+}
+
+.sheet.dragging .sheet-body {
+  overflow: hidden;
+}
 .sheet-head h2 { font-size: 19px; overflow-wrap: anywhere; }
 .sheet-body {
   overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 14px;
@@ -1265,6 +1286,12 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .tb-initial {
   font-size: 17px;
   font-weight: 700;
+}
+
+/* dwie litery (imię + nazwisko) — trochę mniejsze, żeby zmieściły się też w zwiniętym pasku */
+.tb-initial.two {
+  font-size: 14px;
+  letter-spacing: -.02em;
 }
 
 /* ---------- Kalendarz ---------- */
