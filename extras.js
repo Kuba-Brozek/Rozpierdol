@@ -339,7 +339,9 @@ const ACH_CATS = [
   ['si', '🏋️ Siła'],
   ['re', '🏆 Rekordy'],
   ['rg', '🔥 Regularność'],
+  ['ca', '🏃 Cardio'],
   ['ci', '⚖️ Waga i ciało'],
+  ['in', '✨ Inne'],
 ];
 
 const BADGES = [
@@ -392,7 +394,95 @@ const BADGES = [
   { c: 'ci', id: 'g25', ic: '🎯', t: 'Ćwierć drogi', d: '25% drogi do celu wagi', k: 'goal', g: 25, u: '%' },
   { c: 'ci', id: 'g50', ic: '🎯', t: 'Półmetek', d: '50% drogi do celu wagi', k: 'goal', g: 50, u: '%' },
   { c: 'ci', id: 'goal', ic: '🏅', t: 'Cel osiągnięty', d: 'Osiągnij cel wagi z profilu', k: 'goal', g: 100, u: '%' },
+
+  /* ---- nowe (listopad 2026) ---- */
+  // treningi
+  { c: 'tr', id: 'w300', ic: '🏰', t: '300 treningów', d: 'Zapisz 300 treningów', k: 'w', g: 300 },
+  { c: 'tr', id: 'w500', ic: '🌌', t: '500 treningów', d: 'Zapisz 500 treningów', k: 'w', g: 500 },
+  { c: 'tr', id: 'set5k', ic: '🔂', t: '5000 serii', d: 'Zrób łącznie 5000 serii', k: 'sets', g: 5000 },
+  { c: 'tr', id: 'set10k', ic: '🌀', t: '10 000 serii', d: 'Zrób łącznie 10 000 serii', k: 'sets', g: 10000 },
+  { c: 'tr', id: 'ex50', ic: '🗺️', t: 'Podróżnik', d: 'Zrób 50 różnych ćwiczeń', k: 'exN', g: 50 },
+  { c: 'tr', id: 'ex100', ic: '🧰', t: 'Encyklopedia', d: 'Zrób 100 różnych ćwiczeń', k: 'exN', g: 100 },
+  { c: 'tr', id: 'exMax8', ic: '🍱', t: 'Pełny talerz', d: '8 ćwiczeń w jednym treningu', k: 'exMax', g: 8 },
+  { c: 'tr', id: 'setMax30', ic: '🧱', t: 'Ściana serii', d: '30 serii w jednym treningu', k: 'setMax', g: 30 },
+  { c: 'tr', id: 'wknd10', ic: '🛋️', t: 'Weekendowy wojownik', d: '10 treningów w sobotę albo niedzielę', k: 'wknd', g: 10 },
+  { c: 'tr', id: 'early10', ic: '☀️', t: 'Skowronek', d: '10 treningów przed 7:00', k: 'early', g: 10 },
+  { c: 'tr', id: 'late10', ic: '🌙', t: 'Sowa', d: '10 treningów po 22:00', k: 'late', g: 10 },
+  // siła
+  { c: 'si', id: 'kg250', ic: '🦏', t: '250 kg', d: 'Seria z ciężarem 250 kg lub więcej', k: 'kg', g: 250, u: ' kg' },
+  { c: 'si', id: 'ton30', ic: '🚢', t: '30 ton', d: 'Objętość jednego treningu: 30 000 kg', k: 'vol', g: 30000, u: ' kg' },
+  { c: 'si', id: 'tot5k', ic: '🏔️', t: '5000 ton łącznie', d: 'Podnieś łącznie 5 000 000 kg', k: 'volT', g: 5000000, u: ' kg' },
+  { c: 'si', id: 'reps50', ic: '🔟', t: 'Maraton powtórzeń', d: '50 powtórzeń w jednej serii', k: 'reps', g: 50 },
+  { c: 'si', id: 'reps100', ic: '💯', t: 'Setka', d: '100 powtórzeń w jednej serii', k: 'reps', g: 100 },
+  // rekordy
+  { c: 're', id: 'pr250', ic: '🔱', t: '250 rekordów', d: 'Pobij 250 rekordów osobistych', k: 'pr', g: 250 },
+  { c: 're', id: 'pr500', ic: '🪐', t: '500 rekordów', d: 'Pobij 500 rekordów osobistych', k: 'pr', g: 500 },
+  { c: 're', id: 'prDay3', ic: '🎆', t: 'Dzień rekordów', d: '3 rekordy w jednym treningu', k: 'prMax', g: 3 },
+  { c: 're', id: 'prDay5', ic: '🎇', t: 'Rekordowy dzień', d: '5 rekordów w jednym treningu', k: 'prMax', g: 5 },
+  { c: 're', id: 'drop100', ic: '🧗', t: 'Dropsetowy maniak', d: 'Zrób 100 dropsetów', k: 'drop', g: 100 },
+  // regularność
+  { c: 'rg', id: 'wk26', ic: '🗓️', t: 'Pół roku z planem', d: 'Cel treningów na tydzień 26 tygodni z rzędu', k: 'wk', g: 26 },
+  { c: 'rg', id: 'wk52', ic: '🏆', t: 'Rok z planem', d: 'Cel treningów na tydzień 52 tygodnie z rzędu', k: 'wk', g: 52 },
+  { c: 'rg', id: 'mo12', ic: '🌕', t: 'Rok w grze', d: 'Treningi w 12 różnych miesiącach', k: 'mo', g: 12 },
+  { c: 'rg', id: 'td3', ic: '📈', t: '3 dni z rzędu', d: 'Trenuj 3 dni z rzędu', k: 'td', g: 3 },
+  { c: 'rg', id: 'td7', ic: '🚀', t: 'Tydzień bez przerwy', d: 'Trenuj 7 dni z rzędu', k: 'td', g: 7 },
+  { c: 'rg', id: 's200', ic: '💫', t: '200 dni ważenia', d: 'Waż się 200 dni z rzędu', k: 'st', g: 200 },
+  { c: 'rg', id: 's365', ic: '🌠', t: 'Rok ważenia', d: 'Waż się 365 dni z rzędu', k: 'st', g: 365 },
+  // cardio
+  { c: 'ca', id: 'c1', ic: '👟', t: 'Pierwsze cardio', d: 'Zapisz pierwszy trening cardio', k: 'cN', g: 1 },
+  { c: 'ca', id: 'c25', ic: '🏃', t: '25 razy cardio', d: 'Zapisz 25 treningów cardio', k: 'cN', g: 25 },
+  { c: 'ca', id: 'km10', ic: '🛣️', t: 'Pierwsze 10 km', d: 'Łącznie 10 km cardio', k: 'km', g: 10, u: ' km' },
+  { c: 'ca', id: 'km42', ic: '🏅', t: 'Maraton', d: 'Łącznie 42,2 km cardio', k: 'km', g: 42.2, u: ' km' },
+  { c: 'ca', id: 'km100', ic: '🚴', t: '100 km', d: 'Łącznie 100 km cardio', k: 'km', g: 100, u: ' km' },
+  { c: 'ca', id: 'km500', ic: '🌍', t: '500 km', d: 'Łącznie 500 km cardio', k: 'km', g: 500, u: ' km' },
+  { c: 'ca', id: 'cmin600', ic: '⏱️', t: '10 godzin cardio', d: 'Łącznie 600 minut cardio', k: 'cMin', g: 600, u: ' min' },
+  { c: 'ca', id: 'kmMax10', ic: '🎽', t: 'Dycha', d: '10 km w jednym treningu', k: 'kmMax', g: 10, u: ' km' },
+  // waga i ciało
+  { c: 'ci', id: 'g75', ic: '🎯', t: 'Na ostatniej prostej', d: '75% drogi do celu wagi', k: 'goal', g: 75, u: '%' },
+  { c: 'ci', id: 'kg5', ic: '📉', t: 'Pierwsze 5 kg', d: '5 kg w stronę celu wagi', k: 'prog', g: 5, u: ' kg' },
+  { c: 'ci', id: 'kg10c', ic: '🪶', t: '10 kg', d: '10 kg w stronę celu wagi', k: 'prog', g: 10, u: ' kg' },
+  { c: 'ci', id: 'kg20c', ic: '🦋', t: '20 kg', d: '20 kg w stronę celu wagi', k: 'prog', g: 20, u: ' kg' },
+  { c: 'ci', id: 'wi500', ic: '🗃️', t: '500 ważeń', d: 'Zapisz 500 pomiarów wagi', k: 'wi', g: 500 },
+  { c: 'ci', id: 'm50', ic: '🧵', t: 'Mistrz centymetra', d: 'Zapisz 50 pomiarów ciała', k: 'ms', g: 50 },
+  // inne
+  { c: 'in', id: 'prof', ic: '🪪', t: 'Wizytówka', d: 'Uzupełnij cały profil: wzrost, płeć, rok urodzenia, aktywność i cel', k: 'prof', g: 1 },
+  { c: 'in', id: 'fav10', ic: '⭐', t: 'Ulubieniec', d: 'Dodaj 10 ćwiczeń do ulubionych', k: 'fav', g: 10 },
+  { c: 'in', id: 'custom1', ic: '🛠️', t: 'Konstruktor', d: 'Dodaj własne ćwiczenie', k: 'cust', g: 1 },
+  { c: 'in', id: 'plan10', ic: '📚', t: 'Strateg', d: 'Ułóż 10 planów treningowych', k: 'plans', g: 10 },
+  { c: 'in', id: 'share1', ic: '🤝', t: 'Drużyna', d: 'Udostępnij coś innej osobie', k: 'share', g: 1 },
 ];
+
+// najdłuższa seria tygodni z wykonanym celem treningów (cała historia, nie tylko bieżąca)
+function bestWeekStreak() {
+  const t = S.profile.weekly;
+  if (!t || !S.workouts.length) {
+    return 0;
+  }
+  let ws = weekStart(S.workouts[0].date);
+  const last = weekStart(today());
+  let best = 0;
+  let cur = 0;
+  while (ws <= last) {
+    cur = workoutsInWeek(ws) >= t ? cur + 1 : 0;
+    best = Math.max(best, cur);
+    ws = addDays(ws, 7);
+  }
+  return best;
+}
+
+// najdłuższa seria kolejnych dni z treningiem
+function bestTrainDays() {
+  const days = [...new Set(S.workouts.map(w => w.date))].sort();
+  let best = 0;
+  let cur = 0;
+  let prev = null;
+  days.forEach(d => {
+    cur = prev && addDays(prev, 1) === d ? cur + 1 : 1;
+    best = Math.max(best, cur);
+    prev = d;
+  });
+  return best;
+}
 
 function achVals() {
   let kg = 0;
@@ -402,6 +492,14 @@ function achVals() {
   let sets = 0;
   let early = 0;
   let late = 0;
+  let wknd = 0;
+  let exMax = 0;
+  let setMax = 0;
+  let reps = 0;
+  let cN = 0;
+  let km = 0;
+  let kmMax = 0;
+  let cMin = 0;
   const exIds = new Set();
   const months = new Set();
 
@@ -410,6 +508,27 @@ function achVals() {
     vol = Math.max(vol, v);
     volT += v;
     months.add((w.date || '').slice(0, 7));
+
+    const dow = parseD(w.date).getDay();
+    if (dow === 0 || dow === 6) {
+      wknd++;
+    }
+
+    // ćwiczenia z wpisanymi seriami, serie w tym treningu, cardio w tym treningu
+    const doneEx = w.ex.filter(e => e.sets.some(filled));
+    exMax = Math.max(exMax, doneEx.length);
+    setMax = Math.max(setMax, w.ex.reduce((s, e) => s + countSets(e.sets), 0));
+
+    const cardioSets = w.ex
+      .filter(e => isCardio(EXMAP[e.id]))
+      .flatMap(e => e.sets.filter(filled));
+    if (cardioSets.length) {
+      cN++;
+      const wKm = cardioSets.reduce((s, x) => s + (x.b || 0), 0);
+      km += wKm;
+      kmMax = Math.max(kmMax, wKm);
+      cMin += cardioSets.reduce((s, x) => s + (x.a || 0), 0);
+    }
 
     // godzina startu tylko dla treningów zapisanych „na żywo” (start ≠ koniec)
     if (w.start && w.end && w.end - w.start > 60000) {
@@ -440,14 +559,20 @@ function achVals() {
           if (s.drop) {
             drop++;
           }
+          if ((s.b || 0) > reps) {
+            reps = s.b;
+          }
         });
     });
   });
 
   const st = stats();
-  const prCount = Object
-    .values(prTimeline().byW)
-    .reduce((sum, list) => sum + list.length, 0);
+  const prLists = Object.values(prTimeline().byW);
+  const prCount = prLists.reduce((sum, list) => sum + list.length, 0);
+  const prMax = Math.max(0, ...prLists.map(list => list.length));
+
+  const p = S.profile;
+  const profileFull = p.height && p.sex && p.born && p.activity && p.goalType ? 1 : 0;
 
   return {
     w: S.workouts.length,
@@ -458,24 +583,43 @@ function achVals() {
     drop,
     early,
     late,
+    wknd,
+    exMax,
+    setMax,
+    reps,
     exN: exIds.size,
     mo: months.size,
     plans: S.plans.length,
     pr: prCount,
-    wk: weeklyStreak(),
+    prMax,
+    wk: Math.max(weeklyStreak(), bestWeekStreak()),
+    td: bestTrainDays(),
     st: bestWeighStreak(),
+    cN,
+    km: Math.round(km * 10) / 10,
+    kmMax: Math.round(kmMax * 10) / 10,
+    cMin: Math.round(cMin),
     wi: S.weights.length,
     ms: (S.measures || []).length,
     goal: st && st.pct != null
       ? Math.floor(st.pct)
       : 0,
+    prog: st && st.prog != null && st.prog > 0
+      ? Math.floor(st.prog * 10) / 10
+      : 0,
+    prof: profileFull,
+    fav: S.fav.length,
+    cust: (S.custom || []).length,
+    share: ((S.share || {}).viewers || []).length,
   };
 }
 
 // stara nazwa (używana w innych miejscach)
 const badgeVals = achVals;
 
-const badgeEarned = (b, v) => (v[b.k] || 0) >= b.g;
+// zdobyte = spełniony warunek ALBO już kiedyś zdobyte (np. seria „z rzędu” mogła się potem przerwać)
+const badgeEarned = (b, v) => (v[b.k] || 0) >= b.g
+  || !!(S.badges && S.badges[b.id]);
 
 function badgeCount() {
   const v = achVals();

@@ -2698,6 +2698,16 @@ $('#wiecej-back').addEventListener('click', () => goBack());
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
   {
+    id: 10,
+    t: 'Więcej osiągnięć',
+    items: [
+      'Jest już <b>91 osiągnięć</b> zamiast 44.',
+      'Nowe grupy: <b>🏃 Cardio</b> (kilometry, minuty, maraton, „Dycha”) i <b>✨ Inne</b> (pełny profil, ulubione, własne ćwiczenia, plany, udostępnianie).',
+      'Nowe osiągnięcia także w starych grupach, np. dni treningowe z rzędu, rekordy w jednym treningu, 50 i 100 powtórzeń w serii, treningi w weekend, kilogramy w stronę celu.',
+      'Zdobyte osiągnięcie zostaje na zawsze, nawet gdy seria „z rzędu” później się przerwie.',
+    ],
+  },
+  {
     id: 9,
     t: 'Poziomy i osiągnięcia',
     items: [
