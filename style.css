@@ -51,8 +51,8 @@ main {
 }
 .view { display: flex; flex-direction: column; gap: 20px; }
 /* Treść każdej zakładki: bloki jeden pod drugim z odstępem */
-#dieta-body, #cialo-body, #trening-body, #plany-body, #cw-body, #wiecej-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-#dieta-body > *, #cialo-body > *, #trening-body > *, #plany-body > *, #cw-body > *, #wiecej-body > * { flex-shrink: 0; }
+#start-body, #miesnie-body, #dieta-body, #cialo-body, #trening-body, #plany-body, #cw-body, #wiecej-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+#start-body > *, #miesnie-body > *, #dieta-body > *, #cialo-body > *, #trening-body > *, #plany-body > *, #cw-body > *, #wiecej-body > * { flex-shrink: 0; }
 #cw-body { gap: 12px; }
 .vhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 8px; }
 .vhead h1 { font: 700 32px/1.1 var(--num); margin: 0; letter-spacing: -.01em; }
