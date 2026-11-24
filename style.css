@@ -1573,3 +1573,17 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .policy-full .rodo {
   margin-top: 10px;
 }
+
+/* trzy przyciski w jednym rzędzie (Trening: Rekordy | Plany | Ćwiczenia) */
+.btns.three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.btns.three .btn {
+  padding-left: 6px;
+  padding-right: 6px;
+  font-size: 14px;
+  white-space: nowrap;
+}

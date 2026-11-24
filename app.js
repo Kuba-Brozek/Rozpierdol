@@ -117,6 +117,16 @@ function setTab(t, fromHistory) {
   if (t === 'wiecej' && UI.tab !== 'wiecej') {
     TAB_PARENT.wiecej = TAB_PARENT[UI.tab] || UI.tab || 'start';
   }
+  // Ćwiczenia otwierane z Treningu wracają do Treningu, z Planów — do Planów
+  if (t === 'cwiczenia' && UI.tab !== 'cwiczenia' && UI.tab !== 'wiecej') {
+    const from = UI.tab === 'plany' ? 'plany' : 'trening';
+    TAB_PARENT.cwiczenia = from;
+    const back = document.querySelector('#view-cwiczenia .back');
+    if (back) {
+      back.dataset.go = from;
+      back.textContent = from === 'plany' ? '‹ Plany' : '‹ Trening';
+    }
+  }
   UI.tab = t;
   if (!fromHistory) UI.sec = null; // zakładka z dolnego paska zawsze otwiera listę ustawień
   // w Ustawieniach żadna zakładka na dole nie jest podświetlona (nie są częścią żadnej z nich)
@@ -1639,9 +1649,10 @@ function renderTrening() {
               <span class="d ${n >= t ? 'down' : ''}">${n >= t ? 'plan wykonany ✓' : 'zostało ' + (t - n)}</span></div>`; })()}
           <div class="tile"><span class="k">Ostatni</span><span class="v" style="font-size:17px">${dayLabel(hist[0].date)}</span><span class="d">${(n => n === 0 ? 'dziś' : n === 1 ? 'wczoraj' : n + ' dni temu')(daysBetween(hist[0].date, today()))}</span></div>
         </div>
-        <div class="btns">
+        <div class="btns three">
           <button class="btn" type="button" id="t-prs">🏆 Rekordy</button>
           <button class="btn" type="button" id="t-plans">📋 Plany</button>
+          <button class="btn" type="button" id="t-ex">💪 Ćwiczenia</button>
         </div>
         <h3>Historia</h3>
         <div class="list">${hist.map(w => `
@@ -1665,6 +1676,10 @@ function renderTrening() {
     const pl = $('#t-plans', body);
     if (pl) {
       pl.onclick = () => setTab('plany');
+    }
+    const ex = $('#t-ex', body);
+    if (ex) {
+      ex.onclick = () => setTab('cwiczenia');
     }
     $$('[data-w]', body).forEach(b => {
       b.onclick = () => showWorkout(b.dataset.w);
