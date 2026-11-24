@@ -1913,9 +1913,10 @@ function setsEditorHTML(e, prev, ei) {
       <span class="hd">#</span>${fs.map(F => `<span class="hd">${F.h}</span>`).join('')}<span class="hd">✓</span>
       ${(() => { let no = 0; return e.sets.map((s, si) => {
         const ph = prev && prev.sets[Math.min(si, prev.sets.length - 1)];
-        // numer serii; dropset (ciąg dalszy poprzedniej) dostaje strzałkę zamiast numeru. Stuknięcie w numer przełącza dropset.
+        // numer serii; dropset (ciąg dalszy swojej serii) dostaje strzałkę zamiast numeru.
+        // Stuknięcie w numer otwiera menu tej serii: dropset do niej, zwykła seria / dropset, usunięcie.
         const drop = si > 0 && s.drop; if (!drop) no++;
-        return `${si > 0 ? `<button type="button" class="n n-btn${drop ? ' drop' : ''}" data-act="drop" data-si="${si}" aria-pressed="${!!drop}" aria-label="Seria ${si + 1}: ${drop ? 'dropset, stuknij, żeby zrobić zwykłą serię' : 'stuknij, żeby oznaczyć jako dropset'}">${drop ? '↘' : no}</button>` : `<span class="n">${no}</span>`}
+        return `<button type="button" class="n n-btn${drop ? ' drop' : ''}" data-act="setmenu" data-si="${si}" aria-label="${drop ? `Dropset serii ${no}` : `Seria ${no}`}: opcje serii">${drop ? '↘' : no}</button>
         ${fs.map(F => { const k = fieldKey(ex, F.id), v = s[k], p = ph && hasVal(ph[k]) ? ph[k] : '';
           return F.text
             ? `<input type="text" inputmode="text" autocomplete="off" maxlength="12" data-si="${si}" data-f="${k}" data-text="1" value="${esc(v ?? '')}" placeholder="${esc(p)}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`
@@ -1935,8 +1936,106 @@ function setsEditorHTML(e, prev, ei) {
           <span class="set-links"><button class="link" type="button" data-act="add">+ Seria</button>${e.sets.length && !isCardio(ex) ? ' <button class="link" type="button" data-act="adddrop">+ Drop</button>' : ''}</span>
           ${e.sets.length ? '<button class="link" type="button" data-act="delmode" style="color:var(--muted)">Usuń serię</button>' : ''}
         </div>`}
-    ${!delMode && e.sets.length > 1 && !isCardio(ex) && !e.sets.some(s => s.drop) ? '<p class="muted small" style="margin:0">Dropset: „+ Drop” albo stuknij numer serii.</p>' : ''}`;
+    ${!delMode && e.sets.length && !isCardio(ex) && !e.sets.some(s => s.drop) ? '<p class="muted small" style="margin:0">Stuknij numer serii, żeby dodać do niej dropset albo ją usunąć.</p>' : ''}`;
 }
+/* ---- Dropsety przypisane do serii ----
+   Seria „matka” to zwykła seria, a jej dropsety to kolejne wiersze z drop: true zaraz pod nią. */
+
+// numer serii „matki” (1, 2, 3…) dla wiersza si — dropset ma numer swojej serii
+function setNumber(sets, si) {
+  let no = 0;
+  for (let i = 0; i <= si; i++) {
+    if (i === 0 || !sets[i].drop) {
+      no++;
+    }
+  }
+  return no;
+}
+
+// indeks wiersza zaraz za serią si i wszystkimi jej dropsetami
+function dropChainEnd(sets, si) {
+  let j = si + 1;
+  while (j < sets.length && sets[j].drop) {
+    j++;
+  }
+  return j;
+}
+
+// dropset do serii si: ok. 20% lżej niż ostatni ciężar w jej łańcuchu (zaokrąglone do 2,5 kg)
+function addDropTo(ex, si) {
+  const end = dropChainEnd(ex.sets, si);
+  const chain = ex.sets.slice(si, end);
+  const last = [...chain].reverse().find(s => s.a > 0);
+  const kg = last ? Math.max(0, Math.round(last.a * 0.8 / 2.5) * 2.5) : null;
+  ex.sets.splice(end, 0, { a: kg, b: null, drop: true, done: false });
+}
+
+// Menu jednej serii (po stuknięciu numeru). inSheet = edytor jest w oknie szczegółów ćwiczenia.
+function setMenu(ei, si, inSheet) {
+  const ex = S.active && S.active.ex[ei];
+  const s = ex && ex.sets[si];
+  if (!s) {
+    return;
+  }
+  const cardio = isCardio(EXMAP[ex.id]);
+  const isDrop = si > 0 && s.drop;
+  const no = setNumber(ex.sets, si);
+  const drops = isDrop ? 0 : dropChainEnd(ex.sets, si) - si - 1;
+
+  const finish = () => {
+    save();
+    if (inSheet) {
+      exDetail(ei);
+    } else {
+      closeSheet();
+      renderTrening();
+    }
+  };
+
+  const opts = [];
+  if (!cardio && !isDrop) {
+    opts.push(['adddrop', `↘ Dodaj dropset do serii ${no}`, '']);
+  }
+  if (isDrop) {
+    opts.push(['plain', 'Zamień w zwykłą serię', '']);
+  } else if (!cardio && si > 0) {
+    opts.push(['makedrop', `Zrób z niej dropset serii ${no - 1}`, '']);
+  }
+  opts.push(['rm', isDrop
+    ? `Usuń ten dropset`
+    : drops ? `Usuń serię ${no} z dropsetem` : `Usuń serię ${no}`, 'danger']);
+
+  openSheet(isDrop ? `Dropset serii ${no}` : `Seria ${no}`, `
+    ${opts.map(([a, l, cls]) => `<button class="btn block ${cls}" type="button" data-sm="${a}">${l}</button>`).join('')}
+    <button class="btn block" type="button" data-sm="back">Anuluj</button>`, b => {
+    b.addEventListener('click', e => {
+      const x = e.target.closest('[data-sm]');
+      if (!x) {
+        return;
+      }
+      const a = x.dataset.sm;
+      if (a === 'adddrop') {
+        addDropTo(ex, si);
+      } else if (a === 'plain') {
+        delete s.drop;
+      } else if (a === 'makedrop') {
+        // dropsety tej serii przechodzą razem z nią do poprzedniej
+        s.drop = true;
+      } else if (a === 'rm') {
+        // seria znika razem ze swoimi dropsetami
+        ex.sets.splice(si, isDrop ? 1 : drops + 1);
+        if (ex.sets[0] && ex.sets[0].drop) {
+          delete ex.sets[0].drop;
+        }
+      }
+      finish();
+    });
+  });
+  if (inSheet) {
+    SHEET_BACK = () => exDetail(ei);
+  }
+}
+
 function setsInput(e) {
   const inp = e.target.closest('input[data-f]'); if (!inp || !S.active) return;
   const ei = +inp.closest('[data-ei]').dataset.ei;
@@ -1947,6 +2046,7 @@ function setsInput(e) {
 function setsAction(b, ei) {
   const ex = S.active.ex[ei], act = b.dataset.act;
   if (act === 'more') { exMenu(ei); return false; }
+  if (act === 'setmenu') { setMenu(ei, +b.dataset.si, !!b.closest('#sheet-body')); return false; }
   if (act === 'add') { const l = [...ex.sets].reverse().find(s => filled(s) && !s.drop); const n = l ? setVals(l) : { a: null, b: null }; delete n.drop; ex.sets.push(Object.assign(n, { done: false })); }
   else if (act === 'adddrop') {
     // dropset: ok. 20% lżej niż ostatnia seria (zaokrąglone do 2,5 kg), powtórzenia do wpisania
@@ -3092,7 +3192,7 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.18.0';
+const APP_VERSION = '1.18.1';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
