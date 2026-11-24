@@ -110,7 +110,7 @@ function thumbHTML(e, cls = 'thumb') {
 
 /* ============ Nawigacja ============ */
 // Ekrany bez własnej zakładki: otwierane przyciskiem z innej zakładki, która zostaje podświetlona
-const TAB_PARENT = { cialo: 'dieta', miesnie: 'start', cwiczenia: 'plany' };
+const TAB_PARENT = { cialo: 'dieta', miesnie: 'start', plany: 'trening', cwiczenia: 'plany' };
 function setTab(t, fromHistory) {
   // Ustawienia nie mają już zakładki na dole (otwiera je ikona użytkownika na górnym pasku):
   // zachowują się jak ekran podrzędny zakładki, z której je otwarto — działa „‹ Wróć” i gest od krawędzi
@@ -120,9 +120,14 @@ function setTab(t, fromHistory) {
   UI.tab = t;
   if (!fromHistory) UI.sec = null; // zakładka z dolnego paska zawsze otwiera listę ustawień
   // w Ustawieniach żadna zakładka na dole nie jest podświetlona (nie są częścią żadnej z nich)
-  const nav = t === 'wiecej'
-    ? null
-    : TAB_PARENT[t] || t;
+  // podświetlona zakładka = zakładka „korzeń” ekranu (np. Ćwiczenia → Plany → Trening)
+  let nav = t;
+  while (TAB_PARENT[nav] && nav !== 'wiecej') {
+    nav = TAB_PARENT[nav];
+  }
+  if (t === 'wiecej') {
+    nav = null;
+  }
   $$('.tabs button').forEach(b => b.dataset.tab === nav ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   $$('main > .view').forEach(v => v.hidden = v.id !== 'view-' + t);
   // historia: ekran podrzędny dostaje wpis, żeby działał gest/przycisk „wstecz”
@@ -212,7 +217,7 @@ if (navigator.standalone === true) {
   document.addEventListener('touchcancel', () => { if (sx != null && tracking) reset(); sx = null; });
 }
 function rerender() {
-  ({ start: renderStart, dieta: renderDieta, cialo: renderCialo, miesnie: renderMiesnie, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
+  ({ start: renderStart, kalendarz: renderKalendarz, dieta: renderDieta, cialo: renderCialo, miesnie: renderMiesnie, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
 
   if (typeof updateTopbar === 'function') {
     updateTopbar();
@@ -1586,7 +1591,7 @@ function renderTrening() {
         </div>
         <div class="btns">
           <button class="btn" type="button" id="t-prs">🏆 Rekordy</button>
-          <button class="btn" type="button" id="t-badges">🏅 Osiągnięcia</button>
+          <button class="btn" type="button" id="t-plans">📋 Plany</button>
         </div>
         <h3>Historia</h3>
         <div class="list">${hist.map(w => `
@@ -1603,10 +1608,14 @@ function renderTrening() {
               ${volume(w) ? '<br>' + fmt(volume(w), 0) + ' kg' : ''}
             </div>
           </button>`).join('')}</div>`
-      : `<div class="card empty"><strong>Brak treningów</strong><span>Rozpocznij trening, dodaj ćwiczenia z bazy i zapisuj serie: ciężar i powtórzenia. Przy kolejnym treningu zobaczysz, co zrobiłeś ostatnio.</span></div>`}`;
+      : `<div class="card empty"><strong>Brak treningów</strong><span>Rozpocznij trening, dodaj ćwiczenia z bazy i zapisuj serie: ciężar i powtórzenia. Przy kolejnym treningu zobaczysz, co zrobiłeś ostatnio.</span></div>
+        <button class="btn block" type="button" id="t-plans">📋 Plany i baza ćwiczeń</button>`}`;
     $('#t-start').onclick = startWorkoutSheet;
     const prb = $('#t-prs', body); if (prb) prb.onclick = showRecords;
-    const bdg = $('#t-badges', body); if (bdg) bdg.onclick = () => typeof showBadges === 'function' && showBadges();
+    const pl = $('#t-plans', body);
+    if (pl) {
+      pl.onclick = () => setTab('plany');
+    }
     $$('[data-w]', body).forEach(b => {
       b.onclick = () => showWorkout(b.dataset.w);
     });
@@ -2697,6 +2706,16 @@ $('#wiecej-back').addEventListener('click', () => goBack());
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 11,
+    t: 'Kalendarz',
+    items: [
+      'Nowa zakładka <b>Kalendarz</b>: miesiąc w kratkach z treningami, ważeniami i pomiarami ciała.',
+      'Stuknij dzień, żeby zobaczyć, co wtedy było. Na dziś i kolejne dni możesz <b>zaplanować trening</b> z planu, a w dniu treningu uruchomić go przyciskiem „Start”.',
+      'Zaplanowany trening zaznacza się sam jako zrobiony, gdy tego dnia zapiszesz trening z tego planu.',
+      '<b>Plany</b> są teraz w zakładce Trening (przycisk „📋 Plany” obok Rekordów). Osiągnięcia znajdziesz w zakładce Postęp.',
+    ],
+  },
   {
     id: 10,
     t: 'Więcej osiągnięć',

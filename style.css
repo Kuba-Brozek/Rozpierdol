@@ -53,8 +53,8 @@ main {
 }
 .view { display: flex; flex-direction: column; gap: 20px; }
 /* Treść każdej zakładki: bloki jeden pod drugim z odstępem */
-#start-body, #miesnie-body, #dieta-body, #cialo-body, #trening-body, #plany-body, #cw-body, #wiecej-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-#start-body > *, #miesnie-body > *, #dieta-body > *, #cialo-body > *, #trening-body > *, #plany-body > *, #cw-body > *, #wiecej-body > * { flex-shrink: 0; }
+#start-body, #kalendarz-body, #miesnie-body, #dieta-body, #cialo-body, #trening-body, #plany-body, #cw-body, #wiecej-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+#start-body > *, #kalendarz-body > *, #miesnie-body > *, #dieta-body > *, #cialo-body > *, #trening-body > *, #plany-body > *, #cw-body > *, #wiecej-body > * { flex-shrink: 0; }
 #cw-body { gap: 12px; }
 .vhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-top: 8px; }
 .vhead h1 { font: 700 32px/1.1 var(--num); margin: 0; letter-spacing: -.01em; }
@@ -1236,4 +1236,133 @@ html[data-accent="oliwka"] .auth-link.dim { color: #ffe4ec; }
 .tb-initial {
   font-size: 17px;
   font-weight: 700;
+}
+
+/* ---------- Kalendarz ---------- */
+.cal-title {
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cal-dow {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding-bottom: 4px;
+}
+
+.cal-cell {
+  aspect-ratio: 1 / 1.1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cal-cell.empty {
+  cursor: default;
+}
+
+.cal-cell:not(.empty):active {
+  background: var(--surface-2);
+}
+
+.cal-n {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.cal-cell.future .cal-n {
+  color: var(--muted);
+}
+
+/* dzień z treningiem: delikatne tło w kolorze motywu */
+.cal-cell.trained {
+  background: var(--accent-soft);
+}
+
+/* dziś: obwódka */
+.cal-cell.today {
+  border-color: var(--accent);
+}
+
+.cal-cell.today .cal-n {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+/* zaplanowany (jeszcze niezrobiony) trening: przerywana obwódka */
+.cal-cell.planned {
+  border: 1.5px dashed var(--accent);
+}
+
+.cal-dots {
+  display: flex;
+  gap: 3px;
+  height: 6px;
+}
+
+.cal-dots i,
+.cal-legend i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.dt-w {
+  background: var(--accent);
+}
+
+.dt-k {
+  background: var(--muted);
+}
+
+.dt-m {
+  background: var(--star);
+}
+
+.cal-legend i.dt-p {
+  width: 10px;
+  height: 10px;
+  border-radius: 4px;
+  border: 1.5px dashed var(--accent);
+  background: none;
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+}
+
+.cal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }

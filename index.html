@@ -110,7 +110,16 @@
   </section>
 
   <!-- PLANY -->
+  <!-- KALENDARZ -->
+  <section class="view" id="view-kalendarz" hidden aria-labelledby="h-kalendarz">
+    <header class="vhead">
+      <h1 id="h-kalendarz">Kalendarz</h1>
+    </header>
+    <div id="kalendarz-body"></div>
+  </section>
+
   <section class="view" id="view-plany" hidden aria-labelledby="h-plany">
+    <button class="link back" type="button" data-go="trening">‹ Trening</button>
     <header class="vhead"><h1 id="h-plany">Plany</h1><button class="link" id="plan-new" type="button">+ Nowy plan</button></header>
     <div id="plany-body"></div>
   </section>
@@ -154,9 +163,15 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8v8M3.5 10v4M18 8v8M20.5 10v4M6 12h12"/></svg>
     <span>Trening</span>
   </button>
-  <button type="button" data-tab="plany">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6.5A1.5 1.5 0 0 0 5 6.5v13A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 17.5 5H16"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/></svg>
-    <span>Plany</span>
+  <button type="button" data-tab="kalendarz">
+    <!-- kartka kalendarza z kropkami dni -->
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="15" rx="3"/>
+      <path d="M4 10h16"/>
+      <path d="M8.5 3v4M15.5 3v4"/>
+      <path d="M8.5 14h.01M12 14h.01M15.5 14h.01M8.5 17h.01M12 17h.01"/>
+    </svg>
+    <span>Kalendarz</span>
   </button>
 </nav>
 
@@ -175,6 +190,7 @@
 
 <script src="config.js"></script>
 <script src="extras.js"></script>
+<script src="calendar.js"></script>
 <script src="app.js"></script>
 <script src="sync.js"></script>
 <script src="lock.js"></script>
