@@ -64,6 +64,12 @@
   })();
 </script>
 
+<!-- górny pasek na każdym ekranie: poziom i XP (stuknij = szczegóły), ikona użytkownika = Ustawienia -->
+<header class="topbar" id="topbar">
+  <button type="button" class="tb-level" id="tb-level" aria-label="Twój poziom"></button>
+  <button type="button" class="tb-user" id="tb-user" aria-label="Ustawienia i konto"></button>
+</header>
+
 <main id="app">
   <!-- PODSUMOWANIE -->
   <section class="view" id="view-start" aria-labelledby="h-start">
@@ -114,7 +120,7 @@
 
   <!-- WIĘCEJ -->
   <section class="view" id="view-wiecej" hidden aria-labelledby="h-wiecej">
-    <button class="link back" type="button" id="wiecej-back" hidden>‹ Ustawienia</button>
+    <button class="link back" type="button" id="wiecej-back" hidden>‹ Wróć</button>
     <header class="vhead"><h1 id="h-wiecej">Ustawienia</h1></header>
     <div id="wiecej-body"></div>
   </section>
@@ -145,10 +151,6 @@
   <button type="button" data-tab="plany">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z"/><path d="M8 5H6.5A1.5 1.5 0 0 0 5 6.5v13A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 17.5 5H16"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/></svg>
     <span>Plany</span>
-  </button>
-  <button type="button" data-tab="wiecej">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg>
-    <span>Ustawienia</span>
   </button>
 </nav>
 

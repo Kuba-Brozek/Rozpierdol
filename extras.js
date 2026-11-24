@@ -1123,3 +1123,64 @@ function wireMuscleBars(el) {
     };
   });
 }
+
+
+/* ---------- górny pasek: poziom, XP i ikona użytkownika (otwiera Ustawienia) ---------- */
+
+const USER_ICON = `
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="8.5" r="3.6"/>
+    <path d="M4.8 20c1.2-3.6 4-5.4 7.2-5.4s6 1.8 7.2 5.4"/>
+  </svg>`;
+
+function updateTopbar() {
+  const lvlBtn = document.getElementById('tb-level');
+  const userBtn = document.getElementById('tb-user');
+  if (!lvlBtn || !userBtn) {
+    return;
+  }
+
+  const L = levelInfo();
+  const xpTxt = L.next
+    ? `${fmtN(L.xp)} / ${fmtN(L.next)} XP`
+    : `${fmtN(L.xp)} XP · max`;
+
+  lvlBtn.innerHTML = `
+    <span class="tb-lvl num">${L.lvl}</span>
+    <span class="tb-info">
+      <span class="tb-name">${esc(L.name)}</span>
+      <span class="tb-bar"><i style="width:${L.pct}%"></i></span>
+      <span class="tb-xp num">${xpTxt}</span>
+    </span>`;
+  lvlBtn.setAttribute('aria-label', `Poziom ${L.lvl}, ${L.name}, ${xpTxt}`);
+
+  // inicjał z e-maila zalogowanego konta, inaczej ikonka ludzika
+  const email = typeof SY !== 'undefined' && SY.session && SY.session.email;
+  const initial = email ? email.trim()[0].toUpperCase() : '';
+  userBtn.innerHTML = initial
+    ? `<span class="tb-initial">${esc(initial)}</span>`
+    : USER_ICON;
+  userBtn.classList.toggle('on', UI.tab === 'wiecej');
+}
+
+let topbarTimer = null;
+function scheduleTopbar() {
+  clearTimeout(topbarTimer);
+  topbarTimer = setTimeout(updateTopbar, 400);
+}
+
+function openSettings() {
+  if (UI.tab === 'wiecej') {
+    goBack();
+    return;
+  }
+  setTab('wiecej');
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#tb-user')) {
+    openSettings();
+  } else if (e.target.closest('#tb-level')) {
+    showLevels();
+  }
+});

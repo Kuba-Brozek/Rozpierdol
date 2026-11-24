@@ -41,6 +41,11 @@ function save(silent) {
   if (!silent) S.updatedAt = Date.now();
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Nie udało się zapisać danych'); }
   if (!silent && typeof syncSoon === 'function') syncSoon();
+
+  // XP i poziom na górnym pasku (z opóźnieniem — save() leci przy każdym wpisanym znaku)
+  if (typeof scheduleTopbar === 'function') {
+    scheduleTopbar();
+  }
 }
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
 
@@ -107,6 +112,11 @@ function thumbHTML(e, cls = 'thumb') {
 // Ekrany bez własnej zakładki: otwierane przyciskiem z innej zakładki, która zostaje podświetlona
 const TAB_PARENT = { cialo: 'dieta', miesnie: 'start', cwiczenia: 'plany' };
 function setTab(t, fromHistory) {
+  // Ustawienia nie mają już zakładki na dole (otwiera je ikona użytkownika na górnym pasku):
+  // zachowują się jak ekran podrzędny zakładki, z której je otwarto — działa „‹ Wróć” i gest od krawędzi
+  if (t === 'wiecej' && UI.tab !== 'wiecej') {
+    TAB_PARENT.wiecej = TAB_PARENT[UI.tab] || UI.tab || 'start';
+  }
   UI.tab = t;
   if (!fromHistory) UI.sec = null; // zakładka z dolnego paska zawsze otwiera listę ustawień
   const nav = TAB_PARENT[t] || t;
@@ -144,10 +154,22 @@ window.addEventListener('popstate', e => {
     return;
   }
   const st = e.state;
-  if (UI.tab === 'wiecej' && !(st && st.sub && st.sub !== 'wiecej')) { // ekrany w Ustawieniach
-    const s = st && st.sec || null;
-    if (s !== UI.sec) { UI.sec = s; renderWiecej(); window.scrollTo(0, 0); }
-    return;
+  if (UI.tab === 'wiecej') {
+    // w obrębie Ustawień: między listą a ekranem jednej sekcji
+    if (st && st.sub === 'wiecej') {
+      const s = st.sec || null;
+      if (s !== UI.sec) {
+        UI.sec = s;
+        renderWiecej();
+        window.scrollTo(0, 0);
+      }
+      return;
+    }
+    // wyjście z Ustawień: wróć do zakładki, z której je otwarto
+    if (!st || !st.sub) {
+      setTab(TAB_PARENT.wiecej || 'start', true);
+      return;
+    }
   }
   if (st && st.sub && st.sub !== UI.tab) setTab(st.sub, true);
   else if (TAB_PARENT[UI.tab] && !(st && st.sub === UI.tab)) setTab(TAB_PARENT[UI.tab], true);
@@ -188,6 +210,10 @@ if (navigator.standalone === true) {
 }
 function rerender() {
   ({ start: renderStart, dieta: renderDieta, cialo: renderCialo, miesnie: renderMiesnie, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
+
+  if (typeof updateTopbar === 'function') {
+    updateTopbar();
+  }
 }
 $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 // przyciski „‹ Forma”, „Pomiary ciała ›” itp.
@@ -739,7 +765,6 @@ function renderStart() {
   const top = st
     ? `
       ${heroHTML(st)}
-      ${has('levelCardHTML') ? levelCardHTML() : ''}
       ${statTilesHTML(st)}
       ${muscles}
       ${has('weightTrendHTML') ? weightTrendHTML() : ''}
@@ -751,14 +776,13 @@ function renderStart() {
         <span>Wpisz pierwszy pomiar w zakładce Waga, a tu pojawi się podsumowanie: postęp do celu, BMI, średnie i ciekawostki.</span>
         <button class="btn primary" type="button" data-go="dieta">Przejdź do Wagi</button>
       </div>
-      ${has('levelCardHTML') ? levelCardHTML() : ''}
       ${muscles}`;
 
   body.innerHTML = `
     ${top}
     ${has('monthSummaryHTML') ? monthSummaryHTML() : ''}
     ${achCard}
-    ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w zakładce Ustawienia, żeby zobaczyć BMI i postęp do celu.</p>'}`;
+    ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w Ustawieniach (ikona użytkownika w prawym górnym rogu), żeby zobaczyć BMI i postęp do celu.</p>'}`;
 
   const lv = $('#level-card', body);
   if (lv) {
@@ -2592,7 +2616,7 @@ const SHEET_SECS = ['log', 'sug', 'sugadmin', 'admin', 'about', 'rodo', 'priv', 
 function applySettingsNav(body) {
   UI.sec = null;
   $('#h-wiecej').textContent = 'Ustawienia';
-  $('#wiecej-back').hidden = true;
+  $('#wiecej-back').hidden = false; // „‹ Wróć” do zakładki, z której otwarto Ustawienia
   $$('[data-sec]', body).forEach(s => s.hidden = SHEET_SECS.includes(s.dataset.sec));
   const rows = SECS.filter(s => s && SHEET_SECS.includes(s[0]) && $(`[data-sec="${s[0]}"]`, body));
   const foot = $('.settings-foot', body);
@@ -2673,6 +2697,8 @@ const CHANGELOG = [
       '<b>Poziomy</b>: zbierasz XP za treningi, serie, rekordy, ważenie, pomiary ciała i osiągnięcia. Jest 20 poziomów, od Świeżaka do Rozpierdola. Stuknij kartę poziomu w zakładce Postęp, żeby zobaczyć, ile XP masz z czego.',
       'Odznaki to teraz <b>Osiągnięcia</b>. Jest ich 44 w pięciu grupach: treningi, siła, rekordy, regularność oraz waga i ciało.',
       'Przy awansie na wyższy poziom i przy nowym osiągnięciu wyskakują gratulacje.',
+      '<b>Górny pasek</b> na każdym ekranie: poziom, nazwa i pasek XP. Stuknij go, żeby zobaczyć szczegóły.',
+      '<b>Ustawienia</b> otwierasz ikoną użytkownika w prawym górnym rogu. Dolny pasek ma teraz 4 zakładki.',
       'W zakładce Postęp paski partii i graf sylwetki są teraz nad wykresem wagi.',
     ],
   },
