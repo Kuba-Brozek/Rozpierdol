@@ -2153,6 +2153,7 @@ const ALIASES = {
   Pushups: 'pompki push up pushup',
   Plank: 'plank deska',
   Hanging_Leg_Raise: 'wznosy nog w zwisie brzuch',
+  Elliptical_Trainer: 'orbitrek eliptyczny elliptical crosstrainer cross trener',
 };
 // Porównujemy bez wielkości liter i polskich znaków („zolnierskie” = „żołnierskie”)
 const fold = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l');
@@ -2764,7 +2765,7 @@ function renderWiecej() {
       <p>Na co dzień jestem programistą SAP ABAP z 5-letnim stażem komercyjnym, a hobbystycznie klaunem cyrkowym 🤡. Ten projekt robię czysto dla zabawy.</p>
     </section>
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
-    <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Sylwetki mięśni: <a href="https://pixabay.com/vectors/anatomical-anatomy-anatomy-chart-6826992/" target="_blank" rel="noopener" style="color:inherit">Pixabay</a>. Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
+    <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Rysunek „Unoszenie bokiem na maszynie”: roneydya, <a href="https://wger.de" target="_blank" rel="noopener" style="color:inherit">wger.de</a>, licencja <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.pl" target="_blank" rel="noopener" style="color:inherit">CC BY-SA 4.0</a>, podzielony na dwie klatki. Sylwetki mięśni: <a href="https://pixabay.com/vectors/anatomical-anatomy-anatomy-chart-6826992/" target="_blank" rel="noopener" style="color:inherit">Pixabay</a>. Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
     <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: ${APP_VERSION}</p>
     <p class="muted small settings-foot" style="margin:4px 0 0">©2026${new Date().getFullYear() > 2026 ? '–' + new Date().getFullYear() : ''} Rozpierdol. Wszelkie prawa zastrzeżone.<br>Zrobione z miłością i odrobiną bólu mięśni 💪</p>`;
   // numer wersji (np. 1.14.1) + numer kompilacji = nazwa schowka plików apki (ustawiana przy budowaniu)
@@ -2952,7 +2953,7 @@ $('#wiecej-back').addEventListener('click', () => goBack());
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.17.2';
+const APP_VERSION = '1.17.3';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
