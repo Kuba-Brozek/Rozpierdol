@@ -2219,6 +2219,7 @@ function renderWiecej() {
       <div class="row small"><span>Własne ćwiczenia</span><b class="num">${(S.custom || []).length}</b></div>
       <button class="btn danger" type="button" id="wipe">Usuń wszystkie dane</button>
     </section>
+    <section class="card" data-sec="log"></section>
     <section class="card" data-sec="sug" id="sug-box"></section>
     ${IS_ADMIN ? '<section class="card" data-sec="sugadmin" id="sugadmin-box"></section><section class="card" data-sec="admin"></section>' : ''}
     <section class="card rodo" data-sec="rodo">
@@ -2326,7 +2327,7 @@ const SECS = [
   ['konto', '👤', 'Konto i chmura'], ['share', '🤝', 'Udostępnianie'], null,
   ['profil', '🧍', 'Profil i cel'], ['dieta', '📈', 'Ekran Forma'], ['wyglad', '🎨', 'Wygląd'], null,
   ['excel', '📄', 'Kopia zapasowa w Excelu'], ['dane', '🗂️', 'Dane na tym telefonie'], null,
-  ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
+  ['log', '🆕', 'Co nowego'], ['sug', '💡', 'Sugestie'], ['sugadmin', '📬', 'Sugestie użytkowników'], ['admin', '🛠️', 'Panel administratora'], ['about', '👨‍💻', 'O autorze'], ['rodo', '🛡️', 'Przetwarzanie danych osobowych'], ['priv', '🔒', 'Polityka prywatności'], ['compl', '📮', 'Reklamacje'],
 ];
 function secSub(k) {
   const p = S.profile, th = getTheme(), sy = typeof SY !== 'undefined' ? SY : null;
@@ -2338,6 +2339,7 @@ function secSub(k) {
     case 'wyglad': { const a = ACCENTS.find(x => x.id === th.accent), m = MODES.find(([v]) => v === th.mode); return [a && a.label, m && m[1]].filter(Boolean).join(' · '); }
     case 'excel': return 'Zapisz albo wczytaj plik .xlsx';
     case 'dane': return `${plural(S.weights.length, 'pomiar', 'pomiary', 'pomiarów')} wagi, ${plural(S.workouts.length, 'trening', 'treningi', 'treningów')}`;
+    case 'log': return 'Ostatnio: ' + esc(CHANGELOG[0].t);
     case 'sug': return 'Napisz, co ulepszyć w apce';
     case 'sugadmin': return 'Widoczne tylko dla admina';
     case 'admin': return 'Konta użytkowników';
@@ -2346,7 +2348,7 @@ function secSub(k) {
   }
 }
 // Ustawienia na jednej stronie z kartami. Sugestie / polityka / reklamacje: karta „Inne”, każda pozycja otwiera okno.
-const SHEET_SECS = ['sug', 'sugadmin', 'admin', 'about', 'rodo', 'priv', 'compl'];
+const SHEET_SECS = ['log', 'sug', 'sugadmin', 'admin', 'about', 'rodo', 'priv', 'compl'];
 function applySettingsNav(body) {
   UI.sec = null;
   $('#h-wiecej').textContent = 'Ustawienia';
@@ -2370,6 +2372,7 @@ function openSec(k) {
     if (k === 'sug') typeof renderSuggest === 'function' ? renderSuggest(box) : box.innerHTML = '<p style="margin:0">Sugestie wymagają połączenia z chmurą.</p>';
     else if (k === 'sugadmin') { if (typeof renderSuggestAdmin === 'function') renderSuggestAdmin(box); }
     else if (k === 'admin') { if (typeof renderAdmin === 'function') renderAdmin(box); }
+    else if (k === 'log') { box.classList.add('log'); box.innerHTML = changelogHTML(CHANGELOG) + '<button class="btn block" type="button" data-close>OK</button>'; }
     else { src.classList.forEach(c => c !== 'card' && box.classList.add(c)); box.innerHTML = src.innerHTML + '<button class="btn block" type="button" data-close>OK</button>'; }
   });
 }
@@ -2418,6 +2421,65 @@ $('#wiecej-back').addEventListener('click', () => goBack());
   btn.addEventListener('click', e => e.preventDefault());
 })();
 
+/* ============ Co nowego ============
+   Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id).
+   S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
+   Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
+const CHANGELOG = [
+  { id: 5, t: 'Forma i mapa mięśni', items: [
+    'Zakładka Dieta nazywa się teraz <b>Forma</b> i ma nową ikonę. Pasuje do każdego celu: redukcji, utrzymania i masy.',
+    'Nowy ekran <b>Partie mięśni</b> (Forma → 💪). Sylwetka z przodu i z tyłu, a ćwiczone partie świecą na czerwono. Stuknij partię, żeby zobaczyć serie z ostatnich 7 dni, dzień po dniu.',
+    'Osobna sylwetka dla profilu „Kobieta”.',
+    'Okno „Co nowego” po aktualizacji. Pełną listę zmian znajdziesz w Ustawieniach → Inne.',
+  ] },
+  { id: 4, t: 'Konto i ustawienia', items: [
+    'Zmiana hasła, zmiana e-maila i usuwanie konta w karcie Konto i chmura.',
+    '<b>Sugestie</b>: napisz, co dodać albo poprawić w apce.',
+    'Nowe pozycje w Ustawieniach → Inne: O autorze, Przetwarzanie danych osobowych, Polityka prywatności i Reklamacje.',
+    'Losowe teksty na ekranie startowym.',
+  ] },
+  { id: 3, t: 'Profil i cele', items: [
+    'Profil: płeć, rok urodzenia, aktywność, cel (redukcja, utrzymanie albo masa) i tempo.',
+    'Kafelek z dziennym zapotrzebowaniem na kalorie.',
+    'Szacowany % tkanki tłuszczowej w Pomiarach ciała.',
+    'Cel treningów na tydzień i wykres kołowy z ostatnich 7 dni.',
+    'Przełączniki w Ustawieniach: pokaż albo ukryj kafelek kalorii i losowy fakt.',
+  ] },
+  { id: 2, t: 'Nowy układ', items: [
+    '4 zakładki zamiast 6: Baza ćwiczeń jest teraz w Planach, a Pomiary ciała w Formie.',
+    'Kafelek z losowym, pozytywnym faktem o twoich postępach.',
+    'Na iPhonie cofasz się gestem od lewej krawędzi ekranu.',
+  ] },
+  { id: 1, t: 'Treningi', items: [
+    'Kolejność ćwiczeń i serii zmieniasz przytrzymaniem i przeciągnięciem.',
+    'Własne pola w seriach: kg, powtórzenia, czas, dystans, prędkość, nachylenie, tempo, RIR, RPE i inne.',
+    '<b>Rekordy osobiste</b> z gratulacjami po pobiciu.',
+    'Podmiana ćwiczenia na inne bez utraty wpisanych serii.',
+    'Widok kompaktowy treningu.',
+    'Puste ćwiczenia i ustawiona liczba serii zostają po zapisaniu treningu.',
+  ] },
+];
+const LOG_LATEST = CHANGELOG[0].id;
+const hasAnyData = () => S.weights.length || S.workouts.length || S.plans.length || (S.measures || []).length;
+function changelogHTML(list) {
+  return list.map(r => `<section class="log-rel"><h3>${esc(r.t)}</h3><ul>${r.items.map(i => `<li>${i}</li>`).join('')}</ul></section>`).join('');
+}
+function showChangelog(list, title) {
+  openSheet(title, `<div class="log">${changelogHTML(list)}</div><button class="btn primary block" type="button" data-close>Super</button>`);
+}
+// Wywoływane po starcie, po zalogowaniu i po zamknięciu ekranu logowania
+let whatsNewTries = 0;
+function whatsNew() {
+  if ((S.seenLog || 0) >= LOG_LATEST) return;
+  // nowy użytkownik (pusty telefon, bez konta): nie ma czego nadrabiać
+  if (!hasAnyData()) { if (!(typeof SY !== 'undefined' && SY.session)) { S.seenLog = LOG_LATEST; save(true); } return; }
+  // nie przykrywaj ekranu logowania ani innego okna — spróbuj za chwilę
+  if (document.getElementById('auth') || !$('#sheet').hidden || $('#splash')) { if (whatsNewTries++ < 30) setTimeout(whatsNew, 1500); return; }
+  const missed = CHANGELOG.filter(r => r.id > (S.seenLog || 0));
+  S.seenLog = LOG_LATEST; save();
+  showChangelog(missed, missed.length > 1 ? 'Co nowego od twojej ostatniej wizyty' : 'Co nowego 🎉');
+}
+
 /* ============ Start ============ */
 const splashStart = performance.now();
 function hideSplash() {
@@ -2430,6 +2492,7 @@ try { applyTheme(getTheme()); } catch (e) { console.error(e); }
 rebuildExMap();
 try { setTab(S.active ? 'trening' : 'dieta'); } catch (e) { console.error(e); }
 loadExercises().finally(hideSplash);
+setTimeout(() => { try { whatsNew(); } catch (e) { console.error(e); } }, 2600);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && UI.tab === 'dieta') renderDieta(); });
 // Apka działa z pamięci telefonu. Nowa wersja pobiera się w tle (raz), a potem proponujemy odświeżenie.
 if ('serviceWorker' in navigator) {

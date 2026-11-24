@@ -93,6 +93,7 @@ async function cloudLogin(email, password) {
   checkSpecialTheme(SY.session.email);
   fetchAccountCreated();
   await firstSyncAfterLogin();
+  if (typeof whatsNew === 'function') setTimeout(whatsNew, 800);
 }
 async function cloudSignup(email, password) {
   const r = await authPost('signUp', { email, password, returnSecureToken: true });
@@ -398,7 +399,7 @@ async function firstSyncAfterLogin() {
     b.addEventListener('click', e => { const c = e.target.closest('[data-c]'); if (c) { closeSheet(); res(c.dataset.c); } });
   }));
   if (choice === 'remote') { adoptRemote(r); SY.lastRemoteAt = remote.updatedAt; SY.dirty = false; SY.lastSyncAt = Date.now(); sySave(); updateSyncUI(); return; }
-  if (choice === 'merge') { applyData(stateAsData(r), false); save(true); rebuildExMap(); }
+  if (choice === 'merge') { applyData(stateAsData(r), false); S.seenLog = Math.max(S.seenLog || 0, r.seenLog || 0); save(true); rebuildExMap(); }
   SY.lastRemoteAt = remote.updatedAt; SY.dirty = true; sySave();
   await syncNow();
   rerender();
@@ -731,6 +732,7 @@ function hideAuthScreen() {
   const a = document.getElementById('auth'); if (!a) return;
   a.classList.add('hide'); setTimeout(() => a.remove(), 300);
   document.body.style.overflow = '';
+  if (typeof whatsNew === 'function') setTimeout(whatsNew, 1200);
 }
 function showAuthScreen(mode = 'login') {
   if (!cloudReady()) return;
