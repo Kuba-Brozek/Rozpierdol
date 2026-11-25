@@ -36,8 +36,33 @@
     <rect x="392" y="196" width="48" height="120" rx="18" fill="#fff"/>
   </svg>
   <div class="splash-name">Rozpierdol</div>
-  <p class="splash-quote" id="splash-quote">„Dalej już idę sam,<br>w stronę lepszego ja”<span class="splash-author">~Gibbs</span></p>
+  <p class="splash-quote" id="splash-quote">Gdy wiatry nie sprzyjają,<br>to buduje się charakter.</p>
 </div>
+<script>
+  // Losowy tekst na ekranie startowym (zatwierdzona lista); nigdy dwa razy ten sam pod rząd
+  (function () {
+    var Q = [
+      'Gdy wiatry nie sprzyjają,<br>to buduje się charakter.',
+      'Nie ma że boli.',
+      'Jak nie urok, to sraczka.',
+      'Jest moc!',
+      'Kto rano wstaje,<br>ten ma cały dzień na trening.',
+      'Ogarnij się i działaj.',
+      'Nie pękaj, będzie dobrze.',
+      'Niech kurwy giną<br>pod ciepłą pierzyną.',
+      'Pierdolę, nie robię…<br>dobra, robię.',
+      'Nie ma chuja we wsi.',
+      'Zapierdalaj, nie gadaj.',
+      'Mordo, nie ma lipy.',
+      'Ja pierdolę, ale pompa.'
+    ];
+    var last = -1; try { last = +localStorage.getItem('rozpierdol-cytat'); } catch (e) {}
+    var i = Math.floor(Math.random() * Q.length);
+    if (i === last) i = (i + 1 + Math.floor(Math.random() * (Q.length - 1))) % Q.length;
+    try { localStorage.setItem('rozpierdol-cytat', i); } catch (e) {}
+    document.getElementById('splash-quote').innerHTML = Q[i];
+  })();
+</script>
 
 <!-- górny pasek na każdym ekranie: poziom i XP (stuknij = szczegóły), ikona użytkownika = Ustawienia -->
 <header class="topbar" id="topbar">
