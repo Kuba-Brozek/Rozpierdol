@@ -912,13 +912,51 @@ function statTilesHTML(st) {
     </div>`;
 }
 
-// cytat na dole zakładki Postęp (ten sam co na ekranie startowym)
-function mottoHTML() {
-  return `
-    <figure class="card motto">
-      <blockquote>„Dalej już idę sam,<br>w stronę lepszego ja”</blockquote>
-      <figcaption>~Gibbs</figcaption>
-    </figure>`;
+// cytat: na ekranie po zapisaniu treningu i na stałe w stopce Ustawień
+const MOTTO = {
+  text: '„Dalej już idę sam,<br>w stronę lepszego ja”',
+  author: 'Gibbs',
+};
+
+// ekran „Trening zapisany” na całą stronę: krótkie podsumowanie i cytat;
+// znika sam po kilku sekundach albo po stuknięciu, potem then() (np. rekordy)
+function workoutDone(w, then) {
+  const sets = w.ex.reduce((sum, e) => sum + e.sets.filter(filled).length, 0);
+  const mins = Math.max(1, Math.round((w.end - w.start) / 60000));
+  const vol = volume(w);
+
+  const stats = [
+    `${w.ex.length} ${w.ex.length === 1 ? 'ćwiczenie' : 'ćw.'}`,
+    `${sets} ${sets === 1 ? 'seria' : [2, 3, 4].includes(sets % 10) && ![12, 13, 14].includes(sets % 100) ? 'serie' : 'serii'}`,
+    mins < 600 ? `${mins} min` : '',
+    vol ? `${fmt(vol, 0)} kg` : '',
+  ].filter(Boolean).join(' · ');
+
+  const el = document.createElement('div');
+  el.id = 'wdone';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `
+    <span class="wdone-ic" aria-hidden="true">💪</span>
+    <h2>Trening zapisany</h2>
+    <p class="wdone-stats num">${stats}</p>
+    <blockquote class="wdone-quote">${MOTTO.text}<span>~${MOTTO.author}</span></blockquote>
+    <p class="wdone-tap small">Stuknij, żeby zamknąć</p>`;
+  document.body.appendChild(el);
+
+  let closed = false;
+  const close = () => {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    el.classList.add('hide');
+    setTimeout(() => el.remove(), 350);
+    if (then) {
+      then();
+    }
+  };
+  el.onclick = close;
+  setTimeout(close, 4000);
 }
 
 function renderStart() {
@@ -981,8 +1019,7 @@ function renderStart() {
     ${top}
     ${has('monthSummaryHTML') ? monthSummaryHTML() : ''}
     ${showDuo ? '' : achCard}
-    ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w Ustawieniach (ikona użytkownika w prawym górnym rogu), żeby zobaczyć BMI i postęp do celu.</p>'}
-    ${mottoHTML()}`;
+    ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w Ustawieniach (ikona użytkownika w prawym górnym rogu), żeby zobaczyć BMI i postęp do celu.</p>'}`;
 
   const lv = $('#level-card', body);
   if (lv) {
@@ -2357,8 +2394,11 @@ async function finishWorkout() {
   S.workouts.push(w); S.workouts.sort((a, b) => a.start - b.start);
   S.active = null; save(); renderTrening();
   if (typeof restStop === 'function') restStop();
-  if (!celebratePRs(w.id)) toast('Zapisano trening');
-  if (typeof checkBadges === 'function') checkBadges();
+  // najpierw ekran „Trening zapisany” z cytatem, po nim rekordy i odznaki
+  workoutDone(w, () => {
+    celebratePRs(w.id);
+    if (typeof checkBadges === 'function') checkBadges();
+  });
 }
 function editWorkout(id) {
   const w = S.workouts.find(x => x.id === id); if (!w) return;
@@ -3056,6 +3096,7 @@ function renderWiecej() {
     </section>
     <section class="card" data-sec="compl"><div class="xd" aria-label="XD">XD</div></section>
     <p class="muted small settings-foot">Zdjęcia i opisy ćwiczeń: <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener" style="color:inherit">Free Exercise DB</a> (domena publiczna). Rysunek „Unoszenie bokiem na maszynie”: roneydya, <a href="https://wger.de" target="_blank" rel="noopener" style="color:inherit">wger.de</a>, licencja <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.pl" target="_blank" rel="noopener" style="color:inherit">CC BY-SA 4.0</a>, podzielony na dwie klatki. Sylwetki mięśni: <a href="https://pixabay.com/vectors/anatomical-anatomy-anatomy-chart-6826992/" target="_blank" rel="noopener" style="color:inherit">Pixabay</a>. Zdjęcia są częścią apki: telefon pobiera każde przy pierwszym obejrzeniu, potem działa ono też offline.</p>
+    <p class="settings-motto">${MOTTO.text}<span>~${MOTTO.author}</span></p>
     <p class="muted small settings-foot" id="app-version" style="margin:0">Wersja apki: ${APP_VERSION}</p>
     <p class="muted small settings-foot" style="margin:4px 0 0">©2026${new Date().getFullYear() > 2026 ? '–' + new Date().getFullYear() : ''} Rozpierdol. Wszelkie prawa zastrzeżone.<br>Zrobione z miłością i odrobiną bólu mięśni 💪</p>`;
   // numer wersji (np. 1.14.1) + numer kompilacji = nazwa schowka plików apki (ustawiana przy budowaniu)
@@ -3344,13 +3385,22 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.20.4';
+const APP_VERSION = '1.21.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 21,
+    v: '1.21.0',
+    t: 'Trening zapisany 💪',
+    items: [
+      'Po zapisaniu treningu na chwilę pokazuje się ekran z podsumowaniem: ćwiczenia, serie, czas i objętość. Rekordy osobiste pojawiają się zaraz po nim.',
+      'Na tym ekranie i na stałe w stopce Ustawień stoi cytat: „Dalej już idę sam, w stronę lepszego ja” (Gibbs).',
+    ],
+  },
   {
     id: 20,
     v: '1.20.0',
