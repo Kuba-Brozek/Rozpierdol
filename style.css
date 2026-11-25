@@ -1803,3 +1803,6 @@ a.btn.qr-link {
 
 /* cytat na stałe w stopce Ustawień */
 .settings-motto { margin: 22px auto 14px; max-width: 280px; text-align: center; font-size: 15px; line-height: 1.45; font-style: italic; color: var(--fg); opacity: .8; text-wrap: balance; }
+
+/* przesuwanie między zakładkami: ekran wyjeżdżający w bok nie robi poziomego przewijania strony */
+#app { overflow-x: clip; }

@@ -226,6 +226,166 @@ if (navigator.standalone === true) {
   });
   document.addEventListener('touchcancel', () => { if (sx != null && tracking) reset(); sx = null; });
 }
+
+/* ---- przesuwanie palcem w bok między zakładkami z dolnego paska ----
+   działa tylko na ekranach głównych (Postęp, Ciało, Trening, Kalendarz);
+   nie startuje z pól, wykresów, list przewijanych w bok ani przy otwartym oknie */
+const TAB_SWIPE_SKIP = 'input, textarea, select, canvas, [contenteditable], .chips, .sets, .no-swipe';
+
+function tabOrder() {
+  return $$('.tabs button[data-tab]').map(b => b.dataset.tab);
+}
+
+// czy element (albo któryś z jego rodziców) sam przewija się w bok
+function scrollsSideways(el) {
+  for (let n = el; n && n !== document.body; n = n.parentElement) {
+    if (n.scrollWidth > n.clientWidth + 2) {
+      const ox = getComputedStyle(n).overflowX;
+      if (ox === 'auto' || ox === 'scroll') {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+{
+  let sx = null;
+  let sy = 0;
+  let dx = 0;
+  let t0 = 0;
+  let tracking = false;
+  let view = null;
+
+  const order = tabOrder();
+
+  const blocked = e => {
+    const t = e.touches[0];
+    const edge = 24; // krawędzie zostawiamy systemowi (gest „wstecz”)
+    return e.touches.length !== 1
+      || t.clientX < edge
+      || t.clientX > innerWidth - edge
+      || DRAG.on
+      || !$('#sheet').hidden
+      || !order.includes(UI.tab)
+      || document.querySelector('#wdone, #policy, #auth, #lock, #splash')
+      || e.target.closest(TAB_SWIPE_SKIP)
+      || scrollsSideways(e.target);
+  };
+
+  const snapBack = () => {
+    if (!view) {
+      return;
+    }
+    const v = view;
+    v.style.transition = 'transform .2s ease, opacity .2s ease';
+    v.style.transform = '';
+    v.style.opacity = '';
+    setTimeout(() => {
+      v.style.transition = '';
+    }, 220);
+  };
+
+  document.addEventListener('touchstart', e => {
+    sx = null;
+    tracking = false;
+    dx = 0;
+    if (blocked(e)) {
+      return;
+    }
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    t0 = Date.now();
+    view = $('#view-' + UI.tab);
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (sx == null) {
+      return;
+    }
+    const t = e.touches[0];
+    const mx = t.clientX - sx;
+    const my = t.clientY - sy;
+
+    if (!tracking) {
+      // najpierw rozstrzygamy: przewijanie w pionie czy gest w bok
+      if (Math.abs(my) > 10 && Math.abs(my) >= Math.abs(mx)) {
+        sx = null;
+        return;
+      }
+      if (Math.abs(mx) < 12) {
+        return;
+      }
+      tracking = true;
+    }
+
+    e.preventDefault();
+    const i = order.indexOf(UI.tab);
+    const hasNext = mx < 0 ? i < order.length - 1 : i > 0;
+    // na pierwszej i ostatniej zakładce ekran tylko lekko się opiera
+    dx = hasNext ? mx : mx * 0.25;
+    view.style.transition = 'none';
+    view.style.transform = `translateX(${dx}px)`;
+    view.style.opacity = String(1 - Math.min(0.35, Math.abs(dx) / innerWidth));
+  }, { passive: false });
+
+  document.addEventListener('touchend', () => {
+    if (sx == null) {
+      return;
+    }
+    sx = null;
+    if (!tracking) {
+      return;
+    }
+
+    const i = order.indexOf(UI.tab);
+    const dir = dx < 0 ? 1 : -1; // 1 = następna zakładka (w prawo na pasku)
+    const next = order[i + dir];
+    const fast = Math.abs(dx) / Math.max(1, Date.now() - t0) > 0.5;
+    const far = Math.abs(dx) > Math.min(110, innerWidth * 0.28);
+
+    if (!next || !(far || (fast && Math.abs(dx) > 40))) {
+      snapBack();
+      return;
+    }
+
+    // stary ekran wyjeżdża, nowy wjeżdża z przeciwnej strony
+    const old = view;
+    old.style.transition = 'transform .15s ease, opacity .15s ease';
+    old.style.transform = `translateX(${-dir * innerWidth * 0.5}px)`;
+    old.style.opacity = '0';
+
+    setTimeout(() => {
+      old.style.transition = '';
+      old.style.transform = '';
+      old.style.opacity = '';
+      setTab(next);
+
+      const nv = $('#view-' + next);
+      nv.style.transition = 'none';
+      nv.style.transform = `translateX(${dir * innerWidth * 0.3}px)`;
+      nv.style.opacity = '0';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          nv.style.transition = 'transform .2s ease, opacity .2s ease';
+          nv.style.transform = '';
+          nv.style.opacity = '';
+          setTimeout(() => {
+            nv.style.transition = '';
+          }, 220);
+        });
+      });
+    }, 140);
+  });
+
+  document.addEventListener('touchcancel', () => {
+    if (sx != null && tracking) {
+      snapBack();
+    }
+    sx = null;
+  });
+}
+
 function rerender() {
   ({ start: renderStart, kalendarz: renderKalendarz, dieta: renderDieta, cialo: renderCialo, miesnie: renderMiesnie, trening: renderTrening, plany: renderPlany, cwiczenia: renderCw, wiecej: renderWiecej })[UI.tab]();
 
@@ -3385,13 +3545,22 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.21.0';
+const APP_VERSION = '1.22.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 22,
+    v: '1.22.0',
+    t: 'Przesuwanie między zakładkami',
+    items: [
+      'Przesuń palcem w lewo albo w prawo, żeby przejść do sąsiedniej zakładki: Postęp, Ciało, Trening, Kalendarz.',
+      'Gest nie działa na polach do wpisywania, seriach w treningu, grafie mięśni i przy samych krawędziach ekranu, żeby nie przeszkadzał.',
+    ],
+  },
   {
     id: 21,
     v: '1.21.0',
