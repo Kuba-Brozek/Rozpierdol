@@ -237,6 +237,7 @@ ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column;
 .splash-logo { animation: lift 1.1s ease-in-out infinite alternate; }
 .splash-name { font: 700 34px/1 var(--num); letter-spacing: -.01em; margin-top: 18px; }
 .splash-quote { margin: 18px 0 0; max-width: 300px; padding: 0 24px; text-align: center; font-size: 17px; line-height: 1.45; font-style: italic; opacity: .82; text-wrap: balance; }
+.splash-author { display: block; margin-top: 6px; font-size: 14px; font-style: normal; opacity: .75; }
 @keyframes lift { from { transform: translateY(6px); } to { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .splash-logo { animation: none; } #splash { transition: none; } }
 
