@@ -1809,3 +1809,22 @@ a.btn.qr-link {
 
 /* przycisk „Podsumowanie tygodnia” pod podsumowaniem miesiąca */
 .month-sum .ms-week { display: block; margin: 12px auto 0; font-weight: 600; }
+
+/* historia jednego ćwiczenia */
+.hist-list { display: flex; flex-direction: column; gap: 10px; }
+.hist-item { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; }
+.hist-head {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 0; border: 0;
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.hist-head .grow { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.hist-head .pill { flex: none; }
+.hist-sets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.hist-sets li { display: flex; align-items: baseline; gap: 10px; font-size: 15px; }
+.hist-sets .no {
+  flex: none; width: 22px; height: 22px; display: inline-grid; place-items: center; border-radius: 50%;
+  background: var(--surface-2); font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.hist-sets li.drop { padding-left: 14px; font-size: 14px; color: var(--muted); }
+.hist-sets li.drop .no { background: none; width: 16px; }
+.tile .v.small-v { font-size: 17px; }

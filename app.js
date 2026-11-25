@@ -2444,7 +2444,8 @@ function exDetail(ei) {
   openSheet(exName(ex), `
     <div data-ei="${ei}" class="ex-detail">
       <div class="row" style="align-items:flex-start">
-        <div class="small muted" style="flex:1">${prev ? `Ostatnio (${dayLabel(prev.date)}): ${setsSummary(ex, prev.sets)}` : 'Pierwszy raz'}</div>
+        <div class="small muted" style="flex:1">${prev ? `Ostatnio (${dayLabel(prev.date)}): ${setsSummary(ex, prev.sets)}
+          <button class="link small" type="button" data-act="hist">Cała historia ›</button>` : 'Pierwszy raz'}</div>
         <button class="icon-btn" type="button" data-act="more" aria-label="Opcje ćwiczenia: zamień, co wpisujesz">${MORE_ICON}</button>
       </div>
       ${setsEditorHTML(e, prev, ei)}
@@ -2454,6 +2455,7 @@ function exDetail(ei) {
     b.addEventListener('click', e2 => {
       const btn = e2.target.closest('[data-act]'); if (!btn) return;
       if (btn.dataset.act === 'more') { exMenu(ei); SHEET_BACK = () => exDetail(ei); return; }
+      if (btn.dataset.act === 'hist') { showExHistory(e.id); SHEET_BACK = () => exDetail(ei); return; }
       if (setsAction(btn, ei)) redraw();
     });
   });
@@ -2578,7 +2580,8 @@ function showWorkout(id) {
       <div class="tile"><span class="k">Serie</span><span class="v">${w.ex.reduce((s, e) => s + e.sets.filter(filled).length, 0)}</span><span class="d">łącznie</span></div>
       <div class="tile"><span class="k">Objętość</span><span class="v">${fmt(volume(w), 0)}</span><span class="d">kg × powt.</span></div>
     </div>
-    <div class="list">${w.ex.map(e => { const ex = EXMAP[e.id]; return `<div class="li">${thumbHTML(ex)}<div class="grow"><div class="t">${esc(exName(ex))}</div><div class="s num">${setsSummary(ex, e.sets)}</div>${prLine(e.id)}</div></div>`; }).join('')}</div>
+    <div class="list">${w.ex.map(e => { const ex = EXMAP[e.id]; return `<button class="li" type="button" data-hex="${esc(e.id)}">${thumbHTML(ex)}<div class="grow"><div class="t">${esc(exName(ex))}</div><div class="s num">${setsSummary(ex, e.sets)}</div>${prLine(e.id)}</div><span class="chev" aria-hidden="true">›</span></button>`; }).join('')}</div>
+    <p class="muted small" style="margin:0">Stuknij ćwiczenie, żeby zobaczyć jego historię.</p>
     ${w.planName ? `<p class="muted small" style="margin:0">Według planu: <b>${esc(w.planName)}</b></p>` : ''}
     <button class="btn primary block" type="button" id="wd-edit">Edytuj trening</button>
     <div class="btns">
@@ -2586,6 +2589,18 @@ function showWorkout(id) {
       <button class="btn danger" type="button" id="wd-del">Usuń trening</button>
     </div>`, b => {
     $('#wd-edit', b).onclick = () => editWorkout(id);
+    b.addEventListener('click', ev => {
+      const x = ev.target.closest('[data-hex]');
+      if (!x) {
+        return;
+      }
+      const back = SHEET_BACK; // np. powrót do historii ćwiczenia, z której przyszliśmy
+      showExHistory(x.dataset.hex);
+      SHEET_BACK = () => {
+        showWorkout(id);
+        SHEET_BACK = back;
+      };
+    });
     $('#wd-plan', b).onclick = () => editPlan(null, { id: 'p_' + uid(), name: w.planName ? w.planName + ' (kopia)' : '', ex: w.ex.map(e => ({ id: e.id, sets: e.sets.length || emptySets(e.id).length })) });
     $('#wd-del', b).onclick = async () => {
       if (await confirmBox('Usunąć trening?', 'Tego nie da się cofnąć.', 'Usuń', true)) { S.workouts = S.workouts.filter(x => x.id !== id); save(); renderTrening(); toast('Usunięto trening'); }
@@ -3014,8 +3029,105 @@ function editPlan(id, draft) {
 }
 function exHistory(id) {
   const out = [];
-  S.workouts.forEach(w => w.ex.forEach(e => { if (e.id === id) out.push({ date: w.date, sets: e.sets }); }));
+  S.workouts.forEach(w => w.ex.forEach(e => { if (e.id === id) out.push({ date: w.date, sets: e.sets, w }); }));
   return out.reverse();
+}
+
+/* ---- historia jednego ćwiczenia: każdy trening, w którym było, z każdą serią ---- */
+
+// jeden trening w historii ćwiczenia: data, plan, serie po kolei (dropsety wcięte), objętość i rekordy
+function exHistItemHTML(ex, h, prKinds) {
+  const sets = h.sets.filter(filled);
+  const d = parseD(h.date);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  const when = dayLabel(h.date, sameYear
+    ? { weekday: 'short', day: 'numeric', month: 'long' }
+    : { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const rows = sets.length
+    ? sets.map((s, i) => {
+      const drop = i > 0 && s.drop;
+      return `
+        <li class="${drop ? 'drop' : ''}">
+          <span class="no">${drop ? '↘' : setNumber(sets, i)}</span>
+          <span class="num">${setText(ex, s)}</span>
+        </li>`;
+    }).join('')
+    : '<li class="muted"><span class="no">–</span><span>bez wpisanych serii</span></li>';
+
+  const vol = isCardio(ex)
+    ? 0
+    : sets.reduce((sum, s) => sum + (s.a || 0) * (s.b || 0), 0);
+  const work = sets.filter(s => !s.drop).length;
+  const foot = [
+    `${work} ${work === 1 ? 'seria' : [2, 3, 4].includes(work % 10) && ![12, 13, 14].includes(work % 100) ? 'serie' : 'serii'}`,
+    vol ? `objętość ${fmt(vol, 0)} kg` : '',
+  ].filter(Boolean).join(' · ');
+
+  return `
+    <div class="card hist-item">
+      <button class="hist-head" type="button" data-wid="${esc(h.w.id)}">
+        <span class="grow">
+          <b>${when}</b>
+          <span class="small muted">${h.w.planName ? esc(h.w.planName) : 'Trening'}</span>
+        </span>
+        ${prKinds.length ? `<span class="pill good" title="${prKinds.join(', ')}">🏆 rekord</span>` : ''}
+        <span class="chev" aria-hidden="true">›</span>
+      </button>
+      <ol class="hist-sets">${rows}</ol>
+      <div class="small muted">${foot}</div>
+    </div>`;
+}
+
+const EX_HIST_PAGE = 20;
+
+function showExHistory(id, limit = EX_HIST_PAGE) {
+  const ex = EXMAP[id];
+  if (!ex) {
+    return;
+  }
+  const hist = exHistory(id);
+  const byW = prTimeline().byW;
+  const prKindsOf = h => (byW[h.w.id] || [])
+    .filter(p => p.id === id)
+    .map(p => PR_KINDS[p.k].s);
+
+  const allSets = hist.reduce((sum, h) => sum + countSets(h.sets), 0);
+  const tiles = hist.length
+    ? `<div class="tiles">
+        <div class="tile"><span class="k">Treningi</span><span class="v">${hist.length}</span><span class="d">z tym ćwiczeniem</span></div>
+        <div class="tile"><span class="k">Serie</span><span class="v">${allSets}</span><span class="d">łącznie</span></div>
+        <div class="tile"><span class="k">Ostatnio</span><span class="v small-v">${dayLabel(hist[0].date)}</span><span class="d">${hist.length > 1 ? 'od ' + dayLabel(hist[hist.length - 1].date) : 'pierwszy raz'}</span></div>
+      </div>`
+    : '';
+
+  const shown = hist.slice(0, limit);
+  const more = hist.length - shown.length;
+
+  openSheet(`Historia: ${exName(ex)}`, hist.length ? `
+    ${tiles}
+    <p class="muted small" style="margin:0">Stuknij datę, żeby zobaczyć cały trening.</p>
+    <div class="hist-list">${shown.map(h => exHistItemHTML(ex, h, prKindsOf(h))).join('')}</div>
+    ${more ? `<button class="btn block" type="button" id="eh-more">Pokaż starsze (${more})</button>` : ''}
+    <button class="btn primary block" type="button" data-close>Zamknij</button>` : `
+    <div class="card empty"><span>Tego ćwiczenia nie ma jeszcze w żadnym zapisanym treningu.</span></div>
+    <button class="btn primary block" type="button" data-close>Zamknij</button>`, b => {
+    b.addEventListener('click', e => {
+      const head = e.target.closest('[data-wid]');
+      if (head) {
+        showWorkout(head.dataset.wid);
+        SHEET_BACK = () => showExHistory(id, limit);
+      }
+    });
+    const mb = $('#eh-more', b);
+    if (mb) {
+      mb.onclick = () => {
+        const st = $('#sheet-body').scrollTop;
+        showExHistory(id, limit + EX_HIST_PAGE);
+        $('#sheet-body').scrollTop = st;
+      };
+    }
+  });
 }
 function showExercise(id) {
   const e = EXMAP[id]; if (!e) return;
@@ -3037,8 +3149,14 @@ function showExercise(id) {
     </div>
     ${recHTML ? `<div class="card"><h3>🏆 Rekordy osobiste</h3>${recHTML}</div>` : ''}
     ${typeof exProgressHTML === 'function' ? exProgressHTML(id) : ''}
-    ${hist.length ? `<div class="card"><h3>Twoja historia</h3>
-      ${hist.slice(0, 5).map(h => `<div class="row small"><span class="muted">${dayLabel(h.date)}</span><span class="num">${setsSummary(e, h.sets)}</span></div>`).join('')}</div>` : ''}
+    ${hist.length ? `<button class="card nav-card" type="button" id="ex-hist">
+        <span class="nav-ic" aria-hidden="true">📜</span>
+        <span class="grow">
+          <b>Historia ćwiczenia</b>
+          <span class="small muted">${hist.length} ${hist.length === 1 ? 'trening' : [2, 3, 4].includes(hist.length % 10) && ![12, 13, 14].includes(hist.length % 100) ? 'treningi' : 'treningów'} · ostatnio ${dayLabel(hist[0].date)}: <span class="num">${setsSummary(e, hist[0].sets)}</span></span>
+        </span>
+        <span class="chev" aria-hidden="true">›</span>
+      </button>` : ''}
     ${e.ins && e.ins.length ? `<div class="card"><h3>Jak wykonać${e.insPl ? '' : ' (po angielsku)'}</h3><ol class="steps">${e.ins.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div>` : ''}
     ${e.own ? `<button class="btn danger" type="button" id="ex-del">Usuń własne ćwiczenie</button>` : ''}`, b => {
     $('#ex-fav', b).onclick = ev => {
@@ -3048,6 +3166,17 @@ function showExercise(id) {
     };
     const add = $('#ex-add', b); add && (add.onclick = () => { addExToActive(id); closeSheet(); setTab('trening'); toast('Dodano do treningu'); });
     const pg = $('.exprog', b); if (pg && typeof wireExProgress === 'function') wireExProgress(pg);
+    const hb = $('#ex-hist', b);
+    if (hb) {
+      hb.onclick = () => {
+        const back = SHEET_BACK; // np. powrót do Rekordów — zachowaj go za oknem ćwiczenia
+        showExHistory(id);
+        SHEET_BACK = () => {
+          showExercise(id);
+          SHEET_BACK = back;
+        };
+      };
+    }
     const del = $('#ex-del', b); del && (del.onclick = () => { S.custom = S.custom.filter(c => c.id !== id); save(); rebuildExMap(); closeSheet(); renderCw(); });
   });
 }
@@ -3545,13 +3674,23 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.23.0';
+const APP_VERSION = '1.24.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 24,
+    v: '1.24.0',
+    t: 'Historia ćwiczenia 📜',
+    items: [
+      'Każde ćwiczenie ma pełną historię: każdy trening, w którym było, z datą, planem i wszystkimi seriami (ciężar, powtórzenia, dropsety), objętością i oznaczeniem rekordu.',
+      'Otworzysz ją w oknie ćwiczenia („Historia ćwiczenia”), stukając ćwiczenie w zapisanym treningu albo przyciskiem „Cała historia” podczas treningu.',
+      'Stuknij datę w historii, żeby zobaczyć cały tamten trening.',
+    ],
+  },
   {
     id: 23,
     v: '1.23.0',
