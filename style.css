@@ -238,6 +238,9 @@ ol.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column;
 .splash-name { font: 700 34px/1 var(--num); letter-spacing: -.01em; margin-top: 18px; }
 .splash-quote { margin: 18px 0 0; max-width: 300px; padding: 0 24px; text-align: center; font-size: 17px; line-height: 1.45; font-style: italic; opacity: .82; text-wrap: balance; }
 .splash-author { display: block; margin-top: 6px; font-size: 14px; font-style: normal; opacity: .75; }
+.card.motto { margin: 18px 0 0; padding: 18px 20px; text-align: center; background: transparent; border: 1px dashed var(--line, rgba(127,127,127,.3)); box-shadow: none; }
+.card.motto blockquote { margin: 0; font-size: 16px; line-height: 1.45; font-style: italic; text-wrap: balance; }
+.card.motto figcaption { margin-top: 6px; font-size: 13px; color: var(--muted); }
 @keyframes lift { from { transform: translateY(6px); } to { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .splash-logo { animation: none; } #splash { transition: none; } }
 

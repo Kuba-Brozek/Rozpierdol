@@ -912,6 +912,15 @@ function statTilesHTML(st) {
     </div>`;
 }
 
+// cytat na dole zakładki Postęp (ten sam co na ekranie startowym)
+function mottoHTML() {
+  return `
+    <figure class="card motto">
+      <blockquote>„Dalej już idę sam,<br>w stronę lepszego ja”</blockquote>
+      <figcaption>~Gibbs</figcaption>
+    </figure>`;
+}
+
 function renderStart() {
   // data jest na górnym pasku (updateTopbar)
   const st = stats();
@@ -972,7 +981,8 @@ function renderStart() {
     ${top}
     ${has('monthSummaryHTML') ? monthSummaryHTML() : ''}
     ${showDuo ? '' : achCard}
-    ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w Ustawieniach (ikona użytkownika w prawym górnym rogu), żeby zobaczyć BMI i postęp do celu.</p>'}`;
+    ${S.profile.height ? '' : '<p class="muted small">Podaj wzrost i cel w Ustawieniach (ikona użytkownika w prawym górnym rogu), żeby zobaczyć BMI i postęp do celu.</p>'}
+    ${mottoHTML()}`;
 
   const lv = $('#level-card', body);
   if (lv) {
@@ -3334,7 +3344,7 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.20.2';
+const APP_VERSION = '1.20.3';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
