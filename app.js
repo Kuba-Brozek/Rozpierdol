@@ -834,7 +834,7 @@ function fitFactSquare(card) {
 }
 
 // Przełączniki kafelków na ekranie Forma (S.prefs, zapisywane w chmurze); domyślnie włączone
-const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu', '🔥'], ['fact', 'Losowy pozytywny fakt', 'kafelek w zakładce Postęp', '✨']];
+const PREFS = [['kcal', 'Dzienne kalorie', 'zapotrzebowanie z profilu', '🔥'], ['fact', 'Losowy pozytywny fakt', 'kafelek w zakładce Postęp', '✨'], ['week', 'Podsumowanie tygodnia', 'okno w niedzielę wieczorem', '📅']];
 const pref = k => !(S.prefs && S.prefs[k] === false);
 // Kafelek „Kalorie”: zapotrzebowanie z profilu albo zachęta do uzupełnienia profilu
 function kcalCardHTML(st) {
@@ -3545,13 +3545,23 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.22.0';
+const APP_VERSION = '1.23.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 23,
+    v: '1.23.0',
+    t: 'Podsumowanie tygodnia 📅',
+    items: [
+      'W niedzielę od 18:00 (albo przy pierwszym otwarciu w nowym tygodniu) apka pokaże podsumowanie tygodnia: treningi, serie, objętość, czas, średnią wagę i pobite rekordy, w porównaniu z tygodniem wcześniej.',
+      'Każdy tydzień obejrzysz też ręcznie: przycisk „Podsumowanie tygodnia” pod podsumowaniem miesiąca w zakładce Postęp.',
+      'Okno wyłączysz w Ustawieniach, w sekcji Ekran Postęp.',
+    ],
+  },
   {
     id: 22,
     v: '1.22.0',

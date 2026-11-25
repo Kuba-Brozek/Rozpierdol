@@ -272,12 +272,230 @@ function wireMonthSummary(el, off = UI.mOff || 0) {
       ${tile('Objętość', volTxt)}
       ${tile('Rekordy', c.prs ? '🏆 ' + c.prs : '0')}
       ${tile('Waga', weightTxt, c.wch == null ? 'za mało pomiarów' : 'kg w miesiącu', true)}
-    </div>`;
+    </div>
+    <button class="link ms-week" type="button" id="ms-week">📅 Podsumowanie tygodnia ›</button>`;
+
+  $('#ms-week', el).onclick = () => showWeekSummary(weekMonday(today()));
 
   $$('[data-mo]', el).forEach(b => {
     b.onclick = () => wireMonthSummary(el, off + +b.dataset.mo);
   });
 }
+
+
+/* ---------- podsumowanie tygodnia (pon–nd) ----------
+   Samo wyskakuje w niedzielę od 18:00 albo przy pierwszym otwarciu w następnym tygodniu
+   (jeśli w tamtym tygodniu było cokolwiek wpisane). Raz na tydzień: S.weekSeen = poniedziałek
+   ostatnio pokazanego tygodnia (synchronizuje się z kontem). Ręcznie: przycisk pod podsumowaniem miesiąca. */
+
+// poniedziałek tygodnia, w którym jest dzień d (RRRR-MM-DD)
+function weekMonday(d) {
+  const dow = (parseD(d).getDay() + 6) % 7; // 0 = poniedziałek
+  return addDays(d, -dow);
+}
+
+function weekData(mon) {
+  const sun = addDays(mon, 6);
+  const inWeek = d => d >= mon && d <= sun;
+  const byW = prTimeline().byW;
+
+  const ws = S.workouts.filter(w => inWeek(w.date || ''));
+  const wts = S.weights.filter(x => inWeek(x.d));
+
+  // średnia waga z tygodnia (stabilniejsza niż pierwszy i ostatni pomiar)
+  const avg = list => list.length
+    ? list.reduce((s, x) => s + x.w, 0) / list.length
+    : null;
+
+  // łączny czas: tylko treningi z sensownym czasem (bez wpisanych wstecz)
+  const mins = ws.reduce((sum, w) => {
+    const m = (w.end - w.start) / 60000;
+    return m >= 1 && m <= 300 ? sum + m : sum;
+  }, 0);
+
+  const prs = ws.flatMap(w => byW[w.id] || []);
+
+  return {
+    mon,
+    sun,
+    n: ws.length,
+    days: new Set(ws.map(w => w.date)).size,
+    sets: ws.reduce((sum, w) => sum + w.ex.reduce((t, e) => t + countSets(e.sets), 0), 0),
+    vol: ws.reduce((sum, w) => sum + volume(w), 0),
+    mins: Math.round(mins),
+    prs,
+    avgW: avg(wts),
+    weighs: wts.length,
+  };
+}
+
+function weekRangeLabel(mon, sun) {
+  const a = parseD(mon);
+  const b = parseD(sun);
+  const sameMonth = a.getMonth() === b.getMonth();
+  return sameMonth
+    ? `${a.getDate()}–${b.getDate()} ${MONTHS_SHORT[b.getMonth()]}`
+    : `${a.getDate()} ${MONTHS_SHORT[a.getMonth()]} – ${b.getDate()} ${MONTHS_SHORT[b.getMonth()]}`;
+}
+
+function showWeekSummary(mon) {
+  const c = weekData(mon);
+  const p = weekData(addDays(mon, -7));
+
+  const diff = c.n - p.n;
+  const vsPrev = p.n || c.n
+    ? `${diff > 0 ? '+' : diff < 0 ? '−' : '±'}${Math.abs(diff)} vs poprzedni`
+    : '';
+  const volTxt = c.vol >= 10000
+    ? fmt(c.vol / 1000, 1) + ' t'
+    : fmt(c.vol, 0) + ' kg';
+  const timeTxt = c.mins >= 60
+    ? `${Math.floor(c.mins / 60)} h ${c.mins % 60} min`
+    : `${c.mins} min`;
+
+  const wch = c.avgW != null && p.avgW != null ? c.avgW - p.avgW : null;
+  const weightTile = c.avgW == null
+    ? tileW('Waga', '–', 'brak pomiarów')
+    : tileW(
+      'Średnia waga',
+      `${fmt(c.avgW, 1)} kg`,
+      wch == null
+        ? `${c.weighs} ${c.weighs === 1 ? 'pomiar' : 'pomiary'}`
+        : `<span class="${wcls(wch)}">${fmtSigned(wch, 1)} kg</span> vs poprzedni`,
+    );
+
+  function tileW(k, v, s) {
+    return `
+      <div class="ms-t wide">
+        <span class="k">${k}</span>
+        <span class="v num">${v}</span>
+        ${s ? `<span class="d">${s}</span>` : ''}
+      </div>`;
+  }
+
+  const tile = (k, v, s) => `
+    <div class="ms-t">
+      <span class="k">${k}</span>
+      <span class="v num">${v}</span>
+      ${s ? `<span class="d">${s}</span>` : ''}
+    </div>`;
+
+  // pobite rekordy: po jednym wierszu na ćwiczenie
+  const prIds = [...new Set(c.prs.map(x => x.id))];
+  const prList = prIds.length
+    ? `<div class="list">${prIds.map(id => {
+      const ex = EXMAP[id];
+      // na ćwiczenie: najlepszy wynik każdego rodzaju z tygodnia, najwyżej dwa najważniejsze
+      const last = {};
+      c.prs
+        .filter(x => x.id === id)
+        .forEach(x => {
+          last[x.k] = x;
+        });
+      const kinds = ['w', 'e1rm', 'dist', 'time', 'reps']
+        .filter(k => last[k] && !PR_KINDS[k].quiet)
+        .slice(0, 2)
+        .map(k => `${PR_KINDS[k].s} ${PR_KINDS[k].f(last[k].cur)}`);
+      return `
+        <div class="li">${thumbHTML(ex)}
+          <div class="grow">
+            <div class="t">${esc(exName(ex))}</div>
+            <div class="s num ">🏆 ${kinds.join(' · ')}</div>
+          </div>
+        </div>`;
+    }).join('')}</div>`
+    : '';
+
+  const thisWeek = mon === weekMonday(today());
+  const head = thisWeek && parseD(today()).getDay() !== 0
+    ? (c.n ? 'Ten tydzień do dziś.' : 'Tydzień dopiero się rozkręca 💪')
+    : c.n === 0
+    ? 'Tydzień bez treningu. Nowy tydzień, nowa szansa 💪'
+    : c.n > p.n && p.n
+      ? 'Więcej treningów niż tydzień wcześniej. Tak trzymać!'
+      : c.prs.length
+        ? 'Rekordy padały. Dobra robota!'
+        : 'Kolejny tydzień zaliczony.';
+
+  openSheet(`📅 Tydzień ${weekRangeLabel(c.mon, c.sun)}`, `
+    <p class="muted" style="margin:0">${head}</p>
+    <div class="ms-grid">
+      ${tile('Treningi', c.n, vsPrev)}
+      ${tile('Dni z treningiem', c.days)}
+      ${tile('Serie', c.sets)}
+      ${tile('Objętość', volTxt)}
+      ${tile('Czas', c.mins ? timeTxt : '–')}
+      ${tile('Rekordy', prIds.length ? '🏆 ' + prIds.length : '0', prIds.length ? 'w ćwiczeniach' : '')}
+      ${weightTile}
+    </div>
+    ${prList ? `<h3 style="margin:4px 0 0">Pobite rekordy</h3>${prList}` : ''}
+    <div class="btns">
+      <button class="btn" type="button" id="wk-prev">‹ Poprzedni</button>
+      ${thisWeek ? '' : '<button class="btn" type="button" id="wk-next">Następny ›</button>'}
+    </div>
+    <button class="btn primary block" type="button" data-close>Super</button>`, b => {
+    $('#wk-prev', b).onclick = () => showWeekSummary(addDays(mon, -7));
+    const nx = $('#wk-next', b);
+    if (nx) {
+      nx.onclick = () => showWeekSummary(addDays(mon, 7));
+    }
+  });
+}
+
+// czy pokazać samo z siebie: niedziela od 18:00 → bieżący tydzień; inaczej → poprzedni
+let weekTries = 0;
+function checkWeekSummary() {
+  if (!pref('week')) {
+    return;
+  }
+  const now = new Date();
+  const sundayEvening = now.getDay() === 0 && now.getHours() >= 18;
+  const mon = sundayEvening
+    ? weekMonday(today())
+    : addDays(weekMonday(today()), -7);
+
+  if ((S.weekSeen || '') >= mon) {
+    return;
+  }
+  const c = weekData(mon);
+  if (!c.n && !c.weighs) {
+    return; // pusty tydzień — nie ma czego podsumowywać
+  }
+
+  // nie przykrywaj innych okien (logowanie, zasady, „Co nowego”, ekran po treningu)
+  const busy = document.querySelector('#splash, #auth, #policy, #lock, #wdone')
+    || !$('#sheet').hidden;
+  if (busy) {
+    if (weekTries++ < 40) {
+      setTimeout(checkWeekSummary, 2000);
+    }
+    return;
+  }
+  weekTries = 0;
+  S.weekSeen = mon;
+  save();
+  showWeekSummary(mon);
+}
+
+setTimeout(() => {
+  try {
+    checkWeekSummary();
+  } catch (e) {
+    console.error(e);
+  }
+}, 5000);
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    setTimeout(() => {
+      try {
+        checkWeekSummary();
+      } catch (e) {
+        console.error(e);
+      }
+    }, 1500);
+  }
+});
 
 
 /* ---------- seria dni ważenia ---------- */

@@ -1806,3 +1806,6 @@ a.btn.qr-link {
 
 /* przesuwanie między zakładkami: ekran wyjeżdżający w bok nie robi poziomego przewijania strony */
 #app { overflow-x: clip; }
+
+/* przycisk „Podsumowanie tygodnia” pod podsumowaniem miesiąca */
+.month-sum .ms-week { display: block; margin: 12px auto 0; font-weight: 600; }
