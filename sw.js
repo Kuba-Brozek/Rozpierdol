@@ -1,6 +1,6 @@
 // Wersję poniżej ustawia automatycznie skrypt build.ps1 (skrót zawartości plików apki).
 // Gdy cokolwiek w apce się zmieni, zmienia się wersja, a telefony pobierają nowe pliki RAZ, w tle.
-const CACHE = "rozpierdol-97ef3e158c";
+const CACHE = "rozpierdol-2a88b578ce";
 // Zdjęcia ćwiczeń (folder img/) mają osobny schowek, który przetrwa aktualizacje apki —
 // każde zdjęcie telefon pobiera tylko raz, przy pierwszym obejrzeniu (wszystkie razem to ok. 37 MB, więc nie hurtem).
 const IMG_CACHE = "rozpierdol-img";
@@ -17,6 +17,7 @@ const FILES = [
   "notify.js",
   "lock.js",
   "vendor/qrcode.js",
+  "instrukcja.html",
   "manifest.webmanifest",
   "data/exercises.json",
   "icons/apple-touch-icon.png",
@@ -65,7 +66,10 @@ self.addEventListener("fetch", e => {
   // Do sieci tylko wtedy, gdy czegoś w pamięci nie ma (np. obraz startowy iOS).
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const key = req.mode === "navigate" ? "index.html" : req;
+    // otwarcie apki (adres główny albo index.html) = zawsze ekran apki;
+    // inne strony (np. instrukcja.html) podajemy jako siebie, a nie jako apkę
+    const appPage = /\/(index\.html)?$/.test(url.pathname);
+    const key = req.mode === "navigate" && appPage ? "index.html" : req;
     const hit = await cache.match(key, { ignoreSearch: true });
     if (hit) return hit;
     try {
