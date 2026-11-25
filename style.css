@@ -1777,3 +1777,10 @@ a.btn.qr-link {
   text-decoration: none;
   color: inherit;
 }
+
+/* ---------- Seria: wartość wyliczona z dwóch pozostałych (czas / dystans / prędkość) ---------- */
+.sets input.calc {
+  color: var(--accent);
+  font-style: italic;
+  border-style: dashed;
+}

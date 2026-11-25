@@ -1925,13 +1925,14 @@ function setsEditorHTML(e, prev, ei) {
         ${fs.map(F => { const k = fieldKey(ex, F.id), v = s[k], p = ph && hasVal(ph[k]) ? ph[k] : '';
           return F.text
             ? `<input type="text" inputmode="text" autocomplete="off" maxlength="12" data-si="${si}" data-f="${k}" data-text="1" value="${esc(v ?? '')}" placeholder="${esc(p)}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`
-            : `<input type="number" inputmode="${F.im}" step="${F.step}" data-si="${si}" data-f="${k}" value="${v ?? ''}" placeholder="${p}" aria-label="${F.l} seria ${si + 1}" class="${s.done ? 'set-done' : ''}">`;
+            : `<input type="number" inputmode="${F.im}" step="${F.step}" data-si="${si}" data-f="${k}" value="${v ?? ''}" placeholder="${p}" aria-label="${F.l} seria ${si + 1}${s.calc === k ? ' (wyliczone)' : ''}" class="${[s.done ? 'set-done' : '', s.calc === k ? 'calc' : ''].filter(Boolean).join(' ')}">`;
         }).join('')}
         ${delMode
           ? `<button class="check del" type="button" data-act="rmset" data-si="${si}" aria-label="Usuń serię ${si + 1}">✕</button>`
           : `<button class="check" type="button" data-act="done" data-si="${si}" aria-pressed="${!!s.done}" aria-label="Seria ${si + 1} zrobiona">✓</button>`}`;
       }).join(''); })()}
     </div>
+    ${calcNoteHTML(e)}
     ${delMode
       ? `<div class="row">
           <span class="small muted">Stuknij ✕ przy serii, którą chcesz usunąć</span>
@@ -2041,10 +2042,136 @@ function setMenu(ei, si, inSheet) {
   }
 }
 
+/* ---- Czas / dystans / prędkość: trzecia wartość wylicza się z dwóch wpisanych ----
+   Czas = min i/lub sekundy, dystans = km i/lub metry, prędkość = km/h.
+   Wyliczone pole zapamiętujemy w s.calc (klucz w serii). Wpisanie czegoś ręcznie w to pole wygrywa
+   z wyliczeniem. Gdy trzeciego pola nie ma w serii (np. domyślne min + km), wartość i tak zapisujemy
+   (widać ją w historii i w linijce pod seriami). */
+const CALC_GROUPS = {
+  time: ['min', 'sec'],
+  dist: ['km', 'm'],
+  speed: ['speed'],
+};
+
+function cardioCalc(e, s) {
+  const ex = EXMAP[e.id];
+  const shown = exFields(e.id);
+  const key = f => fieldKey(ex, f);
+  const val = f => {
+    const k = key(f);
+    return k !== s.calc && hasVal(s[k]) ? +s[k] : null;
+  };
+
+  // stare wyliczenie znika — liczymy od nowa z tego, co wpisane ręcznie
+  if (s.calc) {
+    s[s.calc] = null;
+    delete s.calc;
+  }
+
+  const hours = (val('min') != null || val('sec') != null)
+    ? ((val('min') || 0) / 60 + (val('sec') || 0) / 3600)
+    : null;
+  const km = (val('km') != null || val('m') != null)
+    ? ((val('km') || 0) + (val('m') || 0) / 1000)
+    : null;
+  const speed = val('speed');
+
+  // do którego pola grupy wpisać wynik: najpierw to, które jest w serii, inaczej pierwsze z grupy
+  const target = group => CALC_GROUPS[group].find(f => shown.includes(f)) || CALC_GROUPS[group][0];
+  const put = (f, v, digits) => {
+    if (!(v > 0) || !isFinite(v)) {
+      return;
+    }
+    const k = key(f);
+    s[k] = Math.round(v * Math.pow(10, digits)) / Math.pow(10, digits);
+    s.calc = k;
+  };
+
+  if (hours > 0 && km > 0 && speed == null) {
+    put('speed', km / hours, 1);
+  } else if (hours > 0 && speed > 0 && km == null) {
+    const f = target('dist');
+    put(f, f === 'm' ? speed * hours * 1000 : speed * hours, f === 'm' ? 0 : 2);
+  } else if (km > 0 && speed > 0 && hours == null) {
+    const f = target('time');
+    put(f, f === 'sec' ? km / speed * 3600 : km / speed * 60, f === 'sec' ? 0 : 1);
+  }
+}
+
+// tempo biegowe z prędkości: 10 km/h → „6:00 /km”
+function paceText(kmh) {
+  if (!(kmh > 0)) {
+    return '';
+  }
+  const secPerKm = Math.round(3600 / kmh);
+  return `${Math.floor(secPerKm / 60)}:${String(secPerKm % 60).padStart(2, '0')} /km`;
+}
+
+// linijka pod seriami: wyliczone wartości, których nie widać w polach serii
+function calcNoteHTML(e) {
+  const ex = EXMAP[e.id];
+  const shown = exFields(e.id).map(f => fieldKey(ex, f));
+  const parts = [];
+  let no = 0;
+  e.sets.forEach((s, si) => {
+    if (!(si > 0 && s.drop)) {
+      no++;
+    }
+    if (!s.calc || shown.includes(s.calc)) {
+      // wyliczone pole widać w serii — pod spodem pokazujemy tylko tempo
+      const v = hasVal(s.speed) ? +s.speed : null;
+      if (s.calc && v && shown.includes('speed')) {
+        parts.push(`${no}: ${paceText(v)}`);
+      }
+      return;
+    }
+    const F = FIELDS.find(f => fieldKey(ex, f.id) === s.calc);
+    const txt = F ? F.f(s[s.calc]) : '';
+    const pace = s.calc === 'speed' ? ` (${paceText(+s.speed)})` : '';
+    parts.push(`${no}: ${txt}${pace}`);
+  });
+  return parts.length
+    ? `<p class="muted small calc-note" style="margin:0">↳ Wyliczone: ${parts.join(' · ')}</p>`
+    : '';
+}
+
 function setsInput(e) {
   const inp = e.target.closest('input[data-f]'); if (!inp || !S.active) return;
-  const ei = +inp.closest('[data-ei]').dataset.ei;
-  S.active.ex[ei].sets[+inp.dataset.si][inp.dataset.f] = inp.dataset.text ? (inp.value.trim() || null) : num(inp.value);
+  const box = inp.closest('[data-ei]');
+  const ei = +box.dataset.ei;
+  const ex = S.active.ex[ei];
+  const s = ex.sets[+inp.dataset.si];
+  const f = inp.dataset.f;
+  s[f] = inp.dataset.text ? (inp.value.trim() || null) : num(inp.value);
+
+  if (!inp.dataset.text) {
+    if (f === s.calc) {
+      // ręcznie poprawione wyliczone pole — od teraz jest „wpisane”
+      delete s.calc;
+      inp.classList.remove('calc');
+    } else {
+      const before = s.calc;
+      cardioCalc(ex, s);
+      // odśwież pola tej serii (poza tym, w którym piszesz) i linijkę z wyliczeniami
+      [before, s.calc].filter(Boolean).forEach(k => {
+        const el = box.querySelector(`input[data-si="${inp.dataset.si}"][data-f="${k}"]`);
+        if (el && el !== inp) {
+          el.value = hasVal(s[k]) ? s[k] : '';
+          el.classList.toggle('calc', k === s.calc);
+        }
+      });
+      const note = box.querySelector('.calc-note');
+      const html = calcNoteHTML(ex);
+      if (note) {
+        note.outerHTML = html || '<span class="calc-note" hidden></span>';
+      } else if (html) {
+        const grid = box.querySelector('.sets');
+        if (grid) {
+          grid.insertAdjacentHTML('afterend', html);
+        }
+      }
+    }
+  }
   save();
 }
 // zwraca true, gdy trzeba przerysować
@@ -2082,7 +2209,17 @@ function setsAction(b, ei) {
   else if (act === 'done') {
     const s = ex.sets[+b.dataset.si];
     if (!s.done) { // uzupełnij puste pola podpowiedzią z poprzedniego treningu
-      $$(`input[data-si="${b.dataset.si}"]`, b.closest('[data-ei]')).forEach(i => { if (i.value === '' && i.placeholder !== '') s[i.dataset.f] = i.dataset.text ? i.placeholder : num(i.placeholder); });
+      let filledIn = false;
+      $$(`input[data-si="${b.dataset.si}"]`, b.closest('[data-ei]')).forEach(i => {
+        if (i.value === '' && i.placeholder !== '') {
+          s[i.dataset.f] = i.dataset.text ? i.placeholder : num(i.placeholder);
+          filledIn = true;
+        }
+      });
+      // czas / dystans / prędkość z podpowiedzi — dolicz brakującą wartość
+      if (filledIn) {
+        cardioCalc(ex, s);
+      }
     }
     s.done = !s.done;
     if (s.done && navigator.vibrate) navigator.vibrate(10);
@@ -3197,13 +3334,24 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.19.1';
+const APP_VERSION = '1.20.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 20,
+    v: '1.20.0',
+    t: 'Czas, dystans i prędkość liczą się same',
+    items: [
+      'W cardio wpisz dwie z trzech wartości: <b>czas, dystans albo prędkość</b>. Trzecią apka wyliczy sama (np. 30 min i 5 km dają 10 km/h).',
+      'Wyliczona wartość jest niebieska i pochylona. Wpisz w nią coś ręcznie, a zostanie twoja.',
+      'Gdy w serii nie ma pola prędkości, wynik i tempo na km (np. 6:00 /km) widać pod seriami.',
+      'Na grafie partii mięśniowych przywodziciele obejmują teraz całą wewnętrzną stronę uda.',
+    ],
+  },
   {
     id: 19,
     v: '1.19.0',
