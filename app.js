@@ -1176,6 +1176,7 @@ function renderStart() {
       ${muscles}`;
 
   body.innerHTML = `
+    ${xmasCardHTML()}
     ${top}
     ${has('monthSummaryHTML') ? monthSummaryHTML() : ''}
     ${showDuo ? '' : achCard}
@@ -3314,6 +3315,80 @@ function applyTheme(t) {
   if (t.mode === 'auto') r.removeAttribute('data-mode'); else r.setAttribute('data-mode', t.mode);
   const bg = getComputedStyle(document.body).backgroundColor;
   $$('meta[name="theme-color"]').forEach(m => { m.setAttribute('content', bg); m.removeAttribute('media'); });
+  xmasDecor(t.accent === 'xmas');
+}
+
+// motyw „Święta”: spadające płatki śniegu (każdy z losową wielkością, tempem i kołysaniem)
+function xmasDecor(on) {
+  const old = document.getElementById('xmas-snow');
+  if (!on) {
+    if (old) {
+      old.remove();
+    }
+    return;
+  }
+  if (old || !document.body) {
+    return;
+  }
+  const box = document.createElement('div');
+  box.id = 'xmas-snow';
+  box.setAttribute('aria-hidden', 'true');
+  const flakes = ['❄', '❅', '❆', '•'];
+  let html = '';
+  for (let i = 0; i < 22; i++) {
+    const size = 8 + Math.random() * 12;
+    const dur = 9 + Math.random() * 12;
+    const delay = -Math.random() * dur; // od razu rozsiane po ekranie, nie startują wszystkie z góry
+    const sway = Math.round(-30 + Math.random() * 60);
+    html += `<i style="left:${(Math.random() * 100).toFixed(1)}%;font-size:${size.toFixed(0)}px;`
+      + `animation-duration:${dur.toFixed(1)}s;animation-delay:${delay.toFixed(1)}s;--sway:${sway}px;`
+      + `opacity:${(0.45 + Math.random() * 0.45).toFixed(2)}">${flakes[i % flakes.length]}</i>`;
+  }
+  box.innerHTML = html;
+  document.body.appendChild(box);
+}
+
+// karta w zakładce Postęp: odliczanie do Wigilii, potem życzenia (tylko w motywie świątecznym)
+function xmasCardHTML() {
+  if (getTheme().accent !== 'xmas') {
+    return '';
+  }
+  const now = parseD(today());
+  const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const eve = new Date(y, 11, 24);
+  const days = Math.round((eve - now) / 864e5);
+
+  let ic = '🎅';
+  let main = '';
+  let sub = '';
+  if (now.getMonth() === 0) {
+    ic = '🥂';
+    main = 'Szczęśliwego Nowego Roku!';
+    sub = 'Nowy rok, nowe rekordy.';
+  } else if (days > 1) {
+    main = `<span class="xc-num">${days}</span> dni do Wigilii`;
+    sub = days > 7 ? 'Jeszcze zdążysz zrobić formę przed pierogami.' : 'Ostatnia prosta. Karp już się boi.';
+  } else if (days === 1) {
+    main = 'Jutro Wigilia!';
+    sub = 'Ostatni trening przed barszczem?';
+  } else if (days === 0) {
+    ic = '🎄';
+    main = 'Wesołej Wigilii!';
+    sub = 'Dziś liczy się tylko opłatek.';
+  } else if (days >= -2) {
+    ic = '🎁';
+    main = 'Wesołych Świąt!';
+    sub = 'Pierogi to też białko.';
+  } else {
+    ic = '🎆';
+    main = 'Do zobaczenia w nowym roku!';
+    sub = 'Sylwester tuż-tuż.';
+  }
+  return `
+    <div class="card xmas-card">
+      <span class="xc-ic" aria-hidden="true">${ic}</span>
+      <div><b>${main}</b><span>${sub}</span></div>
+    </div>`;
 }
 function setTheme(patch) {
   const t = Object.assign(getTheme(), patch);
@@ -3769,7 +3844,7 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.25.0';
+const APP_VERSION = '1.25.1';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).

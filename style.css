@@ -1897,3 +1897,87 @@ html[data-accent="xmas"] #auth .auth-btn { background: #c1121f; color: #fff; }
 .promo-row input::placeholder { text-transform: none; letter-spacing: 0; }
 .promo-row input.bad { border-color: var(--bad); animation: promo-shake .3s; }
 @keyframes promo-shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+/* ---- motyw „Święta”: ozdoby ---- */
+
+/* migające lampki choinkowe pod górnym paskiem (dwie warstwy żarówek migają na zmianę) */
+html[data-accent="xmas"] .topbar::before,
+html[data-accent="xmas"] .topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -9px; height: 14px; pointer-events: none;
+  background-repeat: repeat-x; background-size: 112px 14px;
+}
+html[data-accent="xmas"] .topbar::before {
+  /* kabel + żarówki czerwone i zielone */
+  background-image:
+    radial-gradient(5px 6px at 14px 9px, #ff3b3b 60%, transparent 70%),
+    radial-gradient(5px 6px at 70px 9px, #2ecc71 60%, transparent 70%),
+    linear-gradient(to bottom, transparent 3px, #2f4a38 3px, #2f4a38 4px, transparent 4px);
+  filter: drop-shadow(0 0 4px rgb(255 80 80 / .7));
+  animation: xmas-blink 1.6s ease-in-out infinite alternate;
+}
+html[data-accent="xmas"] .topbar::after {
+  /* żarówki złote i niebieskie, migają w przeciwnej fazie */
+  background-image:
+    radial-gradient(5px 6px at 42px 9px, #ffd34d 60%, transparent 70%),
+    radial-gradient(5px 6px at 98px 9px, #4da3ff 60%, transparent 70%);
+  filter: drop-shadow(0 0 4px rgb(255 211 77 / .7));
+  animation: xmas-blink 1.6s ease-in-out infinite alternate-reverse;
+}
+@keyframes xmas-blink { from { opacity: 1; } to { opacity: .35; } }
+
+/* spadające płatki śniegu (tworzone w JS: #xmas-snow) */
+#xmas-snow { position: fixed; inset: 0; z-index: 15; pointer-events: none; overflow: hidden; }
+#xmas-snow i {
+  position: absolute; top: -24px; font-style: normal; line-height: 1; color: #fff;
+  text-shadow: 0 0 6px rgb(255 255 255 / .6); opacity: .8;
+  animation: xmas-fall linear infinite;
+}
+html[data-accent="xmas"][data-mode="light"] #xmas-snow i { color: #a9c3de; text-shadow: none; }
+@media (prefers-color-scheme: light) { html[data-accent="xmas"]:not([data-mode="dark"]) #xmas-snow i { color: #a9c3de; text-shadow: none; } }
+@keyframes xmas-fall {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(var(--sway, 20px), 55vh) rotate(180deg); }
+  100% { transform: translate(0, 110vh) rotate(360deg); }
+}
+
+/* czapy śniegu na kartach */
+html[data-accent="xmas"] .card {
+  background-image: radial-gradient(circle at 50% 0, var(--cap) 6px, transparent 6.5px);
+  background-size: 16px 8px; background-repeat: repeat-x; background-position: 4px 0;
+  --cap: #ffffff;
+}
+html[data-accent="xmas"][data-mode="light"] .card { --cap: #e3ebf4; }
+@media (prefers-color-scheme: light) { html[data-accent="xmas"]:not([data-mode="dark"]) .card { --cap: #e3ebf4; } }
+html[data-accent="xmas"] .card.motto, html[data-accent="xmas"] .card.empty { background-image: none; }
+
+/* złote gwiazdki i obwódki */
+html[data-accent="xmas"] .tile { border-color: color-mix(in srgb, #d4a017 35%, var(--line)); }
+html[data-accent="xmas"] .tile .v { color: var(--accent); }
+html[data-accent="xmas"] .tabs button[aria-current="page"]::after { content: "⭐"; position: absolute; top: 2px; font-size: 9px; }
+html[data-accent="xmas"] .tabs button { position: relative; }
+html[data-accent="xmas"] .toast::before { content: "🎄 "; }
+html[data-accent="xmas"] .btn.primary { box-shadow: 0 0 0 2px rgb(212 160 23 / .45), 0 6px 16px rgb(193 18 31 / .3); }
+
+/* karta odliczania do Wigilii (zakładka Postęp) */
+.xmas-card {
+  position: relative; overflow: hidden; color: #fff; border: 0 !important;
+  background: linear-gradient(135deg, #b3121d, #7a0c14) !important;
+  display: flex; flex-direction: row; align-items: center; gap: 14px;
+}
+.xmas-card .xc-ic { font-size: 44px; line-height: 1; flex: none; }
+.xmas-card b { display: block; font: 700 20px/1.2 var(--num); }
+.xmas-card span { opacity: .85; font-size: 14px; }
+.xmas-card .xc-num { font: 800 34px/1 var(--num); color: #ffd34d; }
+.xmas-card::after {
+  content: "❄ ❅ ❆"; position: absolute; right: 10px; top: 6px; font-size: 13px; letter-spacing: 6px; opacity: .55;
+}
+
+/* ekran po treningu w motywie świątecznym */
+html[data-accent="xmas"] #wdone { background: radial-gradient(circle at 50% 30%, #1f7a45, #0b2e1a 70%); }
+html[data-accent="xmas"] #wdone .wdone-ic { font-size: 0; }
+html[data-accent="xmas"] #wdone .wdone-ic::before { content: "🎅"; font-size: 60px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-accent="xmas"] .topbar::before, html[data-accent="xmas"] .topbar::after { animation: none; }
+  #xmas-snow { display: none; }
+}
