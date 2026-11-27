@@ -1828,3 +1828,72 @@ a.btn.qr-link {
 .hist-sets li.drop { padding-left: 14px; font-size: 14px; color: var(--muted); }
 .hist-sets li.drop .no { background: none; width: 16px; }
 .tile .v.small-v { font-size: 17px; }
+
+/* =================== MOTYW „ŚWIĘTA” — odblokowywany kodem promocyjnym =================== */
+html:root[data-accent="xmas"] {
+  --bg: #fbf5ec; --surface: #fffdf8; --surface-2: #f3e9da; --fg: #2b1a12; --muted: #7d6656; --line: #eadcc6;
+  --a-l: #c1121f; --a-d: #ff5a5f; --accent: #c1121f; --accent-fg: #ffffff;
+  --accent-soft: #fbe1df; --good: #1b7a43; --bad: #b0201c; --bad-soft: #fde2df; --star: #d4a017;
+  --snow: rgb(150 170 195 / .45);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  html:root[data-accent="xmas"]:not([data-mode="light"]) {
+    --bg: #0b1912; --surface: #12251b; --surface-2: #1a3325; --fg: #f5efe4; --muted: #a9bfae; --line: #24402f;
+    --accent: #ff5a5f; --accent-fg: #2a0507; --accent-soft: #3a1c1d; --good: #5fd38f; --bad: #ff7a7a; --bad-soft: #3b1d1f; --star: #f2c94c;
+    --snow: rgb(255 255 255 / .55);
+    color-scheme: dark;
+  }
+}
+html:root[data-accent="xmas"][data-mode="dark"] {
+  --bg: #0b1912; --surface: #12251b; --surface-2: #1a3325; --fg: #f5efe4; --muted: #a9bfae; --line: #24402f;
+  --accent: #ff5a5f; --accent-fg: #2a0507; --accent-soft: #3a1c1d; --good: #5fd38f; --bad: #ff7a7a; --bad-soft: #3b1d1f; --star: #f2c94c;
+  --snow: rgb(255 255 255 / .55);
+  color-scheme: dark;
+}
+
+/* padający śnieg: kropki w tle za treścią, nie przeszkadzają w klikaniu */
+html[data-accent="xmas"] body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image:
+    radial-gradient(2px 2px at 20px 30px, var(--snow) 50%, transparent 51%),
+    radial-gradient(3px 3px at 90px 120px, var(--snow) 50%, transparent 51%),
+    radial-gradient(2px 2px at 160px 60px, var(--snow) 50%, transparent 51%),
+    radial-gradient(2.5px 2.5px at 60px 180px, var(--snow) 50%, transparent 51%),
+    radial-gradient(2px 2px at 140px 200px, var(--snow) 50%, transparent 51%);
+  background-size: 200px 220px;
+  animation: xmas-snow 14s linear infinite;
+}
+@keyframes xmas-snow { from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; } to { background-position: 20px 220px, -30px 220px, 10px 220px, -15px 220px, 25px 220px; } }
+@media (prefers-reduced-motion: reduce) { html[data-accent="xmas"] body::before { animation: none; } }
+
+html[data-accent="xmas"] .vhead h1::after { content: " 🎄"; font-size: .6em; vertical-align: .12em; }
+html[data-accent="xmas"] .card, html[data-accent="xmas"] .tile, html[data-accent="xmas"] .list, html[data-accent="xmas"] .ex-card {
+  box-shadow: 0 4px 16px rgb(120 20 20 / .08);
+}
+/* paski postępu jak laska cukrowa */
+html[data-accent="xmas"] .bar > i { background: repeating-linear-gradient(45deg, #c1121f 0 8px, #ffffff 8px 16px); }
+html[data-accent="xmas"] .btn.primary, html[data-accent="xmas"] .auth-btn {
+  background: linear-gradient(135deg, #e0313d, #a50e18); color: #fff; border-color: transparent;
+}
+html[data-accent="xmas"] .tabs { border-top: 2px solid var(--good); }
+html[data-accent="xmas"] .tabs button[aria-current="page"] { color: var(--accent); }
+html[data-accent="xmas"] .hero-nums .lost h3::after { content: " 🎁"; }
+html[data-accent="xmas"] .toast { background: #1b6b3a; color: #fff; }
+html[data-accent="xmas"] #splash,
+html[data-accent="xmas"] #auth { background: linear-gradient(165deg, #1b6b3a 0%, #0f4426 55%, #0a2e1a 100%); }
+html[data-accent="xmas"] #splash rect[fill="#7d8796"], html[data-accent="xmas"] #auth rect[fill="#7d8796"] { fill: #d4a017; }
+html[data-accent="xmas"] #auth .auth-btn { background: #c1121f; color: #fff; }
+.swatch[data-accent="xmas"] { grid-column: 1 / -1; }
+
+/* kod promocyjny w Wyglądzie */
+.promo { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.promo label { font-size: 13px; color: var(--muted); }
+.promo-row { display: flex; gap: 8px; }
+.promo-row input {
+  flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface-2); text-transform: uppercase; letter-spacing: .04em;
+}
+.promo-row input::placeholder { text-transform: none; letter-spacing: 0; }
+.promo-row input.bad { border-color: var(--bad); animation: promo-shake .3s; }
+@keyframes promo-shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }

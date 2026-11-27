@@ -3215,7 +3215,65 @@ const ACCENTS = [
   { id: 'green', label: 'Zieleń', c: '#1d7a52' },
   { id: 'pink', label: 'Różowy szał', c: 'linear-gradient(135deg, #ff1493, #ff9ccf)' },
   { id: 'oliwka', label: 'Oliwka 🌸', c: 'linear-gradient(135deg, #ffc2d4, #d94f80)', only: 'oliwka' },
+  { id: 'xmas', label: 'Święta 🎄', c: 'linear-gradient(135deg, #c1121f 0 50%, #1b6b3a 50%)', only: 'xmas' },
 ];
+
+/* ---- kody promocyjne: odblokowują ukryte motywy ----
+   W publicznym kodzie leży tylko skrót SHA-256 kodu (po ujednoliceniu: wielkie litery, bez polskich znaków
+   i spacji), nie sam kod. Odblokowane rzeczy siedzą w S.unlocks, więc synchronizują się z kontem. */
+const PROMO_CODES = {
+  '314129ba094f0998384f49740abd44f7ed4c9a33b9bcb6a5ba051f7f8d100d16': {
+    unlock: 'xmas',
+    msg: 'Wesołych Świąt! 🎄 Odblokowałeś motyw świąteczny',
+  },
+};
+
+function promoNormalize(code) {
+  return String(code)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // Ś → S
+    .replace(/ł/gi, 'L')
+    .toUpperCase()
+    .replace(/[‐-―]/g, '-') // różne kreski z klawiatury telefonu → zwykły minus
+    .replace(/\s+/g, '');
+}
+
+function isUnlocked(id) {
+  return Array.isArray(S.unlocks) && S.unlocks.includes(id);
+}
+
+// motyw dostępny dla tego użytkownika?
+function accentAllowed(a) {
+  if (!a.only) {
+    return true;
+  }
+  if (a.only === 'oliwka') {
+    return IS_OLIWKA;
+  }
+  return isUnlocked(a.only);
+}
+
+async function redeemPromo(raw) {
+  const code = promoNormalize(raw);
+  if (!code) {
+    return null;
+  }
+  let h = '';
+  try {
+    h = await sha256hex(code);
+  } catch (e) {
+    return null;
+  }
+  const p = PROMO_CODES[h];
+  if (!p) {
+    return null;
+  }
+  if (!isUnlocked(p.unlock)) {
+    S.unlocks = (S.unlocks || []).concat(p.unlock);
+    save();
+  }
+  return p;
+}
 /* Motyw tylko dla jednego konta. W kodzie (publicznym) jest wyłącznie skrót SHA-256 adresu e-mail,
    nie sam adres — apka liczy skrót e-maila zalogowanej osoby i porównuje. */
 const OLIWKA_HASH = '2e9efe58a8ebfbc0468a417eb1ae8319921686b01fa2d18dc069923ab4c5dfc0';
@@ -3243,6 +3301,8 @@ async function checkSpecialTheme(email) {
     }
   } else if (th.accent === 'oliwka') {
     setTheme({ accent: 'ocean' }); // inne konto albo wylogowanie — wracamy do domyślnego
+  } else if (th.accent === 'xmas' && !isUnlocked('xmas')) {
+    setTheme({ accent: 'ocean' }); // dane bez odblokowanego motywu (np. inne konto)
   }
   if (UI.tab === 'wiecej') renderWiecej();
 }
@@ -3300,11 +3360,18 @@ function renderWiecej() {
     <section class="card" data-sec="wyglad">
       <h2>Wygląd</h2>
       <div class="swatches" role="group" aria-label="Kolor apki">
-        ${ACCENTS.filter(a => !a.only || (a.only === 'oliwka' && IS_OLIWKA)).map(a => `<button class="swatch" type="button" data-accent="${a.id}" aria-pressed="${th.accent === a.id}"><i style="background:${a.c}"></i><span>${a.label}</span></button>`).join('')}
+        ${ACCENTS.filter(accentAllowed).map(a => `<button class="swatch" type="button" data-accent="${a.id}" aria-pressed="${th.accent === a.id}"><i style="background:${a.c}"></i><span>${a.label}</span></button>`).join('')}
       </div>
       <div class="seg seg-full" role="group" aria-label="Tryb">
         ${MODES.map(([v, l]) => `<button type="button" data-mode="${v}" aria-pressed="${th.mode === v}">${l}</button>`).join('')}
       </div>
+      <form class="promo" id="promo-form" autocomplete="off">
+        <label for="promo-code">Kod promocyjny</label>
+        <div class="promo-row">
+          <input type="text" id="promo-code" placeholder="Wpisz kod" autocapitalize="characters" spellcheck="false" maxlength="60">
+          <button class="btn" type="submit">Użyj</button>
+        </div>
+      </form>
     </section>
     <section class="card" data-sec="dieta">
       <h2>Ekran Postęp</h2>
@@ -3452,6 +3519,34 @@ function renderWiecej() {
   const pr = $('#p-rate'); if (pr) pr.addEventListener('change', e => { P().rate = num(e.target.value); save(); toast('Zapisano tempo'); });
   info();
   body.querySelectorAll('[data-accent]').forEach(b => b.onclick = () => { setTheme({ accent: b.dataset.accent }); body.querySelectorAll('[data-accent]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+
+  // kod promocyjny: dobry kod odblokowuje motyw i od razu go włącza
+  const pf = $('#promo-form', body);
+  if (pf) {
+    pf.onsubmit = async ev => {
+      ev.preventDefault();
+      const inp = $('#promo-code', pf);
+      if (!inp.value.trim()) {
+        toast('Wpisz kod');
+        return;
+      }
+      const p = await redeemPromo(inp.value);
+      if (!p) {
+        inp.classList.add('bad');
+        setTimeout(() => inp.classList.remove('bad'), 600);
+        toast('Nieprawidłowy kod');
+        return;
+      }
+      inp.value = '';
+      inp.blur();
+      setTheme({ accent: p.unlock });
+      renderWiecej();
+      if (navigator.vibrate) {
+        navigator.vibrate([20, 60, 20]);
+      }
+      toast(p.msg);
+    };
+  }
   body.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { setTheme({ mode: b.dataset.mode }); body.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
   $('#imp-xlsx').addEventListener('change', onXlsxPicked);
   $('#exp-xlsx').onclick = () => {
@@ -3674,13 +3769,21 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.24.0';
+const APP_VERSION = '1.25.0';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
    S.seenLog = numer ostatniego obejrzanego wydania (synchronizuje się z kontem, więc okno nie wyskakuje na każdym telefonie osobno).
    Po aktualizacji okno pokazuje wszystkie wydania, których ktoś jeszcze nie widział. */
 const CHANGELOG = [
+  {
+    id: 25,
+    v: '1.25.0',
+    t: 'Kody promocyjne 🎁',
+    items: [
+      'W Ustawieniach, w sekcji Wygląd, jest nowe pole: <b>Kod promocyjny</b>. Dobry kod odblokowuje coś, czego nie ma w zwykłej apce. Kto ma kod, ten wie 😏',
+    ],
+  },
   {
     id: 24,
     v: '1.24.0',

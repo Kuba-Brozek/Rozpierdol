@@ -577,7 +577,7 @@ async function firstSyncAfterLogin() {
     b.addEventListener('click', e => { const c = e.target.closest('[data-c]'); if (c) { closeSheet(); res(c.dataset.c); } });
   }));
   if (choice === 'remote') { adoptRemote(r); SY.lastRemoteAt = remote.updatedAt; SY.dirty = false; SY.lastSyncAt = Date.now(); sySave(); updateSyncUI(); return; }
-  if (choice === 'merge') { applyData(stateAsData(r), false); S.seenLog = Math.max(S.seenLog || 0, r.seenLog || 0); save(true); rebuildExMap(); }
+  if (choice === 'merge') { applyData(stateAsData(r), false); S.seenLog = Math.max(S.seenLog || 0, r.seenLog || 0); S.unlocks = [...new Set([].concat(S.unlocks || [], r.unlocks || []))]; save(true); rebuildExMap(); }
   SY.lastRemoteAt = remote.updatedAt; SY.dirty = true; sySave();
   await syncNow();
   rerender();
