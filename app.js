@@ -3225,9 +3225,136 @@ const ACCENTS = [
 const PROMO_CODES = {
   '314129ba094f0998384f49740abd44f7ed4c9a33b9bcb6a5ba051f7f8d100d16': {
     unlock: 'xmas',
+    quiz: 'xmas', // najpierw quiz, dopiero zdany odblokowuje motyw
     msg: 'Wesołych Świąt! 🎄 Odblokowałeś motyw świąteczny',
   },
 };
+
+/* ---- quizy odblokowujące: pytania ABC, kolejność pytań i odpowiedzi losowana przy każdym podejściu ----
+   a = poprawna odpowiedź (zawsze pierwsza w danych, na ekranie przemieszana) */
+const QUIZZES = {
+  xmas: {
+    title: '🎄 Świąteczny quiz',
+    intro: 'Kod się zgadza, ale motyw trzeba jeszcze wyskakać. 10 pytań o polskie Święta. Zdajesz przy 7 dobrych odpowiedziach.',
+    pass: 7,
+    qs: [
+      { q: 'Ile potraw tradycyjnie stawia się na wigilijnym stole?', a: ['12', '7', '24'] },
+      { q: 'Kiedy według tradycji zaczyna się wieczerza wigilijna?', a: ['Gdy na niebie pojawi się pierwsza gwiazdka', 'Punktualnie o północy', 'Zaraz po pasterce'] },
+      { q: 'Czym łamiemy się przed wigilijną kolacją?', a: ['Opłatkiem', 'Piernikiem', 'Chlebem'] },
+      { q: 'Dla kogo zostawia się dodatkowe nakrycie przy stole?', a: ['Dla niespodziewanego gościa, np. zbłąkanego wędrowca', 'Dla Świętego Mikołaja', 'Dla najmłodszego dziecka'] },
+      { q: 'Jak nazywa się msza odprawiana o północy w Wigilię?', a: ['Pasterka', 'Roraty', 'Nieszpory'] },
+      { q: 'Co tradycyjnie kładzie się pod wigilijny obrus?', a: ['Sianko', 'Igliwie', 'Opłatek'] },
+      { q: 'Kiedy obchodzimy Mikołajki?', a: ['6 grudnia', '1 grudnia', '24 grudnia'] },
+      { q: 'Jak nazywa się czas oczekiwania na Boże Narodzenie?', a: ['Adwent', 'Karnawał', 'Wielki Post'] },
+      { q: 'Jaka zupa najczęściej króluje na polskiej Wigilii?', a: ['Barszcz czerwony z uszkami', 'Żurek', 'Rosół'] },
+      { q: 'Jaka ryba jest symbolem polskiej Wigilii?', a: ['Karp', 'Łosoś', 'Dorsz'] },
+    ],
+  },
+};
+
+function shuffled(list) {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// quiz w oknie od dołu; po zdaniu onPass()
+function startQuiz(id, onPass) {
+  const Q = QUIZZES[id];
+  const qs = shuffled(Q.qs).map(x => ({
+    q: x.q,
+    opts: shuffled(x.a.map((t, i) => ({ t, ok: i === 0 }))),
+  }));
+  let i = 0;
+  let score = 0;
+
+  const intro = () => {
+    openSheet(Q.title, `
+      <p style="margin:0">${Q.intro}</p>
+      <button class="btn primary block" type="button" id="qz-go">Zaczynamy</button>`, b => {
+      $('#qz-go', b).onclick = ask;
+    });
+  };
+
+  const ask = () => {
+    const x = qs[i];
+    openSheet(Q.title, `
+      <div class="quiz">
+        <div class="qz-top small muted">
+          <span>Pytanie ${i + 1} z ${qs.length}</span>
+          <span>Dobre: ${score}</span>
+        </div>
+        <div class="bar qz-bar"><i style="width:${(i / qs.length) * 100}%"></i></div>
+        <h3 class="qz-q">${x.q}</h3>
+        <div class="qz-opts">
+          ${x.opts.map((o, k) => `
+            <button class="btn block qz-opt" type="button" data-k="${k}">
+              <span class="qz-l">${'ABC'[k]}</span><span>${esc(o.t)}</span>
+            </button>`).join('')}
+        </div>
+      </div>`, b => {
+      let done = false;
+      $$('.qz-opt', b).forEach(btn => {
+        btn.onclick = () => {
+          if (done) {
+            return;
+          }
+          done = true;
+          const o = x.opts[+btn.dataset.k];
+          if (o.ok) {
+            score++;
+          }
+          // pokaż dobrą odpowiedź (i ewentualnie złą, którą wybrano)
+          $$('.qz-opt', b).forEach(el => {
+            const ok = x.opts[+el.dataset.k].ok;
+            el.classList.add(ok ? 'right' : el === btn ? 'wrong' : 'dim');
+            el.disabled = true;
+          });
+          if (navigator.vibrate) {
+            navigator.vibrate(o.ok ? 15 : [30, 40, 30]);
+          }
+          setTimeout(() => {
+            i++;
+            if (i < qs.length) {
+              ask();
+            } else {
+              finish();
+            }
+          }, o.ok ? 700 : 1300);
+        };
+      });
+    });
+  };
+
+  const finish = () => {
+    const passed = score >= Q.pass;
+    openSheet(Q.title, `
+      <div class="qz-end">
+        <span class="qz-big" aria-hidden="true">${passed ? '🎉' : '🥶'}</span>
+        <b>${score} / ${qs.length}</b>
+        <p class="muted">${passed
+          ? 'Zdane! Motyw świąteczny jest twój.'
+          : `Zabrakło ${Q.pass - score}. Potrzeba ${Q.pass} dobrych odpowiedzi.`}</p>
+      </div>
+      ${passed
+        ? '<button class="btn primary block" type="button" data-close>Odpakuj motyw 🎁</button>'
+        : `<button class="btn primary block" type="button" id="qz-again">Jeszcze raz</button>
+           <button class="btn block" type="button" data-close>Później</button>`}`, b => {
+      const again = $('#qz-again', b);
+      if (again) {
+        again.onclick = () => startQuiz(id, onPass);
+      }
+    });
+    if (passed) {
+      onPass();
+    }
+  };
+
+  intro();
+}
 
 function promoNormalize(code) {
   return String(code)
@@ -3265,15 +3392,14 @@ async function redeemPromo(raw) {
   } catch (e) {
     return null;
   }
-  const p = PROMO_CODES[h];
-  if (!p) {
-    return null;
-  }
+  return PROMO_CODES[h] || null;
+}
+
+function unlockPromo(p) {
   if (!isUnlocked(p.unlock)) {
     S.unlocks = (S.unlocks || []).concat(p.unlock);
     save();
   }
-  return p;
 }
 /* Motyw tylko dla jednego konta. W kodzie (publicznym) jest wyłącznie skrót SHA-256 adresu e-mail,
    nie sam adres — apka liczy skrót e-maila zalogowanej osoby i porównuje. */
@@ -3614,12 +3740,29 @@ function renderWiecej() {
       }
       inp.value = '';
       inp.blur();
-      setTheme({ accent: p.unlock });
-      renderWiecej();
-      if (navigator.vibrate) {
-        navigator.vibrate([20, 60, 20]);
+
+      // quiet: po quizie nie pokazujemy komunikatu — ekran końcowy quizu mówi to samo, a komunikat by go zasłonił
+      const apply = quiet => {
+        unlockPromo(p);
+        setTheme({ accent: p.unlock });
+        renderWiecej();
+        if (navigator.vibrate) {
+          navigator.vibrate([20, 60, 20]);
+        }
+        if (!quiet) {
+          toast(p.msg);
+        }
+      };
+
+      if (isUnlocked(p.unlock)) {
+        setTheme({ accent: p.unlock });
+        renderWiecej();
+        toast('Ten motyw już masz, włączyłem go');
+      } else if (p.quiz && QUIZZES[p.quiz]) {
+        startQuiz(p.quiz, () => apply(true)); // dopiero zdany quiz odblokowuje
+      } else {
+        apply();
       }
-      toast(p.msg);
     };
   }
   body.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { setTheme({ mode: b.dataset.mode }); body.querySelectorAll('[data-mode]').forEach(x => x.setAttribute('aria-pressed', x === b)); });
@@ -3844,7 +3987,7 @@ document.addEventListener('focusout', e => {
      - MINOR (1.14.x → 1.15.0): nowe funkcje — z wpisem w „Co nowego” (pole v = ta wersja),
      - MAJOR (1.x → 2.0.0): duże przebudowy.
    Podbijaj przy każdym wydaniu. Skrót z build.ps1 (nazwa schowka) zostaje jako numer kompilacji. */
-const APP_VERSION = '1.25.1';
+const APP_VERSION = '1.25.2';
 
 /* ============ Co nowego ============
    Lista zmian, najnowsze na górze. Przy nowym wydaniu dopisz wpis z kolejnym numerem (id) i wersją (v).
